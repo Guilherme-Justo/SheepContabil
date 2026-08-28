@@ -1,0 +1,134 @@
+name: sheepcontabil
+
+x-app-environment: &app-environment
+  DJANGO_SETTINGS_MODULE: config.settings.development
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-unsafe-compose-development-key}
+  DJANGO_DEBUG: "true"
+  DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web
+  DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost:8000
+  DATABASE_URL: postgresql://sheep:sheep-local-only@postgres:5432/sheepcontabil
+  REDIS_URL: redis://redis:6379/0
+  APP_TIME_ZONE: America/Sao_Paulo
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_ACCESS_KEY_ID: sheep-local
+  S3_SECRET_ACCESS_KEY: sheep-local-secret
+  S3_BUCKET_NAME: sheepcontabil
+  S3_REGION: auto
+  DEMO_ADMIN_USERNAME: ${DEMO_ADMIN_USERNAME:-admin}
+  DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-admin@sheepcontabil.local}
+  DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-}
+  DEMO_OPERATOR_USERNAME: ${DEMO_OPERATOR_USERNAME:-operador.processos}
+  DEMO_OPERATOR_EMAIL: ${DEMO_OPERATOR_EMAIL:-operador.processos@sheepcontabil.local}
+  DEMO_OPERATOR_PASSWORD: ${DEMO_OPERATOR_PASSWORD:-}
+
+x-app-service: &app-service
+  build:
+    context: .
+    target: runtime
+  image: sheepcontabil:local
+  environment: *app-environment
+  restart: unless-stopped
+
+services:
+  migrate:
+    <<: *app-service
+    command: python src/manage.py migrate --noinput
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    <<: *app-service
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        exec gunicorn config.wsgi:application --chdir src
+        --bind 0.0.0.0:8000 --workers 2 --threads 2
+        --access-logfile - --error-logfile -
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app-service
+    command: celery --app config worker --loglevel INFO --concurrency 2
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: sheepcontabil
+      POSTGRES_USER: sheep
+      POSTGRES_PASSWORD: sheep-local-only
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # PostgreSQL 18 stores versioned clusters below this mount point.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sheep -d sheepcontabil"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.2-alpine
+    command: redis-server --save "" --appendonly no
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: sheep-local
+      MINIO_ROOT_PASSWORD: sheep-local-secret
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-07-21T05-28-08Z
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - >-
+        mc alias set local http://minio:9000 sheep-local sheep-local-secret
+        && mc mb --ignore-existing local/sheepcontabil
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  postgres-data:
+  minio-data:
