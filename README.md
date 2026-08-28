@@ -1,0 +1,110 @@
+# SheepContabil
+
+Portal único para quatro automações contábeis do desafio Sheep Technology. O projeto parte de pouco contexto, registra as premissas adotadas e mantém a lógica real atrás de fronteiras externas simuladas.
+
+> Estado: **Dia 1 concluído localmente** — fundação executável, identidade da marca, login por sessão, dois perfis, RBAC por área, quatro módulos, histórico comum, dados sintéticos, testes, contêineres, CI e especificação Railway.
+
+## Processos selecionados
+
+| Código | Módulo | Natureza | Frequência | Área |
+| --- | --- | --- | --- | --- |
+| SC-04 | Triagem da caixa de arquivos | Agente de IA | Diário | Fiscal |
+| SC-05 | Bloqueio e desbloqueio de clientes inadimplentes | RPA | Sob demanda | Tecnologia |
+| SC-06 | Briefing societário com perguntas condicionais | Controle sistematizado | Sob demanda | Societário |
+| SC-20 | Vencimento de certificado digital | Controle sistematizado | Mensal | Processos |
+
+A seleção cobre as três naturezas do catálogo e combina dois processos de complexidade média com um controle de menor complexidade, preservando espaço para completude ponta a ponta.
+
+## Decisões principais
+
+- Monólito modular em Python 3.13 e Django 5.2 LTS.
+- Django Templates, HTMX, Alpine.js e Tailwind CSS; não há SPA separada.
+- Sessão Django com CSRF, Argon2 e RBAC no servidor por perfil e área.
+- PostgreSQL como fonte de verdade; Celery e Redis para trabalho assíncrono.
+- Playwright Chromium no adapter RPA e OpenAI atrás de um adapter de classificação.
+- Contrato de storage privado compatível com S3; o adapter entra com o primeiro fluxo de artefato e não persistirá arquivos no disco do contêiner.
+- Docker Compose local e Railway para web, worker, cron efêmero, banco, Redis e bucket.
+
+Os motivos, consequências e alternativas rejeitadas estão em [`docs/architecture.md`](docs/architecture.md) e nos nove ADRs de [`docs/adr/`](docs/adr/).
+
+## Executar com Docker
+
+Pré-requisito: Docker Desktop com Compose v2.
+
+1. Copie `.env.example` para `.env`.
+2. Preencha `DEMO_ADMIN_PASSWORD`, `DEMO_OPERATOR_PASSWORD` e `S3_SECRET_ACCESS_KEY` com valores locais.
+3. Suba o ambiente:
+
+```powershell
+docker compose up --build --detach
+docker compose exec web python src/manage.py seed_demo
+```
+
+4. Abra `http://localhost:8000`.
+
+PostgreSQL, Redis e MinIO são inicializados pelo Compose. O MinIO Console fica em `http://localhost:9001`. `docker compose down` interrompe os serviços sem remover os volumes.
+
+## Executar sem Docker
+
+Pré-requisitos: Python 3.12 ou 3.13 e Node.js 24.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install uv
+.\.venv\Scripts\uv.exe sync --all-groups
+npm ci
+npm run build
+Copy-Item .env.example .env
+.\.venv\Scripts\python.exe src\manage.py migrate
+.\.venv\Scripts\python.exe src\manage.py seed_demo
+.\.venv\Scripts\python.exe src\manage.py runserver
+```
+
+Com `DATABASE_URL` vazio, o desenvolvimento local usa SQLite em `var/dev.sqlite3`. As senhas precisam estar preenchidas em `.env` antes do seed. O comando é idempotente: pode ser repetido sem duplicar áreas, módulos, acessos ou execuções sintéticas.
+
+## Verificações
+
+```powershell
+npm run build
+.\.venv\Scripts\ruff.exe check src tests
+.\.venv\Scripts\mypy.exe src
+.\.venv\Scripts\pytest.exe --cov
+.\.venv\Scripts\python.exe src\manage.py makemigrations --check --dry-run
+docker compose config --quiet
+```
+
+O pipeline em `.github/workflows/ci.yml` repete lint, tipagem, testes, cobertura, conferência de migrations, build dos assets e build da imagem de produção.
+
+## Estrutura
+
+```text
+src/
+├── config/                  settings, URLs, healthchecks e Celery
+├── core/
+│   ├── identity/            usuário, perfis, áreas e acessos
+│   └── automations/         catálogo e execução comum
+├── templates/               portal renderizado no servidor
+├── static_src/              fontes CSS e JavaScript
+└── static/brand/            assinaturas oficiais e cartão social
+docs/                        arquitetura, premissas, ADRs e operação
+.railway/                    infraestrutura Railway em TypeScript
+tests/                       autenticação, autorização e saúde
+```
+
+## Segurança e dados
+
+- Todos os clientes, documentos, execuções e credenciais de demonstração são sintéticos.
+- Senhas, chave OpenAI e credenciais cloud não são versionadas.
+- O operador acessa apenas módulos de áreas concedidas; o administrador de negócio acessa os quatro.
+- Ocultar um link não é controle de acesso: cada view consulta novamente a política no backend.
+- Falhas são registradas com mensagem operacional; stack trace não é apresentado no portal.
+
+## Documentação
+
+- [`docs/day-1.md`](docs/day-1.md): aceite e evidências do primeiro dia.
+- [`docs/architecture.md`](docs/architecture.md): visão arquitetural completa.
+- [`docs/assumptions.md`](docs/assumptions.md): premissas, dúvidas e riscos.
+- [`docs/deployment.md`](docs/deployment.md): implantação e operação Railway.
+- [`docs/adr/`](docs/adr/): decisões arquiteturais versionadas.
+
+A URL pública e o repositório remoto serão registrados aqui após a autenticação das contas do proprietário. As credenciais do ambiente publicado serão entregues separadamente aos avaliadores.

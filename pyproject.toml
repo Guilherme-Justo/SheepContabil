@@ -1,0 +1,84 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sheepcontabil"
+version = "0.1.0"
+description = "Portal de automacoes contabeis do desafio SheepContabil"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "argon2-cffi>=25.1,<26",
+  "boto3>=1.40,<2",
+  "celery>=5.6.3,<5.7",
+  "dj-database-url>=3.0,<4",
+  "django>=5.2.17,<5.3",
+  "django-environ>=0.12,<1",
+  "django-htmx>=1.26,<2",
+  "gunicorn>=23,<24",
+  "openai>=2.0,<3",
+  "pillow>=11,<13",
+  "playwright>=1.55,<2",
+  "psycopg[binary]>=3.2,<4",
+  "pypdf>=6,<7",
+  "redis>=6,<8",
+  "structlog>=25,<26",
+  "whitenoise>=6.11,<7",
+]
+
+[dependency-groups]
+dev = [
+  "django-stubs>=5.2,<6",
+  "factory-boy>=3.3,<4",
+  "freezegun>=1.5,<2",
+  "mypy>=1.17,<2",
+  "pytest>=8.4,<10",
+  "pytest-cov>=6,<8",
+  "pytest-django>=4.11,<5",
+  "ruff>=0.12,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/core", "src/config"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "--strict-markers --strict-config -ra"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "DJ", "SIM"]
+ignore = ["DJ001"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/**/migrations/*.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main"]
+strict = true
+warn_unreachable = true
+exclude = ["src/.*/migrations/"]
+
+[tool.django-stubs]
+django_settings_module = "config.settings.test"
+
+[[tool.mypy.overrides]]
+module = ["celery", "celery.*", "environ", "environ.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/migrations/*", "*/wsgi.py", "*/asgi.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 75

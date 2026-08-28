@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Execução {{ run.module.code }} · SheepContabil{% endblock %}
+
+{% block content %}
+<nav class="breadcrumbs" aria-label="Navegação estrutural">
+  <a href="{% url 'automations:dashboard' %}">Automações</a><span>/</span>
+  <a href="{% url 'automations:module-detail' run.module.slug %}">{{ run.module.code }}</a><span>/</span><strong>Execução</strong>
+</nav>
+
+<section class="mt-6 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+  <div>
+    <p class="eyebrow">Execução rastreável</p>
+    <h1 class="page-title">{{ run.module.code }} · {{ run.created_at|date:"d/m/Y H:i" }}</h1>
+    <p class="mt-3 font-mono text-xs text-grafite">{{ run.id }}</p>
+  </div>
+  <span class="status-badge status-{{ run.status_tone }} self-start sm:self-auto"><i></i>{{ run.get_status_display }}</span>
+</section>
+
+<section class="mt-8 grid gap-5 md:grid-cols-3">
+  <div class="stat-card"><span>Origem</span><strong>{{ run.get_trigger_display }}</strong></div>
+  <div class="stat-card"><span>Duração</span><strong class="font-mono">{{ run.duration_label }}</strong></div>
+  <div class="stat-card"><span>Responsável</span><strong>{% if run.triggered_by %}{{ run.triggered_by.label }}{% else %}Sistema{% endif %}</strong></div>
+</section>
+
+<section class="mt-6 grid gap-6 lg:grid-cols-2">
+  <article class="content-card">
+    <p class="eyebrow">Resultado</p>
+    <h2 class="mt-3 font-display text-xl font-semibold">Resumo operacional</h2>
+    <p class="mt-4 text-sm leading-7 text-grafite">{{ run.summary|default:"Nenhum resumo produzido até o momento." }}</p>
+  </article>
+  <article class="content-card {% if run.error_message %}border-carmim/30{% endif %}">
+    <p class="eyebrow {% if run.error_message %}text-carmim{% endif %}">Tratamento de falha</p>
+    <h2 class="mt-3 font-display text-xl font-semibold">Mensagem compreensível</h2>
+    <p class="mt-4 text-sm leading-7 text-grafite">{{ run.error_message|default:"Nenhuma falha registrada nesta execução." }}</p>
+  </article>
+</section>
+{% endblock %}
+
