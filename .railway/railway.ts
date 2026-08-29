@@ -11,8 +11,8 @@ import {
 } from "railway/iac";
 
 export default defineRailway(() => {
-  const database = postgres("Postgres", { region: "us-east4-eqdc4a" });
-  const broker = redis("Redis", { region: "us-east4-eqdc4a" });
+  const database = postgres("Postgres", { region: "ams" });
+  const broker = redis("Redis", { region: "ams" });
   const artifacts = bucket("sheepcontabil-artifacts", { region: "iad" });
 
   const commonEnvironment = {

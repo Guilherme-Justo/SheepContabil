@@ -11,7 +11,12 @@
 | Redis | Privado | Broker; não guarda histórico oficial |
 | Bucket | Privado | Originais e resultados via S3 |
 
-Todos os recursos ficam na região de Virgínia. A exceção é o identificador próprio do bucket (`iad`), que corresponde à mesma localidade.
+Web e worker ficam em Virgínia (`us-east4-eqdc4a`) e o bucket, ainda vazio e
+sem adapter conectado no Dia 1, usa a localidade equivalente (`iad`). Os
+templates de PostgreSQL e Redis do ambiente `Trial` foram criados em Amsterdã
+(`ams`). Essa topologia cruzada é aceitável apenas para a fundação demonstrativa:
+antes da implementação dos fluxos reais, a região permanente deve ser decidida
+e os volumes só podem ser movidos com backup e aprovação explícita.
 
 ## Pré-requisitos
 
