@@ -34,7 +34,7 @@ export default defineRailway(() => {
     build: { builder: "DOCKERFILE", dockerfilePath: "Dockerfile" },
     start:
       '/bin/sh -c "exec gunicorn config.wsgi:application --chdir src --bind 0.0.0.0:${PORT:-8000} --workers 2 --threads 2 --timeout 120 --access-logfile - --error-logfile -"',
-    preDeploy: "python src/manage.py migrate --noinput",
+    preDeploy: "sh scripts/predeploy.sh",
     healthcheck: "/health/ready",
     healthcheckTimeout: 300,
     replicas: { "us-east4-eqdc4a": 1 },
@@ -42,6 +42,7 @@ export default defineRailway(() => {
       ...commonEnvironment,
       DEMO_ADMIN_PASSWORD: preserve(),
       DEMO_OPERATOR_PASSWORD: preserve(),
+      SEED_DEMO_ON_DEPLOY: preserve(),
     },
   });
 

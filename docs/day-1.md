@@ -3,9 +3,10 @@
 | Campo | Valor |
 | --- | --- |
 | Data | 2026-08-27 |
+| Publicação concluída | 2026-08-29 |
 | Objetivo | Base reproduzível e demonstrável para implementar SC-04, SC-05, SC-06 e SC-20 |
 | Estado local | Concluído |
-| Estado externo | Publicação depende de autenticação GitHub/Railway do proprietário |
+| Estado externo | Concluído — [GitHub público](https://github.com/Guilherme-Justo/SheepContabil) e [portal Railway](https://web-production-8f055.up.railway.app) |
 
 ## Critérios de aceite
 
@@ -26,8 +27,8 @@
 - [x] Dockerfile multi-stage e Compose com web, worker, PostgreSQL, Redis e MinIO.
 - [x] CI com build, lint, mypy, testes, cobertura, migrations e imagem Docker.
 - [x] Especificação Railway sem segredos.
-- [ ] Repositório GitHub público — requer sessão do proprietário.
-- [ ] Primeiro deploy e URL pública — requer conta/billing Railway do proprietário.
+- [x] Repositório GitHub público na branch `main` com CI verde.
+- [x] Primeiro deploy e URL pública HTTPS com healthcheck de prontidão.
 
 ## Evidências locais
 
@@ -41,6 +42,12 @@
 | `npm run build` | CSS e JavaScript gerados |
 | `docker compose config --quiet` | configuração válida |
 | `GET /conta/entrar/` | HTTP 200 |
+| [CI no GitHub](https://github.com/Guilherme-Justo/SheepContabil/actions/workflows/ci.yml) | quality gate e imagem verdes |
+| `GET https://web-production-8f055.up.railway.app/health/ready` | HTTP 200 e PostgreSQL disponível |
+
+## Estado da hospedagem
+
+O ambiente está ativo no período `Trial` da Railway. Nenhuma compra ou alteração de billing foi feita automaticamente; antes do fim do período, o proprietário deve decidir a migração para um plano que não suspenda o portal durante a avaliação.
 
 ## O que deliberadamente não foi fingido
 

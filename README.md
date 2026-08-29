@@ -2,7 +2,17 @@
 
 Portal único para quatro automações contábeis do desafio Sheep Technology. O projeto parte de pouco contexto, registra as premissas adotadas e mantém a lógica real atrás de fronteiras externas simuladas.
 
-> Estado: **Dia 1 concluído localmente** — fundação executável, identidade da marca, login por sessão, dois perfis, RBAC por área, quatro módulos, histórico comum, dados sintéticos, testes, contêineres, CI e especificação Railway.
+> Estado: **Dia 1 concluído e publicado** — fundação executável, identidade da marca, login por sessão, dois perfis, RBAC por área, quatro módulos, histórico comum, dados sintéticos, testes, contêineres, CI e infraestrutura Railway.
+
+## Ambientes publicados
+
+| Entrega | Endereço |
+| --- | --- |
+| Portal HTTPS | [web-production-8f055.up.railway.app](https://web-production-8f055.up.railway.app) |
+| Repositório público | [Guilherme-Justo/SheepContabil](https://github.com/Guilherme-Justo/SheepContabil) |
+| Integração contínua | [GitHub Actions](https://github.com/Guilherme-Justo/SheepContabil/actions/workflows/ci.yml) |
+
+As credenciais do ambiente publicado são sintéticas e devem ser entregues aos avaliadores fora do repositório. O projeto Railway está no período `Trial`; a mudança para um plano pago depende da decisão de billing do proprietário antes do fim do período de avaliação.
 
 ## Processos selecionados
 
@@ -107,4 +117,4 @@ tests/                       autenticação, autorização e saúde
 - [`docs/deployment.md`](docs/deployment.md): implantação e operação Railway.
 - [`docs/adr/`](docs/adr/): decisões arquiteturais versionadas.
 
-A URL pública e o repositório remoto serão registrados aqui após a autenticação das contas do proprietário. As credenciais do ambiente publicado serão entregues separadamente aos avaliadores.
+O repositório e o portal acima são os endereços canônicos do projeto. Detalhes de operação, smoke test e rollback estão em [`docs/deployment.md`](docs/deployment.md).

@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `web` | Domínio HTTPS público | Portal, autenticação, comandos e consulta |
 | `worker` | Privado | Celery, IA, RPA e geração de artefatos |
-| `cron` | Privado e efêmero | Pulso de 15 minutos; entra após o dispatcher real |
+| `cron` (futuro) | Privado e efêmero | Pulso de 15 minutos; entra após o dispatcher real |
 | PostgreSQL | Privado | Fonte de verdade |
 | Redis | Privado | Broker; não guarda histórico oficial |
 | Bucket | Privado | Originais e resultados via S3 |
@@ -38,8 +38,10 @@ Depois de aplicar:
 2. Mantenha `OPENAI_API_KEY` somente no worker; web e worker compartilham apenas os segredos de infraestrutura necessários.
 3. Confirme que web e worker receberam a fonte `Guilherme-Justo/SheepContabil`, branch `main`, declarada na IaC.
 4. Gere domínio Railway somente no web.
-5. Mantenha o pre-deploy `python src/manage.py migrate --noinput` no web.
-6. Execute `python src/manage.py seed_demo` uma vez em um shell do web.
+5. Mantenha o pre-deploy `sh scripts/predeploy.sh` no web.
+6. Para a carga inicial, defina `SEED_DEMO_ON_DEPLOY=true`, publique uma vez e
+   volte a variável para `false` sem novo deploy. O script executa as migrations
+   em toda publicação e só executa o seed idempotente quando a flag está ativa.
 7. Registre a URL e as credenciais de avaliação fora do repositório.
 
 ## Smoke test
