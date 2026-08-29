@@ -8,6 +8,10 @@ DEBUG = False
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default=True)  # noqa: F405
+# Railway reaches health checks over the service's private HTTP network. These
+# endpoints expose no sensitive data and must answer directly so deploys can be
+# promoted while every user-facing route continues to require HTTPS.
+SECURE_REDIRECT_EXEMPT = [r"^health/(?:live|ready)$"]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True

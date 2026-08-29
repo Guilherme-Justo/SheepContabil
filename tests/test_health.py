@@ -1,4 +1,4 @@
-from django.test import Client
+from django.test import Client, override_settings
 from django.urls import reverse
 
 
@@ -28,3 +28,14 @@ def test_readiness_reports_database_failure(client: Client, monkeypatch) -> None
 
     assert response.status_code == 503
     assert response.json() == {"status": "not-ready", "database": "unavailable"}
+
+
+@override_settings(
+    SECURE_SSL_REDIRECT=True,
+    SECURE_REDIRECT_EXEMPT=[r"^health/(?:live|ready)$"],
+)
+def test_health_checks_do_not_redirect_on_private_http(client: Client, db) -> None:
+    response = client.get(reverse("health-ready"))
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ready", "database": "ok"}
