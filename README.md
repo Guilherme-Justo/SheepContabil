@@ -2,7 +2,7 @@
 
 Portal único para quatro automações contábeis do desafio Sheep Technology. O projeto parte de pouco contexto, registra as premissas adotadas e mantém a lógica real atrás de fronteiras externas simuladas.
 
-> Estado: **Dia 1 concluído e publicado** — fundação executável, identidade da marca, login por sessão, dois perfis, RBAC por área, quatro módulos, histórico comum, dados sintéticos, testes, contêineres, CI e infraestrutura Railway.
+> Estado: **versão 0.2.0 em validação de publicação** — fundação do Dia 1 preservada e SC-20 implementado de ponta a ponta, com cadastro, janela de 60 dias, avisos simulados, idempotência, retentativa, auditoria e agendamento mensal.
 
 ## Ambientes publicados
 
@@ -33,7 +33,7 @@ A seleção cobre as três naturezas do catálogo e combina dois processos de co
 - PostgreSQL como fonte de verdade; Celery e Redis para trabalho assíncrono.
 - Playwright Chromium no adapter RPA e OpenAI atrás de um adapter de classificação.
 - Contrato de storage privado compatível com S3; o adapter entra com o primeiro fluxo de artefato e não persistirá arquivos no disco do contêiner.
-- Docker Compose local e Railway para web, worker, cron efêmero, banco, Redis e bucket.
+- Docker Compose local e Railway para web, worker, scheduler efêmero, banco, Redis e bucket.
 
 Os motivos, consequências e alternativas rejeitadas estão em [`docs/architecture.md`](docs/architecture.md) e nos nove ADRs de [`docs/adr/`](docs/adr/).
 
@@ -92,7 +92,7 @@ src/
 ├── config/                  settings, URLs, healthchecks e Celery
 ├── core/
 │   ├── identity/            usuário, perfis, áreas e acessos
-│   └── automations/         catálogo e execução comum
+│   └── automations/         catálogo, execução comum e caso de uso SC-20
 ├── templates/               portal renderizado no servidor
 ├── static_src/              fontes CSS e JavaScript
 └── static/brand/            assinaturas oficiais e cartão social
@@ -112,6 +112,7 @@ tests/                       autenticação, autorização e saúde
 ## Documentação
 
 - [`docs/day-1.md`](docs/day-1.md): aceite e evidências do primeiro dia.
+- [`docs/day-2.md`](docs/day-2.md): contrato, implementação e aceite do SC-20.
 - [`docs/architecture.md`](docs/architecture.md): visão arquitetural completa.
 - [`docs/assumptions.md`](docs/assumptions.md): premissas, dúvidas e riscos.
 - [`docs/deployment.md`](docs/deployment.md): implantação e operação Railway.

@@ -1,6 +1,7 @@
 import {
   bucket,
   defineRailway,
+  fn,
   github,
   postgres,
   preserve,
@@ -58,7 +59,26 @@ export default defineRailway(() => {
     },
   });
 
+  const scheduler = fn("scheduler", {
+    source: github("Guilherme-Justo/SheepContabil", { branch: "main" }),
+    build: { builder: "DOCKERFILE", dockerfilePath: "Dockerfile" },
+    start: "python src/manage.py dispatch_due_schedules",
+    deploy: {
+      cronSchedule: "*/15 * * * *",
+      restartPolicyType: "NEVER",
+    },
+    replicas: { "us-east4-eqdc4a": 1 },
+    env: {
+      DJANGO_SETTINGS_MODULE: "config.settings.production",
+      DJANGO_SECRET_KEY: web.env.DJANGO_SECRET_KEY,
+      DJANGO_ALLOWED_HOSTS: "healthcheck.railway.app",
+      APP_TIME_ZONE: "America/Sao_Paulo",
+      DATABASE_URL: database.env.DATABASE_URL,
+      REDIS_URL: broker.env.REDIS_URL,
+    },
+  });
+
   return project("SheepContabil", {
-    resources: [database, broker, artifacts, web, worker],
+    resources: [database, broker, artifacts, web, worker, scheduler],
   });
 });

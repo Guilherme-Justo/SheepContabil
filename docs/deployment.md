@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `web` | Domínio HTTPS público | Portal, autenticação, comandos e consulta |
 | `worker` | Privado | Celery, IA, RPA e geração de artefatos |
-| `cron` (futuro) | Privado e efêmero | Pulso de 15 minutos; entra após o dispatcher real |
+| `scheduler` | Privado e efêmero | Pulso de 15 minutos que publica o SC-20 quando a competência vence |
 | PostgreSQL | Privado | Fonte de verdade |
 | Redis | Privado | Broker; não guarda histórico oficial |
 | Bucket | Privado | Originais e resultados via S3 |
@@ -35,7 +35,7 @@ railway config plan
 railway config apply
 ```
 
-Revise o plano antes de aplicar. `.railway/railway.ts` cria web, worker, PostgreSQL, Redis e bucket; valores `preserve()` nunca revelam nem substituem um segredo já existente.
+Revise o plano antes de aplicar. `.railway/railway.ts` cria web, worker, scheduler, PostgreSQL, Redis e bucket; valores `preserve()` nunca revelam nem substituem um segredo já existente.
 
 Depois de aplicar:
 
@@ -59,6 +59,9 @@ Depois de aplicar:
 - Acesso direto do operador a outro módulo retorna 404.
 - Assets, logo e fontes carregam em HTTPS.
 - Worker conecta ao Redis sem possuir domínio público e inicia com concorrência 1 para limitar o consumo do Chromium no primeiro deploy.
+- O módulo SC-20 lista a massa sintética, executa a janela inclusiva de 60 dias e registra uma falha deliberada disponível para retentativa.
+- Uma segunda execução do SC-20 não repete os avisos já registrados para a mesma validade, canal e política.
+- O scheduler possui a expressão de 15 minutos, não expõe domínio e termina depois de publicar o trabalho no Redis.
 
 ## Deploy e rollback
 
@@ -66,8 +69,10 @@ O deploy de `main` só deve ocorrer depois do CI verde. Migrations precisam ser 
 
 O healthcheck da Railway é de ativação de deploy, não monitoramento contínuo. Um monitor externo de uptime pode ser adicionado antes da entrega final.
 
-## Scheduler futuro
+## Scheduler do SC-20
 
-A Railway executará `python src/manage.py dispatch_due_schedules` a cada 15 minutos em UTC. O comando converte regras para `America/Sao_Paulo`, identifica o que venceu no PostgreSQL, aplica chave idempotente e publica no Redis. Se uma rodada anterior ainda estiver ativa, a plataforma pode omitir a seguinte; por isso o pulso deve terminar rápido e nunca executar a automação inteira.
+A Railway executa `python src/manage.py dispatch_due_schedules` a cada 15 minutos em UTC. O comando converte a regra para `America/Sao_Paulo`, só considera a competência vencida após o primeiro dia do mês às 08:00, cria a chave `sc20:scheduled:AAAA-MM` e publica no Redis. A data-base permanece ancorada no primeiro dia mesmo se o pulso atrasar.
+
+O pulso termina sem executar a automação. Se a publicação no broker falhar antes de o worker iniciar, a execução registra a falha e o pulso seguinte pode republicar o mesmo UUID; qualquer execução já iniciada ou terminal continua protegida contra duplicidade. Para um ensaio operacional controlado fora do horário, use `python src/manage.py dispatch_due_schedules --force` apenas com dados sintéticos.
 
 Referências oficiais: [IaC](https://docs.railway.com/infrastructure-as-code), [Django](https://docs.railway.com/guides/django), [pre-deploy](https://docs.railway.com/deployments/pre-deploy-command), [healthchecks](https://docs.railway.com/deployments/healthchecks), [cron](https://docs.railway.com/cron-jobs) e [buckets](https://docs.railway.com/storage-buckets).
