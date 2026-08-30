@@ -12,6 +12,7 @@ from core.automations.models import (
     AutomationModule,
     AutomationNature,
     AutomationRun,
+    DigitalCertificate,
     RunStatus,
     RunTrigger,
 )
@@ -35,6 +36,7 @@ def test_demo_seed_is_complete_and_idempotent(monkeypatch: pytest.MonkeyPatch) -
         "SC-20",
     }
     assert AutomationRun.objects.count() == 4
+    assert DigitalCertificate.objects.count() == 7
     assert User.objects.count() == 2
 
     actual_modules = {
@@ -123,3 +125,4 @@ def test_run_detail_obeys_the_same_area_policy(
 
     assert denied.status_code == 404
     assert allowed.status_code == 200
+    assert 'hx-trigger="every 2s"' in allowed.content.decode()

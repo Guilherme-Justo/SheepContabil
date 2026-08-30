@@ -8,6 +8,15 @@
   <a href="{% url 'automations:module-detail' run.module.slug %}">{{ run.module.code }}</a><span>/</span><strong>Execução</strong>
 </nav>
 
+<div id="run-detail-content"
+  {% if run.status == "pending" or run.status == "queued" or run.status == "running" %}
+  hx-get="{% url 'automations:run-detail' run.id %}"
+  hx-trigger="every 2s"
+  hx-select="#run-detail-content"
+  hx-target="#run-detail-content"
+  hx-swap="outerHTML"
+  aria-live="polite"
+  {% endif %}>
 <section class="mt-6 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
   <div>
     <p class="eyebrow">Execução rastreável</p>
@@ -35,5 +44,30 @@
     <p class="mt-4 text-sm leading-7 text-grafite">{{ run.error_message|default:"Nenhuma falha registrada nesta execução." }}</p>
   </article>
 </section>
-{% endblock %}
 
+{% if run.module.code == "SC-20" %}
+<section class="mt-8">
+  <div class="section-heading">
+    <p class="eyebrow">Evidências do SC-20</p>
+    <h2>Tentativas desta execução</h2>
+  </div>
+  <div class="table-shell mt-5 overflow-x-auto">
+    <table class="data-table">
+      <thead><tr><th>Cliente</th><th>Destinatário</th><th>Tentativa</th><th>Estado</th><th>Detalhe</th></tr></thead>
+      <tbody>
+        {% for attempt in attempts %}
+        <tr>
+          <td><strong>{{ attempt.certificate.client_name }}</strong></td>
+          <td>{{ attempt.recipient }}</td>
+          <td class="font-mono text-xs">#{{ attempt.sequence }}</td>
+          <td><span class="status-badge status-{{ attempt.status_tone }}"><i></i>{{ attempt.get_status_display }}</span></td>
+          <td>{{ attempt.error_message|default:"Entrega simulada registrada." }}</td>
+        </tr>
+        {% empty %}<tr><td colspan="5" class="py-10 text-center text-grafite">Esta execução não criou nova tentativa; os avisos elegíveis já estavam registrados.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+</div>
+{% endblock %}

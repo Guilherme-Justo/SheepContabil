@@ -11,6 +11,9 @@ from core.automations.models import (
     AutomationModule,
     AutomationNature,
     AutomationRun,
+    CertificateStatus,
+    CommunicationChannel,
+    DigitalCertificate,
     RunStatus,
     RunTrigger,
 )
@@ -127,6 +130,7 @@ class Command(BaseCommand):
             AreaMembership.objects.get_or_create(user=operator, area=areas["processos"])
         if admin:
             self._seed_runs(modules, admin)
+        self._seed_certificates()
 
         self.stdout.write(self.style.SUCCESS("Áreas e quatro módulos sintéticos disponíveis."))
         if not admin or not operator:
@@ -214,3 +218,92 @@ class Command(BaseCommand):
             )
             if created:
                 AutomationRun.objects.filter(pk=run.pk).update(created_at=created_at)
+
+    def _seed_certificates(self) -> None:
+        today = timezone.localdate()
+        examples = (
+            {
+                "serial_number": "DEMO-CERT-001",
+                "client_name": "Horizonte Comércio Sintético",
+                "client_document": "12345678000190",
+                "responsible_name": "Ana Demonstração",
+                "contact_email": "financeiro@horizonte.example.test",
+                "contact_phone": "",
+                "preferred_channel": CommunicationChannel.EMAIL,
+                "valid_until": today + timedelta(days=15),
+                "status": CertificateStatus.ACTIVE,
+            },
+            {
+                "serial_number": "DEMO-CERT-002",
+                "client_name": "Aurora Serviços Fictícios",
+                "client_document": "98765432000110",
+                "responsible_name": "Bruno Operação",
+                "contact_email": "",
+                "contact_phone": "+55 11 99999-2002",
+                "preferred_channel": CommunicationChannel.WHATSAPP,
+                "valid_until": today + timedelta(days=30),
+                "status": CertificateStatus.ACTIVE,
+            },
+            {
+                "serial_number": "DEMO-CERT-003",
+                "client_name": "Cedro Participações Demo",
+                "client_document": "11222333000181",
+                "responsible_name": "Carla Revisão",
+                "contact_email": "falha@avisos.invalid",
+                "contact_phone": "",
+                "preferred_channel": CommunicationChannel.EMAIL,
+                "valid_until": today + timedelta(days=60),
+                "status": CertificateStatus.ACTIVE,
+            },
+            {
+                "serial_number": "DEMO-CERT-004",
+                "client_name": "Vértice Consultoria Teste",
+                "client_document": "44555666000172",
+                "responsible_name": "Diego Planejamento",
+                "contact_email": "contato@vertice.example.test",
+                "contact_phone": "",
+                "preferred_channel": CommunicationChannel.EMAIL,
+                "valid_until": today + timedelta(days=61),
+                "status": CertificateStatus.ACTIVE,
+            },
+            {
+                "serial_number": "DEMO-CERT-005",
+                "client_name": "Ponte Contábil Simulada",
+                "client_document": "77888999000163",
+                "responsible_name": "Elisa Pendência",
+                "contact_email": "contato@ponte.example.test",
+                "contact_phone": "",
+                "preferred_channel": CommunicationChannel.EMAIL,
+                "valid_until": today - timedelta(days=5),
+                "status": CertificateStatus.ACTIVE,
+            },
+            {
+                "serial_number": "DEMO-CERT-006",
+                "client_name": "Nuvem Arquivos Fictícios",
+                "client_document": "10111213000154",
+                "responsible_name": "Fabio Histórico",
+                "contact_email": "contato@nuvem.example.test",
+                "contact_phone": "",
+                "preferred_channel": CommunicationChannel.EMAIL,
+                "valid_until": today + timedelta(days=20),
+                "status": CertificateStatus.REVOKED,
+            },
+            {
+                "serial_number": "DEMO-CERT-007",
+                "client_name": "Raiz Tecnologia Demo",
+                "client_document": "14151617000145",
+                "responsible_name": "Giovana Certificados",
+                "contact_email": "contato@raiz.example.test",
+                "contact_phone": "",
+                "preferred_channel": CommunicationChannel.EMAIL,
+                "valid_until": today + timedelta(days=25),
+                "status": CertificateStatus.REPLACED,
+            },
+        )
+        for definition in examples:
+            payload = dict(definition)
+            serial_number = str(payload.pop("serial_number"))
+            DigitalCertificate.objects.update_or_create(
+                serial_number=serial_number,
+                defaults=payload,
+            )

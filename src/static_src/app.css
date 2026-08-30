@@ -126,6 +126,68 @@
   .form-error { border-left: 3px solid #c4453d; border-radius: .55rem; background: rgba(196,69,61,.08); padding: .75rem .85rem; color: #91312c; font-size: .75rem; line-height: 1.5; }
   .field-error { margin-top: .4rem; font-size: .7rem; color: #c4453d; }
   .notice { border-left: 3px solid #1fa69a; border-radius: .65rem; background: white; padding: .8rem 1rem; font-size: .78rem; }
+  .sc20-action-panel {
+    display: flex; flex-direction: column; justify-content: space-between; border-radius: 1.2rem;
+    background: radial-gradient(circle at 92% 2%,rgba(31,166,154,.36),transparent 36%),linear-gradient(145deg,#0b1a20,#10505f);
+    padding: 1.5rem; box-shadow: 0 18px 42px rgba(11,26,32,.14);
+  }
+  .sc20-execute-button {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem; border: 0;
+    border-radius: .8rem; background: white; padding: .82rem 1rem; color: #10505f;
+    font-size: .78rem; font-weight: 600; transition: background .15s, transform .15s, box-shadow .15s;
+  }
+  .sc20-execute-button:hover { background: #e8ffff; transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,.14); }
+  .sc20-execute-button:focus-visible, .sc20-retry-button:focus-visible, .primary-button:focus-visible {
+    outline: 3px solid rgba(31,166,154,.35); outline-offset: 3px;
+  }
+  .sc20-summary-card {
+    display: flex; min-height: 8rem; align-items: center; gap: 1rem; border: 1px solid rgba(90,112,120,.13);
+    border-top: 3px solid #10505f; border-radius: 1.05rem; background: white; padding: 1.15rem;
+    box-shadow: 0 12px 36px rgba(16,80,95,.04);
+  }
+  .sc20-summary-card p { color: #5a7078; font-size: .68rem; }
+  .sc20-summary-card strong { display: block; margin-top: .2rem; font-family: "Archivo",sans-serif; font-size: 1.65rem; line-height: 1; }
+  .sc20-summary-card small { display: block; margin-top: .35rem; color: #5a7078; font-size: .62rem; }
+  .sc20-summary-icon {
+    display: grid; width: 2.5rem; height: 2.5rem; flex: 0 0 auto; place-items: center; border-radius: .8rem;
+    background: rgba(16,80,95,.09); color: #10505f; font-family: "Archivo",sans-serif; font-weight: 700;
+  }
+  .sc20-summary-warning { border-top-color: #e8a33d; }
+  .sc20-summary-warning .sc20-summary-icon { background: rgba(232,163,61,.15); color: #8a5913; }
+  .sc20-summary-danger { border-top-color: #c4453d; }
+  .sc20-summary-danger .sc20-summary-icon { background: rgba(196,69,61,.11); color: #a43731; }
+  .sc20-guidance {
+    display: flex; align-items: flex-start; gap: .8rem; border: 1px solid rgba(31,166,154,.2); border-radius: .9rem;
+    background: rgba(31,166,154,.07); padding: .9rem 1rem; color: #42636b; font-size: .75rem; line-height: 1.6;
+  }
+  .sc20-guidance strong { color: #10505f; }
+  .sc20-guidance-icon {
+    display: grid; width: 1.35rem; height: 1.35rem; flex: 0 0 auto; place-items: center; border-radius: 999px;
+    background: #10505f; color: white; font-family: "IBM Plex Mono",monospace; font-size: .65rem; font-weight: 600;
+  }
+  .sc20-form-card {
+    border: 1px solid rgba(90,112,120,.13); border-radius: 1.15rem; background: white; padding: 1.35rem;
+    box-shadow: 0 12px 36px rgba(16,80,95,.04);
+  }
+  .sc20-form-card input:not([type="hidden"]), .sc20-form-card select, .sc20-form-card textarea {
+    width: 100%; border: 1px solid rgba(90,112,120,.28); border-radius: .8rem; background: white;
+    padding: .72rem .82rem; color: #0b1a20; outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  .sc20-form-card input:focus, .sc20-form-card select:focus, .sc20-form-card textarea:focus {
+    border-color: #1fa69a; box-shadow: 0 0 0 4px rgba(31,166,154,.12);
+  }
+  .sc20-form-card input[aria-invalid="true"], .sc20-form-card select[aria-invalid="true"] { border-color: #c4453d; }
+  .form-help { margin-top: .4rem; color: #5a7078; font-size: .66rem; line-height: 1.5; }
+  .sc20-days { display: inline-flex; white-space: nowrap; font-size: .7rem; font-weight: 600; color: #42636b; }
+  .sc20-days-warning { color: #8a5913; }
+  .sc20-days-danger { color: #a43731; }
+  .sc20-retry-button {
+    white-space: nowrap; border: 1px solid rgba(196,69,61,.25); border-radius: .7rem; background: rgba(196,69,61,.06);
+    padding: .55rem .72rem; color: #a43731; font-size: .7rem; font-weight: 600; transition: background .15s, border-color .15s;
+  }
+  .sc20-retry-button:hover { border-color: rgba(196,69,61,.45); background: rgba(196,69,61,.12); }
+  .sc20-certificates-table { min-width: 58rem; }
+  .sc20-attempts-table { min-width: 50rem; }
 }
 
 @media (min-width: 640px) {
@@ -142,3 +204,6 @@
   .login-form-panel { padding: 3rem; }
 }
 
+@media (min-width: 1536px) {
+  .sc20-form-card { position: sticky; top: 1.5rem; }
+}
