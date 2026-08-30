@@ -7,7 +7,7 @@
 | Processo | SC-20 — Vencimento de certificado digital |
 | Natureza preservada | Controle sistematizado |
 | Estado local | Concluído |
-| Estado externo | A validar após CI e deploy da versão 0.2.0 |
+| Estado externo | Concluído no ambiente `production` da Railway |
 
 ## Resultado entregue
 
@@ -101,8 +101,8 @@ Não há CPF, CNPJ, telefone, e-mail ou certificado real na carga de demonstraç
 - [x] Seed sintético e idempotente.
 - [x] Scheduler Railway especificado sem domínio público ou segredo no Git.
 - [x] Testes de domínio, interface, comando e regressão.
-- [ ] CI verde para a versão 0.2.0.
-- [ ] Migração, seed e smoke test confirmados no portal público.
+- [x] CI verde para a versão 0.2.0.
+- [x] Migração, seed e smoke test confirmados no portal público.
 
 ## Limites conscientes
 
@@ -124,7 +124,7 @@ npm run build
 docker compose config --quiet
 ```
 
-Após o deploy, este documento deve registrar a execução do CI, a aplicação da migração, a carga sintética e o smoke test manual do fluxo completo na URL pública.
+As evidências da publicação estão registradas abaixo e vinculadas ao commit implantado.
 
 ## Resultado da validação local
 
@@ -136,3 +136,21 @@ O ensaio autenticado em navegador, com servidor, Redis e worker reais, confirmou
 - retentativa: tentativa `#2` enviada com sucesso, preservando a evidência `#1`;
 - reexecução: três certificados encontrados, zero aviso reenviado e três comunicações deduplicadas;
 - layout validado nos breakpoints móvel e desktop, com e-mail e WhatsApp apresentados corretamente.
+
+## Resultado da publicação
+
+Em 30/08/2026, o commit `7203500b88d07be1eb711d4d635058c69046f4c5` foi publicado no ambiente `production` da Railway. A execução [GitHub Actions #33315765671](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33315765671) concluiu com sucesso os jobs de qualidade, testes e imagem de contêiner.
+
+As evidências operacionais foram:
+
+- `web` e `worker` concluíram o deploy da release 0.2.0 com estado `SUCCESS`;
+- o pre-deploy aplicou `automations.0003_digitalcertificate_certificatecommunication_and_more` sem erro;
+- `https://web-production-8f055.up.railway.app/health/ready` respondeu `{"status": "ready", "database": "ok"}` e a rota de login HTTPS respondeu `200`;
+- o seed idempotente confirmou sete certificados sintéticos no PostgreSQL;
+- a tela `/modulos/vencimento-certificado-digital/` renderizou com status `200` para o operador de Processos, contendo a ação de verificação e a carteira sintética;
+- o scheduler privado foi criado pelo IaC sem alteração ou destruição dos recursos anteriores, no commit publicado, com `*/15 * * * *`, comando `python src/manage.py dispatch_due_schedules`, política de restart `NEVER` e sem domínio público. O primeiro pulso cron real, às 14:30 UTC, iniciou o contêiner efêmero, reconheceu a competência já processada e terminou sem duplicação;
+- o pulso mensal controlado criou a execução `fd9ee663-6fae-482c-a32e-f4e110970a0e`; o worker processou três certificados e registrou três sucessos. Uma segunda pulsação retornou o mesmo UUID sem nova publicação;
+- o ciclo manual na data corrente criou a execução `d577f2ce-a754-47ee-af8c-14dc41804c48`, com três selecionados, uma falha transitória e duas comunicações deduplicadas;
+- a recuperação explícita criou a execução `4eaf41c9-caca-47ad-8247-f5bc98a611b2`, enviou a tentativa `#2` e preservou a tentativa `#1` com falha. Os estados finais foram `succeeded_with_warnings` no ciclo original e `succeeded` na retentativa.
+
+O pulso mensal usa o primeiro dia da competência como data-base. Por isso, o ensaio mensal de agosto e o ensaio manual de 30/08 selecionam conjuntos temporais diferentes; essa diferença é deliberada e confirma que um disparo atrasado não desloca a janela mensal.

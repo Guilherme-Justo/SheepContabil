@@ -2,7 +2,7 @@
 
 Portal único para quatro automações contábeis do desafio Sheep Technology. O projeto parte de pouco contexto, registra as premissas adotadas e mantém a lógica real atrás de fronteiras externas simuladas.
 
-> Estado: **versão 0.2.0 em validação de publicação** — fundação do Dia 1 preservada e SC-20 implementado de ponta a ponta, com cadastro, janela de 60 dias, avisos simulados, idempotência, retentativa, auditoria e agendamento mensal.
+> Estado: **versão 0.2.0 publicada** — fundação do Dia 1 preservada e SC-20 validado de ponta a ponta no ambiente Railway, com cadastro, janela de 60 dias, avisos simulados, idempotência, retentativa, auditoria e agendamento mensal.
 
 ## Ambientes publicados
 
