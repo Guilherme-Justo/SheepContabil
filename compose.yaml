@@ -14,12 +14,23 @@ x-app-environment: &app-environment
   S3_SECRET_ACCESS_KEY: sheep-local-secret
   S3_BUCKET_NAME: sheepcontabil
   S3_REGION: auto
+  S3_ADDRESSING_STYLE: path
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-}
+  SC04_AUTO_ROUTE_THRESHOLD: ${SC04_AUTO_ROUTE_THRESHOLD:-0.85}
+  SC04_DAILY_HOUR: ${SC04_DAILY_HOUR:-8}
   DEMO_ADMIN_USERNAME: ${DEMO_ADMIN_USERNAME:-admin}
   DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-admin@sheepcontabil.local}
   DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-}
   DEMO_OPERATOR_USERNAME: ${DEMO_OPERATOR_USERNAME:-operador.processos}
   DEMO_OPERATOR_EMAIL: ${DEMO_OPERATOR_EMAIL:-operador.processos@sheepcontabil.local}
   DEMO_OPERATOR_PASSWORD: ${DEMO_OPERATOR_PASSWORD:-}
+  DEMO_SOCIETARY_OPERATOR_USERNAME: ${DEMO_SOCIETARY_OPERATOR_USERNAME:-operador.societario}
+  DEMO_SOCIETARY_OPERATOR_EMAIL: ${DEMO_SOCIETARY_OPERATOR_EMAIL:-operador.societario@sheepcontabil.local}
+  DEMO_SOCIETARY_OPERATOR_PASSWORD: ${DEMO_SOCIETARY_OPERATOR_PASSWORD:-}
+  DEMO_FISCAL_OPERATOR_USERNAME: ${DEMO_FISCAL_OPERATOR_USERNAME:-operador.fiscal}
+  DEMO_FISCAL_OPERATOR_EMAIL: ${DEMO_FISCAL_OPERATOR_EMAIL:-operador.fiscal@sheepcontabil.local}
+  DEMO_FISCAL_OPERATOR_PASSWORD: ${DEMO_FISCAL_OPERATOR_PASSWORD:-}
 
 x-app-service: &app-service
   build:
@@ -59,7 +70,7 @@ services:
 
   worker:
     <<: *app-service
-    command: celery --app config worker --loglevel INFO --concurrency 2
+    command: celery --app config worker --loglevel INFO --concurrency 1
     depends_on:
       migrate:
         condition: service_completed_successfully

@@ -28,6 +28,9 @@ export default defineRailway(() => {
     S3_SECRET_ACCESS_KEY: ref(artifacts, "SECRET_ACCESS_KEY"),
     S3_BUCKET_NAME: ref(artifacts, "BUCKET"),
     S3_REGION: ref(artifacts, "REGION"),
+    S3_ADDRESSING_STYLE: "path",
+    SC04_AUTO_ROUTE_THRESHOLD: "0.85",
+    SC04_DAILY_HOUR: "8",
   };
 
   const web = service("web", {
@@ -55,7 +58,7 @@ export default defineRailway(() => {
     env: {
       ...commonEnvironment,
       OPENAI_API_KEY: preserve(),
-      OPENAI_MODEL: "gpt-5.4-mini-2026-03-17",
+      OPENAI_MODEL: preserve(),
     },
   });
 

@@ -12,8 +12,57 @@ from core.automations.models import (
     CertificateCommunication,
     CommunicationAttempt,
     DigitalCertificate,
+    DocumentClassificationAttempt,
+    DocumentDecision,
+    DocumentIntake,
+    DocumentReview,
+    DocumentRouting,
+    DocumentRunItem,
+    FiscalClient,
+    FiscalDocument,
     SocietaryBriefing,
     SocietaryBriefingStatus,
+)
+
+
+@admin.register(FiscalClient)
+class FiscalClientAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    list_display = ("code", "name", "document_number", "route_prefix", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("code", "name", "document_number")
+    readonly_fields = ("created_at", "updated_at")
+
+
+class SC04EvidenceAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    """SC-04 operational evidence is inspected here, never rewritten."""
+
+    list_per_page = 50
+
+    def get_readonly_fields(
+        self,
+        request: HttpRequest,
+        obj: object | None = None,
+    ) -> tuple[str, ...]:
+        return tuple(field.name for field in self.model._meta.fields)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: object | None = None) -> bool:
+        return False
+
+
+admin.site.register(
+    (
+        FiscalDocument,
+        DocumentIntake,
+        DocumentRunItem,
+        DocumentClassificationAttempt,
+        DocumentReview,
+        DocumentDecision,
+        DocumentRouting,
+    ),
+    SC04EvidenceAdmin,
 )
 
 

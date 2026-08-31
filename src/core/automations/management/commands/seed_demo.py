@@ -17,6 +17,7 @@ from core.automations.models import (
     CertificateStatus,
     CommunicationChannel,
     DigitalCertificate,
+    FiscalClient,
     RunStatus,
     RunTrigger,
     SocietaryBriefing,
@@ -377,9 +378,24 @@ class Command(BaseCommand):
             ),
             password=os.getenv(
                 "DEMO_SOCIETARY_OPERATOR_PASSWORD",
-                os.getenv("DEMO_OPERATOR_PASSWORD", ""),
-            ),
+            )
+            or os.getenv("DEMO_OPERATOR_PASSWORD", "")
+            or "",
             display_name="Operador Societário",
+            role=UserRole.OPERATOR,
+        )
+        fiscal_operator = self._upsert_user(
+            username=os.getenv("DEMO_FISCAL_OPERATOR_USERNAME", "operador.fiscal"),
+            email=os.getenv(
+                "DEMO_FISCAL_OPERATOR_EMAIL",
+                "operador.fiscal@sheepcontabil.local",
+            ),
+            password=os.getenv(
+                "DEMO_FISCAL_OPERATOR_PASSWORD",
+            )
+            or os.getenv("DEMO_OPERATOR_PASSWORD", "")
+            or "",
+            display_name="Operador Fiscal",
             role=UserRole.OPERATOR,
         )
         if operator:
@@ -389,14 +405,20 @@ class Command(BaseCommand):
                 user=societary_operator,
                 area=areas["societario"],
             )
+        if fiscal_operator:
+            AreaMembership.objects.get_or_create(
+                user=fiscal_operator,
+                area=areas["fiscal"],
+            )
         template_version = self._seed_sc06_template(admin)
         if admin:
             self._seed_runs(modules, admin)
             self._seed_sc06_briefings(modules, admin, template_version)
         self._seed_certificates()
+        self._seed_fiscal_clients()
 
         self.stdout.write(self.style.SUCCESS("Áreas e quatro módulos sintéticos disponíveis."))
-        if not admin or not operator or not societary_operator:
+        if not admin or not operator or not societary_operator or not fiscal_operator:
             self.stdout.write(
                 self.style.WARNING(
                     "Usuários sem senha não foram criados. Defina DEMO_ADMIN_PASSWORD e "
@@ -700,3 +722,39 @@ class Command(BaseCommand):
                 serial_number=serial_number,
                 defaults=payload,
             )
+
+    def _seed_fiscal_clients(self) -> None:
+        examples = (
+            {
+                "code": "aurora-participacoes",
+                "name": "Aurora Participações Demo",
+                "document_number": "12345678000190",
+                "aliases": ["Aurora Participacoes", "Grupo Aurora Demo"],
+                "route_prefix": "aurora-participacoes",
+            },
+            {
+                "code": "horizonte-comercio",
+                "name": "Horizonte Comércio Demo",
+                "document_number": "98765432000110",
+                "aliases": ["Horizonte Comercio", "Horizonte Demo"],
+                "route_prefix": "horizonte-comercio",
+            },
+            {
+                "code": "cedro-servicos",
+                "name": "Cedro Serviços Fictícios",
+                "document_number": "11222333000181",
+                "aliases": ["Cedro Servicos", "Cedro Demo"],
+                "route_prefix": "cedro-servicos",
+            },
+            {
+                "code": "lume-servicos",
+                "name": "Lume Serviços Demo Ltda.",
+                "document_number": "45678901000122",
+                "aliases": ["Lume Servicos", "Lume Demo"],
+                "route_prefix": "lume-servicos",
+            },
+        )
+        for definition in examples:
+            payload = dict(definition)
+            code = str(payload.pop("code"))
+            FiscalClient.objects.update_or_create(code=code, defaults=payload)
