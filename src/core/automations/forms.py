@@ -63,3 +63,37 @@ class DigitalCertificateForm(forms.ModelForm):  # type: ignore[type-arg]
         if channel == CommunicationChannel.WHATSAPP and not phone:
             self.add_error("contact_phone", "Informe o telefone usado no aviso simulado.")
         return cleaned_data
+
+
+class BriefingStartForm(forms.Form):
+    client_name = forms.CharField(
+        label="Cliente sintético",
+        max_length=180,
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "off",
+                "placeholder": "Ex.: Horizonte Participações Demo",
+            }
+        ),
+    )
+    client_document = forms.CharField(
+        label="CPF ou CNPJ sintético",
+        max_length=18,
+        help_text="Informe 11 ou 14 dígitos fictícios.",
+        widget=forms.TextInput(
+            attrs={
+                "autocomplete": "off",
+                "inputmode": "numeric",
+                "placeholder": "00.000.000/0000-00",
+            }
+        ),
+    )
+
+    def clean_client_name(self) -> str:
+        return str(self.cleaned_data["client_name"]).strip()
+
+    def clean_client_document(self) -> str:
+        document = re.sub(r"\D", "", str(self.cleaned_data["client_document"]))
+        if len(document) not in {11, 14}:
+            raise forms.ValidationError("Informe um CPF ou CNPJ sintético com 11 ou 14 dígitos.")
+        return document

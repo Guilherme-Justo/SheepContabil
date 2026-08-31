@@ -69,5 +69,21 @@
   </div>
 </section>
 {% endif %}
+
+{% if briefing %}
+<section class="mt-8" aria-labelledby="sc06-run-evidence-title">
+  <article class="sc06-run-evidence">
+    <div>
+      <p class="eyebrow text-turquesa">Evidência do SC-06</p>
+      <h2 id="sc06-run-evidence-title">Briefing societário vinculado</h2>
+      <p>{{ briefing.client_name }} · <span class="font-mono">{{ briefing.client_document }}</span></p>
+    </div>
+    <div class="flex flex-col items-start gap-3 sm:items-end">
+      <span class="status-badge status-{{ briefing.status_tone|default:'neutral' }}"><i></i>{{ briefing.get_status_display }}</span>
+      <a href="{% url 'automations:sc06-briefing-detail' briefing_id=briefing.id %}" class="sc06-case-primary-link">Ver briefing <span aria-hidden="true">→</span></a>
+    </div>
+  </article>
+</section>
+{% endif %}
 </div>
 {% endblock %}

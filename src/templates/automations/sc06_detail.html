@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}{{ module.code }} · SheepContabil{% endblock %}
+
+{% block content %}
+<nav class="breadcrumbs" aria-label="Navegação estrutural">
+  <a href="{% url 'automations:dashboard' %}">Automações</a><span aria-hidden="true">/</span><strong>{{ module.code }}</strong>
+</nav>
+
+<section class="mt-6 grid gap-7 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-stretch">
+  <div class="self-center">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="module-code">{{ module.code }}</span>
+      <span class="soft-badge">{{ module.get_nature_display }}</span>
+      <span class="soft-badge">Fluxo condicional</span>
+    </div>
+    <h1 class="page-title mt-5">{{ module.name }}</h1>
+    <p class="page-subtitle">{{ module.short_description }}</p>
+  </div>
+
+  <aside class="sc06-start-panel" aria-labelledby="sc06-start-title">
+    <div>
+      <p class="eyebrow text-turquesa">Novo atendimento</p>
+      <h2 id="sc06-start-title" class="mt-3 font-display text-xl font-semibold text-white">Iniciar briefing societário</h2>
+      <p class="mt-2 text-sm leading-6 text-white/65">Crie um caso e responda somente às perguntas aplicáveis ao cenário do cliente.</p>
+    </div>
+
+    <form method="post" class="mt-6 space-y-4" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="start">
+
+      {% if start_form.non_field_errors %}
+        <div class="sc06-dark-form-error" role="alert">{{ start_form.non_field_errors.0 }}</div>
+      {% endif %}
+
+      {% for field in start_form %}
+      <div>
+        <label for="{{ field.id_for_label }}" class="sc06-dark-label">
+          {{ field.label }}{% if field.field.required %}<span aria-hidden="true"> *</span><span class="sr-only"> (obrigatório)</span>{% endif %}
+        </label>
+        <div class="sc06-dark-field">{{ field }}</div>
+        {% if field.help_text %}<p class="sc06-dark-help">{{ field.help_text|safe }}</p>{% endif %}
+        {% if field.errors %}<p class="sc06-dark-field-error" role="alert">{{ field.errors.0 }}</p>{% endif %}
+      </div>
+      {% endfor %}
+
+      <button type="submit" class="sc06-start-button w-full">
+        Começar briefing
+        <span aria-hidden="true">→</span>
+      </button>
+    </form>
+  </aside>
+</section>
+
+<section class="mt-8 grid gap-4 sm:grid-cols-3" aria-label="Resumo dos briefings">
+  <article class="sc06-summary-card">
+    <span class="sc06-summary-icon" aria-hidden="true">≡</span>
+    <div><p>Total de casos</p><strong>{{ summary.total|default:0 }}</strong><small>briefings registrados</small></div>
+  </article>
+  <article class="sc06-summary-card sc06-summary-warning">
+    <span class="sc06-summary-icon" aria-hidden="true">◷</span>
+    <div><p>Em elaboração</p><strong>{{ summary.draft|default:0 }}</strong><small>rascunhos que podem ser retomados</small></div>
+  </article>
+  <article class="sc06-summary-card sc06-summary-success">
+    <span class="sc06-summary-icon" aria-hidden="true">✓</span>
+    <div><p>Concluídos</p><strong>{{ summary.completed|default:0 }}</strong><small>documentos consolidados</small></div>
+  </article>
+</section>
+
+<div class="sc06-guidance mt-6" role="note">
+  <span class="sc06-guidance-icon" aria-hidden="true">i</span>
+  <div>
+    <strong>Ambiente de demonstração.</strong>
+    <p>Use exclusivamente nomes e documentos sintéticos. As perguntas mudam conforme as respostas, mas todas as regras são reavaliadas pelo servidor antes da conclusão.</p>
+  </div>
+</div>
+
+<section class="mt-10" aria-labelledby="sc06-cases-title">
+  <div class="section-heading flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <p class="eyebrow">Rastreabilidade societária</p>
+      <h2 id="sc06-cases-title">Casos em atendimento</h2>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Retome rascunhos, consulte respostas consolidadas e baixe briefings concluídos.</p>
+    </div>
+    {% if active_template %}
+      <span class="soft-badge self-start sm:self-auto">Template {{ active_template.version|default:"ativo" }}</span>
+    {% endif %}
+  </div>
+
+  <div class="sc06-case-list mt-5">
+    {% for briefing in briefings %}
+    <article class="sc06-case-card">
+      <div class="sc06-case-identity">
+        <span class="sc06-case-monogram" aria-hidden="true">{{ briefing.client_name|first|upper }}</span>
+        <div class="min-w-0">
+          <h3>{{ briefing.client_name }}</h3>
+          <p class="font-mono">{{ briefing.client_document }}</p>
+        </div>
+      </div>
+
+      <div class="sc06-case-meta">
+        <span class="status-badge status-{{ briefing.status_tone|default:'neutral' }}"><i></i>{{ briefing.get_status_display }}</span>
+        <p>Atualizado em <time datetime="{{ briefing.updated_at|date:'c' }}">{{ briefing.updated_at|date:"d/m/Y H:i" }}</time></p>
+      </div>
+
+      <div class="sc06-case-actions">
+        <a href="{% url 'automations:sc06-briefing-detail' briefing_id=briefing.id %}" class="sc06-case-primary-link">
+          {% if briefing.status == "draft" %}Retomar{% else %}Visualizar{% endif %}
+          <span aria-hidden="true">→</span>
+        </a>
+        {% if briefing.status == "completed" %}
+          <a href="{% url 'automations:sc06-briefing-pdf' briefing_id=briefing.id %}" class="sc06-case-secondary-link">Baixar PDF</a>
+        {% endif %}
+      </div>
+    </article>
+    {% empty %}
+    <div class="empty-state">
+      <span class="sc06-empty-icon" aria-hidden="true">＋</span>
+      <h3 class="mt-4 font-display text-lg font-semibold">Nenhum briefing iniciado</h3>
+      <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-grafite">Preencha os dados sintéticos no painel acima para criar o primeiro atendimento societário.</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

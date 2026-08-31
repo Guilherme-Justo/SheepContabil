@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
+from core.automations.sc06.rules import validate_template_schema
 from core.identity.models import Area
 
 if TYPE_CHECKING:
@@ -429,4 +431,236 @@ class CommunicationAttempt(models.Model):
             return "success"
         if self.status == CommunicationStatus.FAILED:
             return "danger"
+        return "warning"
+
+
+class BriefingTemplate(models.Model):
+    """Stable identity of a configurable SC-06 briefing template."""
+
+    code = models.SlugField("código", max_length=80, primary_key=True)
+    name = models.CharField("nome", max_length=160)
+    description = models.TextField("descrição", blank=True)
+    is_active = models.BooleanField("ativo", default=True)
+    created_at = models.DateTimeField("criado em", auto_now_add=True)
+    updated_at = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        ordering = ("name", "code")
+        verbose_name = "template de briefing"
+        verbose_name_plural = "templates de briefing"
+
+    def __str__(self) -> str:
+        return f"{self.code} · {self.name}"
+
+
+class BriefingVersionStatus(models.TextChoices):
+    DRAFT = "draft", "Rascunho"
+    PUBLISHED = "published", "Publicada"
+
+
+class BriefingTemplateVersion(models.Model):
+    """Validated and immutable-after-publication schema for one template."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    template = models.ForeignKey(
+        BriefingTemplate,
+        on_delete=models.PROTECT,
+        related_name="versions",
+        verbose_name="template",
+    )
+    version = models.PositiveIntegerField("versão")
+    schema = models.JSONField(
+        "schema",
+        default=dict,
+        validators=(validate_template_schema,),
+    )
+    status = models.CharField(
+        "estado",
+        max_length=16,
+        choices=BriefingVersionStatus.choices,
+        default=BriefingVersionStatus.DRAFT,
+    )
+    published_at = models.DateTimeField("publicada em", null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_briefing_template_versions",
+        verbose_name="criada por",
+    )
+    created_at = models.DateTimeField("criada em", auto_now_add=True)
+    updated_at = models.DateTimeField("atualizada em", auto_now=True)
+
+    class Meta:
+        ordering = ("template", "-version")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("template", "version"),
+                name="uniq_briefing_template_version",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(version__gte=1),
+                name="briefing_version_gte_one",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(status=BriefingVersionStatus.DRAFT, published_at__isnull=True)
+                    | models.Q(status=BriefingVersionStatus.PUBLISHED, published_at__isnull=False)
+                ),
+                name="briefing_publication_timestamp_consistent",
+            ),
+        ]
+        verbose_name = "versão de template de briefing"
+        verbose_name_plural = "versões de templates de briefing"
+
+    def __str__(self) -> str:
+        return f"{self.template.name} · v{self.version}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self.status == BriefingVersionStatus.PUBLISHED and self.published_at is None:
+            self.published_at = timezone.now()
+        self._ensure_published_version_is_immutable()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def clean(self) -> None:
+        super().clean()
+        validate_template_schema(self.schema)
+        if self.status == BriefingVersionStatus.PUBLISHED and self.published_at is None:
+            raise ValidationError({"published_at": "Informe quando esta versão foi publicada."})
+        if self.status == BriefingVersionStatus.DRAFT and self.published_at is not None:
+            raise ValidationError(
+                {"published_at": "Uma versão em rascunho não pode ter data de publicação."}
+            )
+
+    def _ensure_published_version_is_immutable(self) -> None:
+        if self._state.adding:
+            return
+        previous = type(self).objects.filter(pk=self.pk).first()
+        if previous is None or previous.status != BriefingVersionStatus.PUBLISHED:
+            return
+        protected_fields = (
+            "template_id",
+            "version",
+            "schema",
+            "status",
+            "published_at",
+            "created_by_id",
+        )
+        if any(getattr(previous, field) != getattr(self, field) for field in protected_fields):
+            raise ValidationError("Uma versão publicada é imutável; crie uma nova versão.")
+
+
+class SocietaryBriefingStatus(models.TextChoices):
+    DRAFT = "draft", "Rascunho"
+    COMPLETED = "completed", "Concluído"
+    CANCELLED = "cancelled", "Cancelado"
+
+
+class SocietaryBriefing(models.Model):
+    """SC-06 answers bound permanently to the schema version used."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    template_version = models.ForeignKey(
+        BriefingTemplateVersion,
+        on_delete=models.PROTECT,
+        related_name="briefings",
+        verbose_name="versão do template",
+    )
+    run = models.OneToOneField(
+        AutomationRun,
+        on_delete=models.PROTECT,
+        related_name="societary_briefing",
+        verbose_name="execução",
+    )
+    client_name = models.CharField("cliente", max_length=180)
+    client_document = models.CharField("número documental sintético", max_length=40)
+    answers = models.JSONField("respostas", default=dict, blank=True)
+    status = models.CharField(
+        "estado",
+        max_length=16,
+        choices=SocietaryBriefingStatus.choices,
+        default=SocietaryBriefingStatus.DRAFT,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_societary_briefings",
+        verbose_name="criado por",
+    )
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="completed_societary_briefings",
+        verbose_name="concluído por",
+    )
+    completed_at = models.DateTimeField("concluído em", null=True, blank=True)
+    created_at = models.DateTimeField("criado em", auto_now_add=True)
+    updated_at = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status=SocietaryBriefingStatus.COMPLETED,
+                        completed_at__isnull=False,
+                        completed_by__isnull=False,
+                    )
+                    | models.Q(
+                        status__in=(
+                            SocietaryBriefingStatus.DRAFT,
+                            SocietaryBriefingStatus.CANCELLED,
+                        ),
+                        completed_at__isnull=True,
+                        completed_by__isnull=True,
+                    )
+                ),
+                name="briefing_completion_audit_consistent",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("status", "-created_at"), name="briefing_status_created_idx"),
+        ]
+        verbose_name = "briefing societário"
+        verbose_name_plural = "briefings societários"
+
+    def __str__(self) -> str:
+        return f"{self.client_name} · {self.template_version}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            previous = type(self).objects.filter(pk=self.pk).first()
+            if previous is not None and previous.status == SocietaryBriefingStatus.COMPLETED:
+                protected_fields = (
+                    "template_version_id",
+                    "run_id",
+                    "client_name",
+                    "client_document",
+                    "answers",
+                    "status",
+                    "created_by_id",
+                    "completed_by_id",
+                    "completed_at",
+                )
+                if any(
+                    getattr(previous, field) != getattr(self, field) for field in protected_fields
+                ):
+                    raise ValidationError(
+                        "Um briefing concluído é imutável; preserve a evidência histórica."
+                    )
+        super().save(*args, **kwargs)
+
+    @property
+    def status_tone(self) -> str:
+        if self.status == SocietaryBriefingStatus.COMPLETED:
+            return "success"
+        if self.status == SocietaryBriefingStatus.CANCELLED:
+            return "neutral"
         return "warning"

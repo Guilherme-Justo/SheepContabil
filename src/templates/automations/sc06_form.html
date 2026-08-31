@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}{{ briefing.client_name }} · {{ module.code }} · SheepContabil{% endblock %}
+
+{% block content %}
+<nav class="breadcrumbs" aria-label="Navegação estrutural">
+  <a href="{% url 'automations:dashboard' %}">Automações</a><span aria-hidden="true">/</span>
+  <a href="{% url 'automations:module-detail' module.slug %}">{{ module.code }}</a><span aria-hidden="true">/</span>
+  <strong>{% if briefing.status == "draft" %}Preenchimento{% else %}Resumo{% endif %}</strong>
+</nav>
+
+{{ frontend_config|json_script:"sc06-frontend-config" }}
+
+<div
+  class="sc06-briefing-workspace mt-6"
+  x-data="window.sc06BriefingForm(JSON.parse(document.getElementById('sc06-frontend-config').textContent))"
+>
+  <header class="sc06-briefing-header">
+    <div class="min-w-0">
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="module-code">{{ module.code }}</span>
+        <span class="status-badge status-{{ briefing.status_tone|default:'neutral' }}"><i></i>{{ briefing.get_status_display }}</span>
+        <span class="soft-badge">Template {{ briefing.template_version.version|default:"versionado" }}</span>
+      </div>
+      <h1 class="page-title mt-5">{{ briefing.client_name }}</h1>
+      <p class="mt-3 font-mono text-xs text-grafite">{{ briefing.client_document }} · Caso {{ briefing.id }}</p>
+    </div>
+
+    {% if briefing.status == "completed" %}
+    <a href="{% url 'automations:sc06-briefing-pdf' briefing_id=briefing.id %}" class="sc06-pdf-button">
+      <span aria-hidden="true">↓</span>
+      Baixar resumo em PDF
+    </a>
+    {% endif %}
+  </header>
+
+  {% if briefing.status == "draft" %}
+  <section class="sc06-progress-card mt-7" aria-labelledby="sc06-progress-title" aria-live="polite">
+    <div class="flex items-center justify-between gap-4">
+      <div>
+        <p id="sc06-progress-title" class="font-display text-sm font-semibold">Progresso do briefing</p>
+        <p class="mt-1 text-xs text-grafite"><span x-text="answeredCount"></span> de <span x-text="visibleQuestionCount"></span> perguntas visíveis respondidas</p>
+      </div>
+      <strong class="sc06-progress-value" x-text="`${progressPercent}%`"></strong>
+    </div>
+    <div class="sc06-progress-track mt-4" role="progressbar" aria-label="Progresso das respostas" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="progressPercent">
+      <span :style="`width: ${progressPercent}%`"></span>
+    </div>
+    <p class="mt-3 text-xs leading-5 text-grafite">O progresso é recalculado quando uma resposta abre ou oculta novas perguntas.</p>
+  </section>
+  {% else %}
+  <div class="sc06-completed-note mt-7" role="status">
+    <span aria-hidden="true">✓</span>
+    <div><strong>Briefing concluído e preservado</strong><p>Esta versão está disponível somente para consulta. O PDF apresenta o resumo das respostas aplicáveis.</p></div>
+  </div>
+  {% endif %}
+
+  <form method="post" class="mt-7" @input="syncFromDom($root)" @change="syncFromDom($root)" novalidate>
+    {% csrf_token %}
+
+    {% if briefing.status == "completed" %}<fieldset disabled aria-label="Respostas consolidadas">{% endif %}
+
+    {% if form.non_field_errors %}
+      <div class="form-error mb-6" role="alert">
+        <strong>Revise o briefing antes de continuar.</strong>
+        <p class="mt-1">{{ form.non_field_errors.0 }}</p>
+      </div>
+    {% endif %}
+
+    <div class="space-y-6">
+      {% for section in sections %}
+      <section
+        class="sc06-section-card"
+        data-section-id="{{ section.id }}"
+        x-show="isSectionVisible('{{ section.id|escapejs }}')"
+        x-cloak
+      >
+        <header class="sc06-section-header">
+          <span class="sc06-section-number" aria-hidden="true">{{ forloop.counter|stringformat:"02d" }}</span>
+          <div>
+            <h2>{{ section.title }}</h2>
+            {% if section.description %}<p>{{ section.description }}</p>{% endif %}
+          </div>
+        </header>
+
+        <div class="sc06-question-grid">
+          {% for question in section.questions %}
+          <div
+            class="sc06-question"
+            data-question-id="{{ question.id }}"
+            x-show="isQuestionVisible('{{ question.id|escapejs }}', '{{ section.id|escapejs }}')"
+            x-effect="setContainerEnabled($el, isQuestionVisible('{{ question.id|escapejs }}', '{{ section.id|escapejs }}'))"
+            x-cloak
+          >
+            <label for="{{ question.bound_field.id_for_label }}" class="form-label">
+              {{ question.label }}
+              {% if question.required %}<span class="text-carmim" aria-hidden="true"> *</span><span class="sr-only"> (obrigatório)</span>{% endif %}
+            </label>
+            <div class="sc06-field-control">{{ question.bound_field }}</div>
+            {% if question.help_text %}<p id="{{ question.bound_field.id_for_label }}_helptext" class="form-help">{{ question.help_text }}</p>{% endif %}
+            {% if question.bound_field.errors %}<p class="field-error" role="alert">{{ question.bound_field.errors.0 }}</p>{% endif %}
+          </div>
+          {% empty %}
+          <p class="sc06-section-empty">Nenhuma pergunta é aplicável nesta seção para as respostas atuais.</p>
+          {% endfor %}
+        </div>
+      </section>
+      {% empty %}
+      <div class="empty-state">
+        <h2 class="font-display text-lg font-semibold">Template indisponível</h2>
+        <p class="mt-2 text-sm text-grafite">Não há perguntas configuradas para este briefing.</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if briefing.status == "completed" %}</fieldset>{% endif %}
+
+    {% if briefing.status == "draft" %}
+    <footer class="sc06-form-actions mt-7">
+      <div>
+        <p class="text-xs leading-5 text-grafite"><span class="text-carmim" aria-hidden="true">*</span> Campos obrigatórios conforme o cenário atual</p>
+        <p class="mt-1 text-xs leading-5 text-grafite">Última atualização: {{ briefing.updated_at|date:"d/m/Y H:i" }}</p>
+      </div>
+      <div class="flex flex-col-reverse gap-3 sm:flex-row">
+        <button type="submit" name="action" value="save" class="sc06-save-button" formnovalidate>Salvar rascunho</button>
+        <button type="submit" name="action" value="complete" class="primary-button">Concluir briefing</button>
+      </div>
+    </footer>
+    {% else %}
+    <footer class="sc06-form-actions mt-7">
+      <p class="text-xs leading-5 text-grafite">Concluído em {{ briefing.completed_at|date:"d/m/Y H:i" }} por {{ briefing.completed_by.label|default:"equipe societária" }}.</p>
+      <a href="{% url 'automations:module-detail' module.slug %}" class="sc06-save-button text-center">Voltar aos casos</a>
+    </footer>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}
