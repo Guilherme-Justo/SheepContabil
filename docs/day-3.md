@@ -2,12 +2,12 @@
 
 | Campo | Valor |
 | --- | --- |
-| Data | 2026-08-30 |
+| Data | 2026-08-31 |
 | Versão | 0.3.0 |
 | Processo | SC-06 — Briefing societário com perguntas condicionais |
 | Natureza preservada | Controle sistematizado |
 | Estado local | Concluído |
-| Estado externo | Pronto para publicação na Railway |
+| Estado externo | Concluído no ambiente `production` da Railway |
 
 ## Resultado entregue
 
@@ -127,7 +127,7 @@ Também é criado `operador.societario`, limitado à área Societário. Por padr
 - [x] RBAC, sessão e CSRF preservados.
 - [x] Seed sintético e idempotente com os dois desvios obrigatórios.
 - [x] Testes de domínio, interface, PDF, regressão e seed.
-- [ ] CI verde e smoke test da versão 0.3.0 no portal público.
+- [x] CI verde e smoke test da versão 0.3.0 no portal público.
 
 ## Resultado da validação local
 
@@ -135,7 +135,20 @@ Em 30/08/2026, a suíte concluiu 41 testes com 90,47% de cobertura. Ruff, format
 
 O build dos assets, a validação do Compose, a imagem de produção e o ensaio autenticado no navegador passaram. O fluxo foi percorrido em desktop e mobile: criação, alternância dos desvios, salvamento, retomada, erro de obrigatoriedade, conclusão somente leitura e download do PDF, sem erro no console.
 
-Ainda faltam, antes de declarar o Dia 3 publicado: CI, deploy da migração/seed e smoke test HTTPS no ambiente Railway.
+## Resultado da publicação
+
+Em 31/08/2026, o commit `c7ccc2fca1b62b47ecbeff03219a2b40a1a8f010` entrou em `main` pelo [PR #1](https://github.com/Guilherme-Justo/SheepContabil/pull/1). A execução [GitHub Actions #33352697536](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33352697536) concluiu com sucesso os jobs de qualidade/testes e build da imagem de produção.
+
+O release foi validado no projeto SheepContabil, ambiente `production` da Railway:
+
+- o deployment web `76c2e32a-458e-4663-87b1-f00b47fb1a55` terminou com sucesso, aplicou as migrations `0004` e `0005`, executou o seed idempotente e iniciou o Gunicorn;
+- o deployment worker `daa5f114-87c7-4a42-83ca-f03fda4e0dbb` terminou com sucesso, conectou-se ao Redis e ficou pronto para consumir a fila Celery;
+- `GET /health/live` respondeu `200` com estado `ok`; `GET /health/ready` respondeu `200` com estado `ready` e PostgreSQL `ok`; a tela de login também respondeu `200` por HTTPS;
+- o smoke test autenticado do operador Societário confirmou template v1, dois briefings sintéticos, sendo um rascunho e um concluído, evidência concluída somente para leitura e PDF de 14.011 bytes com `application/pdf`;
+- o acesso anônimo ao módulo redirecionou para login, enquanto o operador de Processos não viu o SC-06 no painel e recebeu `404` na URL direta;
+- `SEED_DEMO_ON_DEPLOY` foi ativada apenas para este release e voltou a `false` depois do seed, evitando alteração de senhas e massa demonstrativa nos próximos deploys.
+
+O domínio público permanece [web-production-8f055.up.railway.app](https://web-production-8f055.up.railway.app). A associação automática da origem GitHub na Railway exibiu `GitHub Repo not found`; por isso este release foi enviado pela Railway CLI autenticada depois do CI verde. A aplicação e os serviços estão saudáveis, mas a autorização do GitHub App da Railway deve ser restabelecida antes de depender de auto-deploy no próximo release.
 
 ## Limites conscientes
 

@@ -2,7 +2,7 @@
 
 Portal único para quatro automações contábeis do desafio Sheep Technology. O projeto parte de pouco contexto, registra as premissas adotadas e mantém a lógica real atrás de fronteiras externas simuladas.
 
-> Estado: **versão 0.3.0 pronta para publicação** — fundação preservada, SC-20 operacional e SC-06 concluído localmente com template versionado, perguntas condicionais, rascunho, validação no servidor, histórico e PDF.
+> Estado: **versão 0.3.0 publicada** — fundação preservada, SC-20 operacional e SC-06 disponível no ambiente público com template versionado, perguntas condicionais, rascunho, validação no servidor, histórico e PDF.
 
 ## Ambientes publicados
 
