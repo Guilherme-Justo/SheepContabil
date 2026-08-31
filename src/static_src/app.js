@@ -3,6 +3,23 @@ document.body.addEventListener("htmx:configRequest", (event) => {
   if (token) event.detail.headers["X-CSRFToken"] = token;
 });
 
+const setSc04PollingError = (event, visible) => {
+  const source = event.detail?.elt;
+  const pollingRegion = source?.closest?.("[data-sc04-poll]") || source;
+  const message = pollingRegion?.querySelector?.("[data-poll-error]");
+  if (message) message.hidden = !visible;
+};
+
+document.body.addEventListener("htmx:responseError", (event) => {
+  setSc04PollingError(event, true);
+});
+document.body.addEventListener("htmx:sendError", (event) => {
+  setSc04PollingError(event, true);
+});
+document.body.addEventListener("htmx:afterSwap", (event) => {
+  setSc04PollingError(event, false);
+});
+
 window.sc06BriefingForm = (config) => ({
   config,
   answers: { ...(config.initialAnswers || config.answers || {}) },

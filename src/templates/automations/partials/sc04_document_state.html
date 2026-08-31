@@ -1,0 +1,128 @@
+<aside
+  id="sc04-document-state"
+  class="space-y-5"
+  {% if is_polling %}
+    hx-get="{% url 'automations:sc04-document-state' document.id %}"
+    hx-trigger="every 2s"
+    hx-target="this"
+    hx-swap="outerHTML"
+    data-sc04-poll
+  {% endif %}
+>
+  <div class="sc04-poll-error" data-poll-error role="status" hidden>
+    A atualização automática está temporariamente indisponível. O estado exibido foi preservado; atualize a página para tentar novamente.
+  </div>
+
+  <article class="sc04-state-card">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <p class="eyebrow">Estado atual</p>
+        <h2 class="mt-2 font-display text-xl font-semibold" aria-live="polite" aria-atomic="true">{{ stage }}</h2>
+      </div>
+      <span class="status-badge status-{{ document.status_tone }}"><i></i>{{ document.get_status_display }}</span>
+    </div>
+
+    {% if document.status == "queued" %}
+      <p class="sc04-state-description">O original foi validado e aguarda um worker disponível.</p>
+    {% elif document.status == "processing" %}
+      <p class="sc04-state-description">Extração, classificação ou encaminhamento está em andamento. Nenhum resultado é presumido antes da confirmação.</p>
+    {% elif document.status == "awaiting_review" %}
+      <p class="sc04-state-description">A política não autorizou o encaminhamento automático. Uma pessoa da área Fiscal precisa confirmar a decisão.</p>
+    {% elif document.status == "routed" %}
+      <p class="sc04-state-description">A decisão foi validada e uma cópia foi encaminhada; o original permanece preservado.</p>
+    {% else %}
+      <p class="sc04-state-description">O pipeline foi interrompido de forma controlada. Consulte o detalhe abaixo antes de tentar novamente.</p>
+    {% endif %}
+
+    {% if is_polling %}
+      <div class="sc04-processing-note" role="status">
+        <span class="sc04-spinner" aria-hidden="true"></span>
+        Atualização automática ativa
+      </div>
+    {% endif %}
+  </article>
+
+  <article class="sc04-state-card" aria-labelledby="sc04-timeline-title">
+    <p class="eyebrow">Etapas verificáveis</p>
+    <h2 id="sc04-timeline-title" class="mt-2 font-display text-lg font-semibold">Linha do processamento</h2>
+    <ol class="sc04-timeline mt-5">
+      <li class="is-complete"><span aria-hidden="true">✓</span><div><strong>Ingestão segura</strong><p>Original validado, identificado por hash e preservado.</p></div></li>
+      <li class="{% if document.extraction_method %}is-complete{% elif document.status == 'processing' %}is-current{% endif %}"><span aria-hidden="true">{% if document.extraction_method %}✓{% else %}2{% endif %}</span><div><strong>Extração{% if document.extraction_method %} · {{ document.get_extraction_method_display }}{% endif %}</strong><p>{% if document.extraction_method %}Trecho e metadados extraídos sem registrar o conteúdo integral nos logs.{% else %}Texto e metadados ainda não foram confirmados.{% endif %}</p></div></li>
+      <li class="{% if latest_attempt.status == 'succeeded' %}is-complete{% elif latest_attempt.status == 'failed' or latest_attempt.status == 'invalid_response' %}is-error{% elif latest_attempt %}is-current{% endif %}"><span aria-hidden="true">{% if latest_attempt.status == 'succeeded' %}✓{% else %}3{% endif %}</span><div><strong>Classificação estruturada</strong><p>{% if latest_attempt.status == 'succeeded' %}Resposta validada com modelo e versões auditáveis.{% elif latest_attempt.error_message %}{{ latest_attempt.error_message }}{% else %}Aguardando uma resposta válida do classificador.{% endif %}</p></div></li>
+      <li class="{% if decision %}is-complete{% elif review and review.status == 'pending' %}is-current{% endif %}"><span aria-hidden="true">{% if decision %}✓{% else %}4{% endif %}</span><div><strong>Decisão de negócio</strong><p>{% if decision %}Decisão {{ decision.get_origin_display|lower }} preservada.{% elif review and review.status == 'pending' %}Revisão humana necessária antes do destino final.{% else %}A política ainda não produziu uma decisão final.{% endif %}</p></div></li>
+      <li class="{% if routing.status == 'routed' %}is-complete{% elif routing.status == 'failed' %}is-error{% elif routing %}is-current{% endif %}"><span aria-hidden="true">{% if routing.status == 'routed' %}✓{% else %}5{% endif %}</span><div><strong>Encaminhamento</strong><p>{% if routing.status == 'routed' %}Cópia confirmada no destino autorizado.{% elif routing.status == 'failed' %}O destino não confirmou a cópia; a decisão permanece preservada.{% else %}Aguardando uma decisão válida.{% endif %}</p></div></li>
+    </ol>
+  </article>
+
+  {% if review and review.status == "pending" %}
+  <article class="sc04-review-card" aria-labelledby="sc04-review-title">
+    <p class="eyebrow text-ambar">Revisão necessária</p>
+    <h2 id="sc04-review-title" class="mt-2 font-display text-xl font-semibold">Confirmar classificação</h2>
+    <p class="mt-2 text-sm leading-6 text-grafite">Motivo: <strong class="text-tinta">{{ review.get_reason_display }}</strong></p>
+
+    <div class="sc04-confidence-grid mt-5" aria-label="Sugestão registrada">
+      <div>
+        <span>Tipo sugerido</span>
+        <strong>{% if document.classified_type != "unknown" %}{{ document.get_classified_type_display }}{% else %}Não identificado{% endif %}</strong>
+        <small>{{ type_confidence_percent }}% de confiança</small>
+      </div>
+      <div>
+        <span>Cliente sugerido</span>
+        <strong>{% if document.matched_client %}{{ document.matched_client.name }}{% elif review.suggested_attempt.predicted_client %}{{ review.suggested_attempt.predicted_client.name }}{% else %}Não identificado{% endif %}</strong>
+        <small>{{ client_confidence_percent }}% de confiança</small>
+      </div>
+    </div>
+    <p class="mt-3 text-xs leading-5 text-grafite">Os percentuais são indicadores do modelo, não garantias. A decisão final será atribuída ao usuário autenticado.</p>
+
+    {% if document.evidence %}
+    <div class="sc04-evidence mt-5">
+      <strong>Evidências curtas</strong>
+      <ul>{% for evidence_item in document.evidence %}<li>{{ evidence_item }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    <form action="{% url 'automations:sc04-review-resolve' review.id %}" method="post" class="mt-6 space-y-5" novalidate>
+      {% csrf_token %}
+      {% if review_form.non_field_errors %}<div class="form-error" role="alert">{{ review_form.non_field_errors.0 }}</div>{% endif %}
+      {% for field in review_form %}
+      <div>
+        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}{% if field.field.required %}<span class="text-carmim" aria-hidden="true"> *</span><span class="sr-only"> (obrigatório)</span>{% endif %}</label>
+        <div class="sc04-form-control">{{ field }}</div>
+        {% if field.help_text %}<p id="{{ field.id_for_label }}_helptext" class="form-help">{{ field.help_text }}</p>{% endif %}
+        {% if field.errors %}<p class="field-error" role="alert">{{ field.errors.0 }}</p>{% endif %}
+      </div>
+      {% endfor %}
+      <button type="submit" class="primary-button w-full">Confirmar e encaminhar</button>
+    </form>
+  </article>
+  {% endif %}
+
+  {% if decision %}
+  <article class="sc04-decision-card" aria-labelledby="sc04-decision-title">
+    <div class="flex items-start justify-between gap-4">
+      <div><p class="eyebrow text-turquesa">Decisão preservada</p><h2 id="sc04-decision-title" class="mt-2 font-display text-lg font-semibold">{{ decision.get_document_type_display }}</h2></div>
+      <span class="soft-badge">{{ decision.get_origin_display }}</span>
+    </div>
+    <dl class="mt-5 space-y-3 text-sm">
+      <div><dt>Cliente</dt><dd>{{ decision.client.name }}</dd></div>
+      <div><dt>Destino</dt><dd>{{ route_destination }}</dd></div>
+      <div><dt>Decidido em</dt><dd><time datetime="{{ decision.decided_at|date:'c' }}">{{ decision.decided_at|date:"d/m/Y H:i" }}</time></dd></div>
+      {% if decision.decided_by %}<div><dt>Responsável</dt><dd>{{ decision.decided_by.label }}</dd></div>{% endif %}
+    </dl>
+  </article>
+  {% endif %}
+
+  {% if document.status == "failed" %}
+  <article class="sc04-failure-card" role="alert">
+    <p class="eyebrow text-carmim">Falha controlada</p>
+    <h2 class="mt-2 font-display text-lg font-semibold">O documento não foi encaminhado</h2>
+    <p class="mt-3 text-sm leading-6">{{ document.last_error|default:"O pipeline encontrou uma falha operacional. Tente novamente mais tarde." }}</p>
+    {% if can_retry_route %}
+    <form action="{% url 'automations:sc04-route-retry' document.id %}" method="post" class="mt-5">
+      {% csrf_token %}
+      <button type="submit" class="sc04-retry-button">Tentar encaminhamento novamente</button>
+    </form>
+    {% endif %}
+  </article>
+  {% endif %}
+</aside>

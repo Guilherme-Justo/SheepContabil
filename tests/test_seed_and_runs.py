@@ -15,6 +15,7 @@ from core.automations.models import (
     BriefingTemplate,
     BriefingTemplateVersion,
     DigitalCertificate,
+    FiscalClient,
     RunStatus,
     RunTrigger,
     SocietaryBriefing,
@@ -41,7 +42,8 @@ def test_demo_seed_is_complete_and_idempotent(monkeypatch: pytest.MonkeyPatch) -
     }
     assert AutomationRun.objects.count() == 5
     assert DigitalCertificate.objects.count() == 7
-    assert User.objects.count() == 3
+    assert FiscalClient.objects.count() == 4
+    assert User.objects.count() == 4
     assert BriefingTemplate.objects.count() == 1
     assert BriefingTemplateVersion.objects.count() == 1
     assert SocietaryBriefing.objects.count() == 2
@@ -89,6 +91,7 @@ def test_demo_seed_is_complete_and_idempotent(monkeypatch: pytest.MonkeyPatch) -
     admin = User.objects.get(username="admin")
     operator = User.objects.get(username="operador.processos")
     societary_operator = User.objects.get(username="operador.societario")
+    fiscal_operator = User.objects.get(username="operador.fiscal")
     assert admin.role == UserRole.ADMINISTRATOR
     assert admin.check_password("safe-seed-admin-password")
     completed_briefing = SocietaryBriefing.objects.get(status=SocietaryBriefingStatus.COMPLETED)
@@ -101,6 +104,7 @@ def test_demo_seed_is_complete_and_idempotent(monkeypatch: pytest.MonkeyPatch) -
         user=societary_operator,
         area__code="societario",
     ).exists()
+    assert AreaMembership.objects.filter(user=fiscal_operator, area__code="fiscal").exists()
 
 
 def test_run_exposes_duration_and_safe_status_tone(

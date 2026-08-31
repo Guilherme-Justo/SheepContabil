@@ -186,6 +186,666 @@ class AutomationRun(models.Model):
         return "active"
 
 
+class DocumentSource(models.TextChoices):
+    MANUAL = "manual", "Upload manual"
+    SIMULATED_INBOX = "simulated_inbox", "Caixa simulada"
+
+
+class DocumentStatus(models.TextChoices):
+    QUEUED = "queued", "Na fila"
+    PROCESSING = "processing", "Em processamento"
+    AWAITING_REVIEW = "awaiting_review", "Aguardando revisão"
+    ROUTED = "routed", "Encaminhado"
+    FAILED = "failed", "Falhou"
+
+
+class DocumentIntakeStatus(models.TextChoices):
+    QUEUED = "queued", "Na fila"
+    DUPLICATE = "duplicate", "Duplicado"
+    PROCESSING = "processing", "Em processamento"
+    AWAITING_REVIEW = "awaiting_review", "Aguardando revisão"
+    ROUTED = "routed", "Encaminhado"
+    FAILED = "failed", "Falhou"
+
+
+class DocumentType(models.TextChoices):
+    INVOICE = "invoice", "Nota fiscal"
+    TAX_PAYMENT = "tax_payment", "Guia ou tributo"
+    BANK_STATEMENT = "bank_statement", "Extrato financeiro"
+    PAYROLL = "payroll", "Documento trabalhista"
+    CORPORATE_RECORD = "corporate_record", "Documento societário"
+    OTHER = "other", "Outro documento"
+    UNKNOWN = "unknown", "Não identificado"
+
+
+class ExtractionMethod(models.TextChoices):
+    PLAIN_TEXT = "plain_text", "Texto"
+    PDF_TEXT = "pdf_text", "Texto do PDF"
+    OCR = "ocr", "OCR"
+
+
+class ClassificationAttemptStatus(models.TextChoices):
+    PROCESSING = "processing", "Em processamento"
+    SUCCEEDED = "succeeded", "Concluída"
+    INVALID_RESPONSE = "invalid_response", "Resposta inválida"
+    FAILED = "failed", "Falhou"
+
+
+class DocumentReviewStatus(models.TextChoices):
+    PENDING = "pending", "Pendente"
+    COMPLETED = "completed", "Concluída"
+
+
+class DocumentReviewReason(models.TextChoices):
+    LOW_CONFIDENCE = "low_confidence", "Confiança insuficiente"
+    AMBIGUOUS_CLIENT = "ambiguous_client", "Cliente ambíguo"
+    UNKNOWN_CLIENT = "unknown_client", "Cliente não identificado"
+    UNKNOWN_TYPE = "unknown_type", "Tipo não identificado"
+    CLASSIFIER_UNAVAILABLE = "classifier_unavailable", "Classificador indisponível"
+    INVALID_RESPONSE = "invalid_response", "Resposta inválida"
+
+
+class DocumentDecisionOrigin(models.TextChoices):
+    AUTOMATIC = "automatic", "Automático"
+    HUMAN_REVIEW = "human_review", "Revisão humana"
+
+
+class DocumentRunOutcome(models.TextChoices):
+    NEW = "new", "Novo conteúdo"
+    DUPLICATE_SOURCE = "duplicate_source", "Origem já processada"
+    DUPLICATE_HASH = "duplicate_hash", "Conteúdo duplicado"
+
+
+class DocumentRoutingStatus(models.TextChoices):
+    PENDING = "pending", "Pendente"
+    ROUTED = "routed", "Encaminhado"
+    FAILED = "failed", "Falhou"
+
+
+class FiscalClient(models.Model):
+    """Synthetic client catalogue used to ground and route SC-04 predictions."""
+
+    code = models.SlugField("código", max_length=80, primary_key=True)
+    name = models.CharField("nome", max_length=180)
+    document_number = models.CharField("CPF/CNPJ sintético", max_length=14, unique=True)
+    aliases = models.JSONField("aliases", default=list, blank=True)
+    route_prefix = models.SlugField("pasta de destino", max_length=100, unique=True)
+    is_active = models.BooleanField("ativo", default=True)
+    created_at = models.DateTimeField("criado em", auto_now_add=True)
+    updated_at = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        ordering = ("name", "code")
+        verbose_name = "cliente fiscal sintético"
+        verbose_name_plural = "clientes fiscais sintéticos"
+
+    def __str__(self) -> str:
+        return self.name
+
+    def clean(self) -> None:
+        super().clean()
+        if not self.document_number.isdigit() or len(self.document_number) not in {11, 14}:
+            raise ValidationError({"document_number": "Informe 11 ou 14 dígitos sintéticos."})
+        if not isinstance(self.aliases, list) or len(self.aliases) > 20:
+            raise ValidationError({"aliases": "Informe uma lista com até 20 aliases."})
+        if any(
+            not isinstance(alias, str) or not alias.strip() or len(alias) > 120
+            for alias in self.aliases
+        ):
+            raise ValidationError({"aliases": "Cada alias deve conter até 120 caracteres."})
+
+
+class FiscalDocument(models.Model):
+    """Canonical, content-addressed document processed by SC-04."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    sha256 = models.CharField("SHA-256", max_length=64, unique=True)
+    storage_key = models.CharField("chave do original", max_length=500, unique=True)
+    media_type = models.CharField("tipo de mídia", max_length=100)
+    byte_size = models.PositiveIntegerField("tamanho em bytes")
+    status = models.CharField(
+        "estado",
+        max_length=24,
+        choices=DocumentStatus.choices,
+        default=DocumentStatus.QUEUED,
+        db_index=True,
+    )
+    extraction_method = models.CharField(
+        "método de extração",
+        max_length=20,
+        choices=ExtractionMethod.choices,
+        blank=True,
+    )
+    extracted_text_sha256 = models.CharField("hash do texto extraído", max_length=64, blank=True)
+    extracted_excerpt = models.TextField("trecho extraído", blank=True)
+    page_count = models.PositiveSmallIntegerField("páginas", null=True, blank=True)
+    classified_type = models.CharField(
+        "tipo documental",
+        max_length=32,
+        choices=DocumentType.choices,
+        default=DocumentType.UNKNOWN,
+    )
+    type_confidence = models.DecimalField(
+        "confiança no tipo",
+        max_digits=5,
+        decimal_places=4,
+        default=0,
+    )
+    matched_client = models.ForeignKey(
+        FiscalClient,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="documents",
+        verbose_name="cliente identificado",
+    )
+    client_confidence = models.DecimalField(
+        "confiança no cliente",
+        max_digits=5,
+        decimal_places=4,
+        default=0,
+    )
+    evidence = models.JSONField("evidências", default=list, blank=True)
+    last_error = models.TextField("último erro", blank=True)
+    created_at = models.DateTimeField("criado em", auto_now_add=True)
+    updated_at = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(byte_size__gt=0),
+                name="sc04_doc_byte_size_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(type_confidence__gte=0, type_confidence__lte=1),
+                name="sc04_doc_type_confidence_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(client_confidence__gte=0, client_confidence__lte=1),
+                name="sc04_doc_client_confidence_range",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("status", "-created_at"), name="fiscal_doc_status_created_idx"),
+            models.Index(
+                fields=("classified_type", "-created_at"), name="fiscal_doc_type_created_idx"
+            ),
+        ]
+        verbose_name = "documento fiscal"
+        verbose_name_plural = "documentos fiscais"
+
+    def __str__(self) -> str:
+        return f"{self.sha256[:12]} · {self.get_status_display()}"
+
+    @property
+    def status_tone(self) -> str:
+        if self.status == DocumentStatus.ROUTED:
+            return "success"
+        if self.status == DocumentStatus.AWAITING_REVIEW:
+            return "warning"
+        if self.status == DocumentStatus.FAILED:
+            return "danger"
+        return "active"
+
+
+class DocumentIntake(models.Model):
+    """One observed attachment; duplicates still remain auditable occurrences."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.ForeignKey(
+        FiscalDocument,
+        on_delete=models.PROTECT,
+        related_name="intakes",
+        verbose_name="documento",
+    )
+    run = models.ForeignKey(
+        AutomationRun,
+        on_delete=models.PROTECT,
+        related_name="document_intakes",
+        verbose_name="execução",
+    )
+    source = models.CharField("origem", max_length=24, choices=DocumentSource.choices)
+    source_reference = models.CharField("identificador na origem", max_length=180, blank=True)
+    original_filename = models.CharField("nome original", max_length=255)
+    status = models.CharField(
+        "estado",
+        max_length=24,
+        choices=DocumentIntakeStatus.choices,
+        default=DocumentIntakeStatus.QUEUED,
+        db_index=True,
+    )
+    is_duplicate = models.BooleanField("duplicado", default=False)
+    received_at = models.DateTimeField("recebido em", auto_now_add=True)
+
+    class Meta:
+        ordering = ("-received_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("source", "source_reference"),
+                condition=~models.Q(source_reference=""),
+                name="uniq_sc04_source_reference",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        is_duplicate=True,
+                        status=DocumentIntakeStatus.DUPLICATE,
+                    )
+                    | models.Q(is_duplicate=False)
+                    & ~models.Q(status=DocumentIntakeStatus.DUPLICATE)
+                ),
+                name="sc04_intake_duplicate_consistent",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("run", "status"), name="sc04_intake_run_status_idx"),
+        ]
+        verbose_name = "entrada documental"
+        verbose_name_plural = "entradas documentais"
+
+    def __str__(self) -> str:
+        return self.original_filename
+
+
+class DocumentRunItem(models.Model):
+    """Occurrence of an intake in a run, including source redelivery."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    run = models.ForeignKey(
+        AutomationRun,
+        on_delete=models.PROTECT,
+        related_name="document_run_items",
+        verbose_name="execução",
+    )
+    intake = models.ForeignKey(
+        DocumentIntake,
+        on_delete=models.PROTECT,
+        related_name="run_items",
+        verbose_name="entrada",
+    )
+    outcome = models.CharField(
+        "resultado da ingestão", max_length=24, choices=DocumentRunOutcome.choices
+    )
+    created_at = models.DateTimeField("criado em", auto_now_add=True)
+
+    class Meta:
+        ordering = ("created_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("run", "intake"),
+                name="uniq_sc04_run_intake",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("run", "outcome"), name="sc04_run_item_outcome_idx"),
+        ]
+        verbose_name = "item de execução documental"
+        verbose_name_plural = "itens de execução documental"
+
+    def __str__(self) -> str:
+        return f"{self.run_id} · {self.get_outcome_display()}"
+
+
+class DocumentClassificationAttempt(models.Model):
+    """Append-only provider attempt with only validated/minimized output."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.ForeignKey(
+        FiscalDocument,
+        on_delete=models.PROTECT,
+        related_name="classification_attempts",
+        verbose_name="documento",
+    )
+    run = models.ForeignKey(
+        AutomationRun,
+        on_delete=models.PROTECT,
+        related_name="document_classification_attempts",
+        verbose_name="execução",
+    )
+    sequence = models.PositiveSmallIntegerField("tentativa")
+    status = models.CharField(
+        "estado",
+        max_length=24,
+        choices=ClassificationAttemptStatus.choices,
+        default=ClassificationAttemptStatus.PROCESSING,
+    )
+    provider = models.CharField("provedor", max_length=40, default="openai")
+    model = models.CharField("modelo", max_length=120, blank=True)
+    prompt_version = models.CharField("versão do prompt", max_length=80)
+    schema_version = models.CharField("versão do schema", max_length=80)
+    input_sha256 = models.CharField("hash da entrada minimizada", max_length=64)
+    input_char_count = models.PositiveIntegerField("caracteres enviados", default=0)
+    provider_response_id = models.CharField("resposta do provedor", max_length=120, blank=True)
+    predicted_document_type = models.CharField(
+        "tipo previsto",
+        max_length=32,
+        choices=DocumentType.choices,
+        default=DocumentType.UNKNOWN,
+    )
+    predicted_client = models.ForeignKey(
+        FiscalClient,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="classification_attempts",
+        verbose_name="cliente previsto",
+    )
+    type_confidence = models.DecimalField(
+        "confiança no tipo",
+        max_digits=5,
+        decimal_places=4,
+        default=0,
+    )
+    client_confidence = models.DecimalField(
+        "confiança no cliente",
+        max_digits=5,
+        decimal_places=4,
+        default=0,
+    )
+    is_ambiguous = models.BooleanField("resultado ambíguo", default=False)
+    evidence = models.JSONField("evidências", default=list, blank=True)
+    prediction = models.JSONField("snapshot de candidatos", default=dict, blank=True)
+    error_code = models.CharField("código de erro", max_length=80, blank=True)
+    error_message = models.TextField("erro operacional", blank=True)
+    created_at = models.DateTimeField("criada em", auto_now_add=True)
+    finished_at = models.DateTimeField("finalizada em", null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("document", "sequence"),
+                name="uniq_sc04_document_attempt_sequence",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(type_confidence__gte=0, type_confidence__lte=1),
+                name="sc04_attempt_type_confidence_range",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(client_confidence__gte=0, client_confidence__lte=1),
+                name="sc04_attempt_client_confidence_range",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status=ClassificationAttemptStatus.PROCESSING,
+                        finished_at__isnull=True,
+                    )
+                    | models.Q(
+                        status__in=(
+                            ClassificationAttemptStatus.SUCCEEDED,
+                            ClassificationAttemptStatus.INVALID_RESPONSE,
+                            ClassificationAttemptStatus.FAILED,
+                        ),
+                        finished_at__isnull=False,
+                    )
+                ),
+                name="sc04_attempt_finished_consistent",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("run", "status"), name="sc04_attempt_run_status_idx"),
+        ]
+        verbose_name = "tentativa de classificação"
+        verbose_name_plural = "tentativas de classificação"
+
+    def __str__(self) -> str:
+        return f"{self.document.sha256[:12]} · tentativa {self.sequence}"
+
+
+class DocumentReview(models.Model):
+    """Human decision required when the routing policy cannot accept a prediction."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.OneToOneField(
+        FiscalDocument,
+        on_delete=models.PROTECT,
+        related_name="review",
+        verbose_name="documento",
+    )
+    run = models.ForeignKey(
+        AutomationRun,
+        on_delete=models.PROTECT,
+        related_name="document_reviews",
+        verbose_name="execução",
+    )
+    suggested_attempt = models.ForeignKey(
+        DocumentClassificationAttempt,
+        on_delete=models.PROTECT,
+        related_name="reviews",
+        verbose_name="predição sugerida",
+    )
+    status = models.CharField(
+        "estado",
+        max_length=16,
+        choices=DocumentReviewStatus.choices,
+        default=DocumentReviewStatus.PENDING,
+        db_index=True,
+    )
+    reason = models.CharField(
+        "motivo",
+        max_length=32,
+        choices=DocumentReviewReason.choices,
+    )
+    policy_version = models.CharField("versão da política", max_length=80)
+    resolved_document_type = models.CharField(
+        "tipo confirmado",
+        max_length=32,
+        choices=DocumentType.choices,
+        default=DocumentType.UNKNOWN,
+    )
+    resolved_client = models.ForeignKey(
+        FiscalClient,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="document_reviews",
+        verbose_name="cliente confirmado",
+    )
+    notes = models.TextField("observações", blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="document_reviews",
+        verbose_name="revisada por",
+    )
+    created_at = models.DateTimeField("criada em", auto_now_add=True)
+    resolved_at = models.DateTimeField("resolvida em", null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status=DocumentReviewStatus.PENDING,
+                        resolved_document_type=DocumentType.UNKNOWN,
+                        resolved_client__isnull=True,
+                        reviewed_by__isnull=True,
+                        resolved_at__isnull=True,
+                    )
+                    | models.Q(
+                        status=DocumentReviewStatus.COMPLETED,
+                        resolved_client__isnull=False,
+                        reviewed_by__isnull=False,
+                        resolved_at__isnull=False,
+                    )
+                    & ~models.Q(resolved_document_type=DocumentType.UNKNOWN)
+                ),
+                name="sc04_review_status_consistent",
+            ),
+        ]
+        verbose_name = "revisão documental"
+        verbose_name_plural = "revisões documentais"
+
+    def __str__(self) -> str:
+        return f"{self.document.sha256[:12]} · {self.get_status_display()}"
+
+
+class DocumentDecision(models.Model):
+    """Immutable final business decision, distinct from the model prediction."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.OneToOneField(
+        FiscalDocument,
+        on_delete=models.PROTECT,
+        related_name="decision",
+        verbose_name="documento",
+    )
+    classification_attempt = models.ForeignKey(
+        DocumentClassificationAttempt,
+        on_delete=models.PROTECT,
+        related_name="decisions",
+        verbose_name="tentativa de origem",
+    )
+    review = models.OneToOneField(
+        DocumentReview,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="decision",
+        verbose_name="revisão",
+    )
+    document_type = models.CharField(
+        "tipo documental",
+        max_length=32,
+        choices=DocumentType.choices,
+    )
+    client = models.ForeignKey(
+        FiscalClient,
+        on_delete=models.PROTECT,
+        related_name="document_decisions",
+        verbose_name="cliente",
+    )
+    origin = models.CharField(
+        "origem da decisão", max_length=20, choices=DocumentDecisionOrigin.choices
+    )
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="document_decisions",
+        verbose_name="decidido por",
+    )
+    policy_version = models.CharField("versão da política", max_length=80)
+    decided_at = models.DateTimeField("decidido em", auto_now_add=True)
+
+    class Meta:
+        ordering = ("-decided_at",)
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        origin=DocumentDecisionOrigin.AUTOMATIC,
+                        review__isnull=True,
+                        decided_by__isnull=True,
+                    )
+                    | models.Q(
+                        origin=DocumentDecisionOrigin.HUMAN_REVIEW,
+                        review__isnull=False,
+                        decided_by__isnull=False,
+                    )
+                ),
+                name="sc04_decision_origin_consistent",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(document_type=DocumentType.UNKNOWN),
+                name="sc04_decision_type_known",
+            ),
+        ]
+        verbose_name = "decisão documental"
+        verbose_name_plural = "decisões documentais"
+
+    def __str__(self) -> str:
+        return f"{self.client.name} · {self.get_document_type_display()}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Uma decisão documental concluída é imutável.")
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def clean(self) -> None:
+        super().clean()
+        if (
+            self.classification_attempt_id
+            and self.document_id
+            and self.classification_attempt.document_id != self.document_id
+        ):
+            raise ValidationError("A tentativa precisa pertencer ao documento decidido.")
+        selected_review = self.review if self.review_id else None
+        if selected_review is not None and self.document_id:
+            if selected_review.document_id != self.document_id:
+                raise ValidationError("A revisão precisa pertencer ao documento decidido.")
+            if selected_review.status != DocumentReviewStatus.COMPLETED:
+                raise ValidationError("A revisão precisa estar concluída antes da decisão.")
+
+
+class DocumentRouting(models.Model):
+    """Immutable routing evidence; the original object is never removed."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    decision = models.OneToOneField(
+        DocumentDecision,
+        on_delete=models.PROTECT,
+        related_name="routing",
+        verbose_name="decisão",
+    )
+    run = models.ForeignKey(
+        AutomationRun,
+        on_delete=models.PROTECT,
+        related_name="document_routings",
+        verbose_name="execução",
+    )
+    storage_key = models.CharField("chave encaminhada", max_length=500, unique=True)
+    status = models.CharField(
+        "estado",
+        max_length=16,
+        choices=DocumentRoutingStatus.choices,
+        default=DocumentRoutingStatus.PENDING,
+    )
+    attempt_count = models.PositiveSmallIntegerField("tentativas", default=0)
+    last_error = models.TextField("último erro", blank=True)
+    routed_at = models.DateTimeField("encaminhado em", null=True, blank=True)
+    created_at = models.DateTimeField("criado em", auto_now_add=True)
+    updated_at = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        ordering = ("-routed_at",)
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status=DocumentRoutingStatus.PENDING,
+                        routed_at__isnull=True,
+                        last_error="",
+                    )
+                    | models.Q(
+                        status=DocumentRoutingStatus.FAILED,
+                        routed_at__isnull=True,
+                    )
+                    & ~models.Q(last_error="")
+                    | models.Q(
+                        status=DocumentRoutingStatus.ROUTED,
+                        routed_at__isnull=False,
+                        last_error="",
+                        attempt_count__gte=1,
+                    )
+                ),
+                name="sc04_routing_status_consistent",
+            ),
+        ]
+        verbose_name = "encaminhamento documental"
+        verbose_name_plural = "encaminhamentos documentais"
+
+    def __str__(self) -> str:
+        return self.storage_key
+
+
 class CertificateStatus(models.TextChoices):
     ACTIVE = "active", "Ativo"
     REVOKED = "revoked", "Revogado"

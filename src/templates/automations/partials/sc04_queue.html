@@ -1,0 +1,76 @@
+<div
+  id="sc04-queue-content"
+  class="mt-5"
+  {% if has_active_queue %}
+    hx-get="{{ queue_refresh_url }}"
+    hx-trigger="every 5s"
+    hx-target="this"
+    hx-swap="outerHTML"
+    data-sc04-poll
+  {% endif %}
+>
+  <p class="sr-only" aria-live="polite" aria-atomic="true">A fila apresenta {{ queue_rows|length }} item{{ queue_rows|length|pluralize }}.</p>
+  <div class="sc04-poll-error mb-3" data-poll-error role="status" hidden>
+    A atualização automática está temporariamente indisponível. Os dados exibidos foram preservados; atualize a página para tentar novamente.
+  </div>
+
+  <div class="table-shell overflow-x-auto">
+    <table class="data-table sc04-queue-table">
+      <caption class="sr-only">Fila de documentos recebidos pela triagem fiscal</caption>
+      <thead>
+        <tr>
+          <th scope="col">Arquivo</th>
+          <th scope="col">Origem</th>
+          <th scope="col">Ingestão</th>
+          <th scope="col">Classificação</th>
+          <th scope="col">Cliente</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Recebido</th>
+          <th scope="col" class="text-right">Abrir</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in queue_rows %}
+        <tr>
+          <td>
+            <strong class="block max-w-56 truncate" title="{{ row.item.intake.original_filename }}">{{ row.item.intake.original_filename }}</strong>
+            <span class="mt-1 block font-mono text-[.62rem]">{{ row.document.id }}</span>
+          </td>
+          <td>{{ row.item.intake.get_source_display }}</td>
+          <td>
+            {% if row.item.outcome == "new" %}
+              <span class="status-badge status-active"><i></i>{{ row.item.get_outcome_display }}</span>
+            {% else %}
+              <span class="status-badge status-neutral"><i></i>{{ row.item.get_outcome_display }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.document.classified_type != "unknown" %}
+              <strong class="block">{{ row.document.get_classified_type_display }}</strong>
+              <span class="mt-1 block text-xs">{{ row.type_confidence_percent }}% de confiança</span>
+            {% else %}
+              <span>Ainda não identificada</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.document.matched_client %}
+              <strong class="block">{{ row.document.matched_client.name }}</strong>
+              <span class="mt-1 block text-xs">{{ row.client_confidence_percent }}% de confiança</span>
+            {% else %}
+              <span>Não identificado</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="status-badge status-{{ row.document.status_tone }}"><i></i>{{ row.document.get_status_display }}</span>
+            {% if row.item.outcome != "new" %}<span class="mt-2 block text-xs">Estado do original canônico</span>{% endif %}
+          </td>
+          <td class="font-mono text-xs"><time datetime="{{ row.item.created_at|date:'c' }}">{{ row.item.created_at|date:"d/m/Y H:i" }}</time></td>
+          <td class="text-right"><a href="{% url 'automations:sc04-document-detail' row.document.id %}" class="table-link">Detalhes</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="py-12 text-center text-grafite">Nenhum arquivo corresponde aos filtros atuais.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

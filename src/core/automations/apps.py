@@ -7,4 +7,7 @@ class AutomationsConfig(AppConfig):
     verbose_name = "Automações"
 
     def ready(self) -> None:
-        from core.automations import signals  # noqa: F401
+        from core.automations import (
+            checks,  # noqa: F401
+            signals,  # noqa: F401
+        )

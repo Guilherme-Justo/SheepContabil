@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sheepcontabil"
-version = "0.3.0"
+version = "0.4.0"
 description = "Portal de automacoes contabeis do desafio SheepContabil"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
@@ -22,6 +22,7 @@ dependencies = [
   "playwright>=1.55,<2",
   "psycopg[binary]>=3.2,<4",
   "pypdf>=6,<7",
+  "pytesseract>=0.3.13,<1",
   "reportlab>=4.4,<5",
   "redis>=6,<8",
   "structlog>=25,<26",
@@ -73,7 +74,17 @@ exclude = ["src/.*/migrations/"]
 django_settings_module = "config.settings.test"
 
 [[tool.mypy.overrides]]
-module = ["celery", "celery.*", "environ", "environ.*"]
+module = [
+  "boto3",
+  "boto3.*",
+  "botocore",
+  "botocore.*",
+  "celery",
+  "celery.*",
+  "environ",
+  "environ.*",
+  "pytesseract",
+]
 ignore_missing_imports = true
 
 [tool.coverage.run]

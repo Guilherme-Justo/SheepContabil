@@ -70,6 +70,33 @@
 </section>
 {% endif %}
 
+{% if run.module.code == "SC-04" %}
+<section class="mt-8" aria-labelledby="sc04-run-evidence-title">
+  <div class="section-heading">
+    <p class="eyebrow">Evidências do SC-04</p>
+    <h2 id="sc04-run-evidence-title">Documentos desta execução</h2>
+    <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Cada origem e duplicidade permanece ligada ao documento canônico correspondente.</p>
+  </div>
+  <div class="table-shell mt-5 overflow-x-auto">
+    <table class="data-table sc04-queue-table">
+      <caption class="sr-only">Documentos observados nesta execução</caption>
+      <thead><tr><th scope="col">Arquivo</th><th scope="col">Origem</th><th scope="col">Ingestão</th><th scope="col">Estado canônico</th><th scope="col" class="text-right">Detalhe</th></tr></thead>
+      <tbody>
+        {% for item in document_items %}
+        <tr>
+          <td><strong>{{ item.intake.original_filename }}</strong></td>
+          <td>{{ item.intake.get_source_display }}</td>
+          <td>{{ item.get_outcome_display }}</td>
+          <td><span class="status-badge status-{{ item.intake.document.status_tone }}"><i></i>{{ item.intake.document.get_status_display }}</span></td>
+          <td class="text-right"><a href="{% url 'automations:sc04-document-detail' item.intake.document.id %}" class="table-link">Abrir documento</a></td>
+        </tr>
+        {% empty %}<tr><td colspan="5" class="py-10 text-center text-grafite">Nenhum documento foi observado nesta execução.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
 {% if briefing %}
 <section class="mt-8" aria-labelledby="sc06-run-evidence-title">
   <article class="sc06-run-evidence">

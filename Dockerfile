@@ -24,7 +24,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends curl libpq5 \
+    && apt-get install --yes --no-install-recommends \
+        curl \
+        libpq5 \
+        tesseract-ocr \
+        tesseract-ocr-por \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system sheep \
     && useradd --system --gid sheep --create-home --home-dir /home/sheep sheep
