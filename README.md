@@ -2,7 +2,7 @@
 
 Portal único para quatro automações contábeis do desafio Sheep Technology. O projeto parte de pouco contexto, registra as premissas adotadas e mantém a lógica real atrás de fronteiras externas simuladas.
 
-> Estado: **versão 0.2.0 publicada** — fundação do Dia 1 preservada e SC-20 validado de ponta a ponta no ambiente Railway, com cadastro, janela de 60 dias, avisos simulados, idempotência, retentativa, auditoria e agendamento mensal.
+> Estado: **versão 0.3.0 pronta para publicação** — fundação preservada, SC-20 operacional e SC-06 concluído localmente com template versionado, perguntas condicionais, rascunho, validação no servidor, histórico e PDF.
 
 ## Ambientes publicados
 
@@ -42,7 +42,7 @@ Os motivos, consequências e alternativas rejeitadas estão em [`docs/architectu
 Pré-requisito: Docker Desktop com Compose v2.
 
 1. Copie `.env.example` para `.env`.
-2. Preencha `DEMO_ADMIN_PASSWORD`, `DEMO_OPERATOR_PASSWORD` e `S3_SECRET_ACCESS_KEY` com valores locais.
+2. Preencha `DEMO_ADMIN_PASSWORD`, `DEMO_OPERATOR_PASSWORD` e `S3_SECRET_ACCESS_KEY` com valores locais. A senha de operador cria acessos sintéticos separados para Processos e Societário.
 3. Suba o ambiente:
 
 ```powershell
@@ -92,7 +92,7 @@ src/
 ├── config/                  settings, URLs, healthchecks e Celery
 ├── core/
 │   ├── identity/            usuário, perfis, áreas e acessos
-│   └── automations/         catálogo, execução comum e caso de uso SC-20
+│   └── automations/         catálogo, execução comum e casos SC-06/SC-20
 ├── templates/               portal renderizado no servidor
 ├── static_src/              fontes CSS e JavaScript
 └── static/brand/            assinaturas oficiais e cartão social
@@ -113,6 +113,7 @@ tests/                       autenticação, autorização e saúde
 
 - [`docs/day-1.md`](docs/day-1.md): aceite e evidências do primeiro dia.
 - [`docs/day-2.md`](docs/day-2.md): contrato, implementação e aceite do SC-20.
+- [`docs/day-3.md`](docs/day-3.md): motor condicional, briefing e aceite do SC-06.
 - [`docs/architecture.md`](docs/architecture.md): visão arquitetural completa.
 - [`docs/assumptions.md`](docs/assumptions.md): premissas, dúvidas e riscos.
 - [`docs/deployment.md`](docs/deployment.md): implantação e operação Railway.

@@ -250,6 +250,17 @@ O formulário é dirigido por template versionado. Perguntas, opções, obrigato
 
 O frontend reage às regras para usabilidade, mas o servidor reavalia todas elas no envio. Cada briefing aponta para a versão imutável do template usada, garantindo leitura histórica correta.
 
+A versão implementada separa quatro responsabilidades:
+
+- `rules.py` valida o schema, interpreta condições, normaliza respostas ativas e formata o resultado sem importar view ou infraestrutura;
+- `services.py` fixa a versão publicada, cria o briefing e a execução na mesma transação, salva rascunhos e conclui sob lock de linha;
+- o formulário Django cria somente tipos de campo permitidos e o Alpine replica a reação visual usando a configuração entregue pelo servidor;
+- `pdf.py` deriva o documento consolidado do briefing concluído e imutável, sem criar outra fonte de verdade.
+
+Uma versão publicada não pode mudar schema, identidade, estado ou autoria. Um briefing concluído também protege versão, execução, cliente, respostas, autor da abertura, autor e data da conclusão. A evidência concluída é append-only: edição e exclusão individual ou em lote são bloqueadas no domínio, além dos controles do admin. Evolução de perguntas cria uma nova versão e não altera a interpretação dos casos existentes.
+
+O estado comum fica coerente com o caso: criação abre uma `AutomationRun` manual em `RUNNING`; rascunhos atualizam resumo e contagem; uma conclusão válida grava briefing, ator da conclusão e execução `SUCCEEDED` atomicamente. Campos desconhecidos, ocultos por mudança de caminho ou pertencentes a outra ramificação são descartados pelo servidor. Valores sem representação canônica são recusados na publicação do schema para manter a mesma semântica no Python e no navegador.
+
 ### 10.4 SC-20 — Certificados digitais
 
 A execução mensal identifica certificados dentro da janela documental de 60 dias. Seleção, deduplicação, registro de comunicação e tratamento de falha são internos; apenas o envio é simulado por adapter.

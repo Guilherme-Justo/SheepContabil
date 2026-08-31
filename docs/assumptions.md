@@ -82,8 +82,12 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 | A-06-03 | Confirmada | Cliente de outro estado e sócio casado são cenários obrigatórios no seed. | Testes unitários e E2E cobrem ambos. |
 | A-06-04 | Aceita para o desafio | Um template publicado é imutável; alterações criam nova versão. | Respostas históricas continuam interpretáveis. |
 | A-06-05 | Aceita para o desafio | O operador pode preencher briefings; apenas administrador autorizado altera templates. | RBAC distingue uso operacional de configuração. |
-| A-06-06 | Validar | O resultado principal será uma visualização consolidada com opção de download. | O formato final do download será escolhido sem bloquear o formulário. |
+| A-06-06 | Aceita para o desafio | O resultado principal é uma visualização consolidada com download em PDF. | O PDF é derivado da versão imutável e exige autorização no momento do download. |
 | A-06-07 | Fora do escopo | Editor visual genérico de arrastar e soltar. | A configuração inicial pode usar formulários administrativos estruturados. |
+| A-06-08 | Aceita para o desafio | São Paulo é a UF de referência do template demonstrativo. | Qualquer outra UF ativa o bloco interestadual; a referência pode mudar em nova versão do template. |
+| A-06-09 | Aceita para o desafio | O bloco interestadual pede órgão e número sintético de registro na origem. | Os campos demonstram a ramificação e não constituem checklist jurídico homologado. |
+| A-06-10 | Aceita para o desafio | O operador declara se existe sócio casado e identifica qual sócio sintético está nesse estado civil. | A resposta positiva torna identificação e regime de casamento obrigatórios. |
+| A-06-11 | Aceita para o desafio | Um integrante autorizado da área pode concluir um caso aberto por outro. | Abertura e conclusão registram atores distintos; a evidência concluída é imutável e não pode ser excluída. |
 
 ## 6. SC-20 — Certificados digitais
 
@@ -131,10 +135,9 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 1. Confirmar tipos documentais e clientes sintéticos do SC-04.
 2. Calibrar o limiar de revisão com a massa sintética.
 3. Registrar ordem, pré-condição e compensação de cada portal do SC-05.
-4. Definir o formato de download do briefing SC-06.
-5. Confirmar se SC-20 terá apenas o aviso de 60 dias ou faixas adicionais.
-6. Confirmar o canal simulado e o conteúdo mínimo das comunicações.
-7. Confirmar a conta Railway, orçamento e período de permanência pública.
-8. Confirmar disponibilidade de credencial OpenAI para o ambiente demonstrável.
+4. Confirmar se SC-20 terá apenas o aviso de 60 dias ou faixas adicionais.
+5. Confirmar o canal simulado e o conteúdo mínimo das comunicações.
+6. Confirmar a conta Railway, orçamento e período de permanência pública.
+7. Confirmar disponibilidade de credencial OpenAI para o ambiente demonstrável.
 
 Nenhum desses itens justifica criar microsserviços ou adiar autenticação, histórico, fila, storage e estrutura modular.

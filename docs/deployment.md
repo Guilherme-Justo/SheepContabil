@@ -39,7 +39,7 @@ Revise o plano antes de aplicar. `.railway/railway.ts` cria web, worker, schedul
 
 Depois de aplicar:
 
-1. Cadastre `DJANGO_SECRET_KEY`, `DEMO_ADMIN_PASSWORD` e `DEMO_OPERATOR_PASSWORD` no serviço web.
+1. Cadastre `DJANGO_SECRET_KEY`, `DEMO_ADMIN_PASSWORD` e `DEMO_OPERATOR_PASSWORD` no serviço web. A última cria os operadores sintéticos de Processos e Societário; use `DEMO_SOCIETARY_OPERATOR_PASSWORD` somente se precisar separá-las.
 2. Mantenha `OPENAI_API_KEY` somente no worker; web e worker compartilham apenas os segredos de infraestrutura necessários.
 3. Confirme que web e worker receberam a fonte `Guilherme-Justo/SheepContabil`, branch `main`, declarada na IaC.
 4. Gere domínio Railway somente no web.
@@ -56,11 +56,14 @@ Depois de aplicar:
 - `/conta/entrar/` abre sem VPN.
 - Administrador vê SC-04, SC-05, SC-06 e SC-20.
 - Operador de Processos vê somente SC-20.
+- Operador Societário vê somente SC-06.
 - Acesso direto do operador a outro módulo retorna 404.
 - Assets, logo e fontes carregam em HTTPS.
 - Worker conecta ao Redis sem possuir domínio público e inicia com concorrência 1 para limitar o consumo do Chromium no primeiro deploy.
 - O módulo SC-20 lista a massa sintética, executa a janela inclusiva de 60 dias e registra uma falha deliberada disponível para retentativa.
 - Uma segunda execução do SC-20 não repete os avisos já registrados para a mesma validade, canal e política.
+- O SC-06 lista um caso concluído e um rascunho, reage aos caminhos de abertura/alteração, exige o bloco de outra UF e o regime quando houver sócio casado.
+- Um briefing incompleto não conclui; o caso completo aparece na execução e seu PDF baixa apenas para usuário autorizado.
 - O scheduler possui a expressão de 15 minutos, não expõe domínio e termina depois de publicar o trabalho no Redis.
 
 ## Deploy e rollback
