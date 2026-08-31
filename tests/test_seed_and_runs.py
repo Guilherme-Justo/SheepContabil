@@ -12,9 +12,13 @@ from core.automations.models import (
     AutomationModule,
     AutomationNature,
     AutomationRun,
+    BriefingTemplate,
+    BriefingTemplateVersion,
     DigitalCertificate,
     RunStatus,
     RunTrigger,
+    SocietaryBriefing,
+    SocietaryBriefingStatus,
 )
 from core.identity.models import Area, AreaMembership, User, UserRole
 
@@ -35,9 +39,16 @@ def test_demo_seed_is_complete_and_idempotent(monkeypatch: pytest.MonkeyPatch) -
         "SC-06",
         "SC-20",
     }
-    assert AutomationRun.objects.count() == 4
+    assert AutomationRun.objects.count() == 5
     assert DigitalCertificate.objects.count() == 7
-    assert User.objects.count() == 2
+    assert User.objects.count() == 3
+    assert BriefingTemplate.objects.count() == 1
+    assert BriefingTemplateVersion.objects.count() == 1
+    assert SocietaryBriefing.objects.count() == 2
+    assert set(SocietaryBriefing.objects.values_list("status", flat=True)) == {
+        SocietaryBriefingStatus.DRAFT,
+        SocietaryBriefingStatus.COMPLETED,
+    }
 
     actual_modules = {
         module.code: (
@@ -77,11 +88,19 @@ def test_demo_seed_is_complete_and_idempotent(monkeypatch: pytest.MonkeyPatch) -
 
     admin = User.objects.get(username="admin")
     operator = User.objects.get(username="operador.processos")
+    societary_operator = User.objects.get(username="operador.societario")
     assert admin.role == UserRole.ADMINISTRATOR
     assert admin.check_password("safe-seed-admin-password")
+    completed_briefing = SocietaryBriefing.objects.get(status=SocietaryBriefingStatus.COMPLETED)
+    assert completed_briefing.completed_by == admin
+    assert completed_briefing.run.metadata["completed_by_id"] == admin.pk
     assert operator.role == UserRole.OPERATOR
     assert operator.check_password("safe-seed-operator-password")
     assert AreaMembership.objects.filter(user=operator, area__code="processos").exists()
+    assert AreaMembership.objects.filter(
+        user=societary_operator,
+        area__code="societario",
+    ).exists()
 
 
 def test_run_exposes_duration_and_safe_status_tone(
