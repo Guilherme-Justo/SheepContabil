@@ -1,11 +1,139 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, cast
 
 from django import forms
+from django.conf import settings
+from django.core.files.uploadedfile import UploadedFile
 
-from core.automations.models import CommunicationChannel, DigitalCertificate
+from core.automations.models import (
+    CommunicationChannel,
+    DigitalCertificate,
+    DocumentClassificationAttempt,
+    DocumentRunOutcome,
+    DocumentSource,
+    DocumentStatus,
+    DocumentType,
+    FiscalClient,
+)
+from core.automations.sc04.contracts import InvalidDocument, ValidatedDocument
+from core.automations.sc04.validation import validate_document
+
+
+class SC04UploadForm(forms.Form):
+    attachment = forms.FileField(
+        label="Documento sintético",
+        help_text="PDF, PNG, JPEG ou TXT UTF-8 com até 10 MiB.",
+        widget=forms.ClearableFileInput(
+            attrs={
+                "accept": (
+                    ".pdf,.png,.jpg,.jpeg,.txt,application/pdf,image/png,image/jpeg,text/plain"
+                )
+            }
+        ),
+    )
+    confirm_synthetic = forms.BooleanField(
+        label="Confirmo que o arquivo contém somente dados sintéticos",
+        required=True,
+    )
+
+    validated_document: ValidatedDocument | None = None
+
+    def clean_attachment(self) -> UploadedFile:
+        attachment = self.cleaned_data["attachment"]
+        if not isinstance(attachment, UploadedFile):
+            raise forms.ValidationError("Selecione um arquivo válido.")
+        if (attachment.size or 0) > int(settings.SC04_MAX_UPLOAD_BYTES):
+            max_mib = int(settings.SC04_MAX_UPLOAD_BYTES) // (1024 * 1024)
+            raise forms.ValidationError(f"O arquivo ultrapassa o limite de {max_mib} MiB.")
+        content = attachment.read()
+        attachment.seek(0)
+        try:
+            self.validated_document = validate_document(
+                filename=attachment.name or "documento",
+                declared_content_type=attachment.content_type or "",
+                content=content,
+            )
+        except InvalidDocument as exc:
+            raise forms.ValidationError(str(exc)) from exc
+        return attachment
+
+
+class SC04ReviewForm(forms.Form):
+    document_type = forms.ChoiceField(
+        label="Tipo documental confirmado",
+        choices=[
+            ("", "Selecione o tipo documental"),
+            *[choice for choice in DocumentType.choices if choice[0] != DocumentType.UNKNOWN],
+        ],
+    )
+    client = forms.ModelChoiceField(
+        label="Cliente confirmado",
+        queryset=FiscalClient.objects.none(),
+    )
+    notes = forms.CharField(
+        label="Justificativa da correção",
+        required=False,
+        max_length=1000,
+        widget=forms.Textarea(attrs={"rows": 4}),
+        help_text="Obrigatória quando a decisão for diferente da sugestão da IA.",
+    )
+
+    def __init__(
+        self,
+        *args: Any,
+        attempt: DocumentClassificationAttempt,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.attempt = attempt
+        self.reference_client_id = attempt.document.matched_client_id or attempt.predicted_client_id
+        client_field = cast("forms.ModelChoiceField[FiscalClient]", self.fields["client"])
+        client_field.queryset = FiscalClient.objects.filter(is_active=True).order_by("name")
+        if not self.is_bound:
+            self.initial.update(
+                {
+                    "document_type": attempt.predicted_document_type,
+                    "client": self.reference_client_id,
+                }
+            )
+
+    def clean(self) -> dict[str, Any]:
+        cleaned = super().clean() or {}
+        selected_type = cleaned.get("document_type")
+        selected_client = cleaned.get("client")
+        changed = (
+            selected_type != self.attempt.predicted_document_type
+            or getattr(selected_client, "pk", None) != self.reference_client_id
+        )
+        if changed and not str(cleaned.get("notes") or "").strip():
+            self.add_error("notes", "Explique a correção feita sobre a sugestão da IA.")
+        return cleaned
+
+
+class SC04QueueFilterForm(forms.Form):
+    status = forms.ChoiceField(
+        label="Estado",
+        required=False,
+        choices=[("", "Todos os estados"), *DocumentStatus.choices],
+    )
+    source = forms.ChoiceField(
+        label="Origem",
+        required=False,
+        choices=[("", "Todas as origens"), *DocumentSource.choices],
+    )
+    outcome = forms.ChoiceField(
+        label="Resultado",
+        required=False,
+        choices=[("", "Todos os resultados"), *DocumentRunOutcome.choices],
+    )
+    q = forms.CharField(
+        label="Buscar",
+        required=False,
+        max_length=120,
+        widget=forms.TextInput(attrs={"placeholder": "Arquivo ou cliente"}),
+    )
 
 
 class DigitalCertificateForm(forms.ModelForm):  # type: ignore[type-arg]
