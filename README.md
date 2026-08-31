@@ -2,7 +2,7 @@
 
 Portal único para quatro automações contábeis do desafio Sheep Technology. O projeto parte de pouco contexto, registra as premissas adotadas e mantém a lógica real atrás de fronteiras externas simuladas.
 
-> Estado: **versão 0.4.0 em validação de release** — SC-04 implementado com storage privado, extração/OCR, classificação estruturada, revisão humana, deduplicação e roteamento auditável; a versão pública anterior permanece 0.3.0 até a conclusão do deploy.
+> Estado: **versão 0.4.0 publicada e validada em produção** — SC-04 está ativo com storage privado, extração/OCR, classificação OpenAI estruturada, revisão humana, deduplicação e roteamento auditável. Os caminhos de indisponibilidade segura e de encaminhamento automático foram confirmados no ambiente público.
 
 ## Ambientes publicados
 
