@@ -48,6 +48,9 @@ jobs:
       - name: Build browser assets
         run: npm run build
 
+      - name: Check worker entrypoint syntax
+        run: sh -n scripts/run_worker_with_simulator.sh
+
       - name: Lint
         run: uv run ruff check src tests
 

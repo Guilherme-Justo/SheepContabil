@@ -64,7 +64,7 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 
 | ID | Status | Premissa | Implicação |
 | --- | --- | --- | --- |
-| A-05-01 | Aceita para o desafio | Um serviço privado representa Portal de arquivos, Sistema contábil e Sistema de tarefas. | A fronteira é HTTP/HTML autenticada; o domínio nunca consulta as tabelas internas do simulador. |
+| A-05-01 | Aceita para o desafio | Um processo WSGI privado representa Portal de arquivos, Sistema contábil e Sistema de tarefas. | A fronteira é HTTP/HTML autenticada; o domínio nunca consulta as tabelas internas do simulador. A unidade de hospedagem pode variar sem mudar esse contrato. |
 | A-05-02 | Aceita para o desafio | Playwright opera os três portais pelo mesmo caminho visível a um usuário. | Leitura e mutação usam DOM e formulários com CSRF; alteração direta no banco ou endpoint oculto não conta como RPA. |
 | A-05-03 | Aceita para o desafio | Cada portal possui gateway independente sobre uma sessão de navegador comum à saga. | URLs, seletores e credenciais permanecem fora do serviço de domínio e podem ser substituídos por integrações reais. |
 | A-05-04 | Confirmada | No sistema de tarefas, o cliente não é desativado: o bloqueio troca o responsável das tarefas abertas por um marcador e preserva o histórico. | O marcador adotado é `BLOQUEADO_INADIMPLENCIA`; tarefas fechadas não mudam e o snapshot anterior precisa permitir restauração exata. |
@@ -77,6 +77,8 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 | A-05-11 | Aceita para o desafio | Screenshots PNG de inspeção, aplicação, recusa e compensação são evidências privadas, não conteúdo público do simulador. | A imagem é recortada ao cliente ou alerta atual; o objeto recebe chave opaca, hash e tamanho, e o download revalida RBAC e integridade. |
 | A-05-12 | Aceita para o desafio | Desbloquear significa desfazer o efeito do SC-05, não remover restrição preexistente de outro processo. | Arquivos e Contábil retornam ao booleano capturado na última saga de bloqueio bem-sucedida. |
 | A-05-13 | Aceita para o desafio | Mudanças legítimas no ciclo de vida das tarefas podem ocorrer entre bloqueio e renegociação. | O undo restaura os responsáveis das referências alteradas sem reabrir/fechar tarefas nem apagar tarefas novas; divergência de responsável ou marcador sem snapshot é recusada. |
+| A-05-14 | Aceita para o desafio | O Compose mantém o simulador em contêiner separado; na Railway, o limite do plano exige co-localizar seu WSGI no contêiner do worker. | O gateway Playwright usa `127.0.0.1:8000`; a porta fica disponível na rede privada somente para healthcheck e não recebe domínio público. |
+| A-05-15 | Aceita para o desafio | Co-localização física não autoriza herdar todos os segredos do worker. | O subprocesso nasce com allowlist de ambiente sem Redis, S3 nem OpenAI; isso reduz exposição acidental, mas não cria isolamento forte entre processos do mesmo UID/contêiner. |
 
 ### 4.1 Ordem e compensações congeladas no Dia 5
 
@@ -129,6 +131,7 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 | A-OPS-01 | Aceita para o desafio | Logs estruturados da Railway e histórico interno bastam para operação inicial. | Sentry é opcional; stack própria de métricas não entra na semana. |
 | A-OPS-02 | Aceita para o desafio | Um backup diário de PostgreSQL e um ensaio de restauração são suficientes. | RPO/RTO formais ficam fora do desafio. |
 | A-OPS-03 | Aceita para o desafio | Cada pulso do scheduler é curto e termina após publicar os vencidos. | Sobreposição é evitada pela plataforma e duplicidade adicional pelo banco. |
+| A-OPS-04 | Aceita para o desafio | Celery e o WSGI sintético formam uma única unidade de disponibilidade na Railway. | O supervisor só inicia Celery após readiness do simulador e encerra ambos quando qualquer processo termina, permitindo reinício coerente pela plataforma. |
 
 ## 8. Riscos derivados
 
@@ -138,6 +141,7 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 | Saída de IA com schema ou confiança inválida | Média | Alto | Validação estrita e limiar configurável | Documento enviado à revisão |
 | Seletores do RPA frágeis | Média | Alto | Page Objects, seletores estáveis, screenshots e testes de contrato | Falha identifica portal e etapa |
 | Estado parcial em SC-05 | Média | Alto | Snapshots antes/desejado/depois, compensação condicional, projeção parcial e retomada explícita | Cenário local `PARTIALLY_FAILED` coberto sem repetir portal já conforme |
+| Processo auxiliar do SC-05 indisponível no worker | Baixa após mitigação | Alto em SC-05 | Readiness local antes do Celery, supervisão dos dois filhos e restart conjunto | Falha do WSGI derruba o serviço em vez de deixar worker falso-saudável |
 | Duplo disparo do scheduler | Baixa | Alto | Railway Cron curto e constraint de idempotência | Segunda publicação não duplica execução |
 | Perda de arquivo no redeploy | Média sem mitigação | Alto | S3 e metadados no PostgreSQL | Arquivo permanece após nova versão |
 | Regra de SC-06 diverge entre UI e backend | Média | Médio | Mesmo schema/regra avaliado no servidor; testes | Envio inválido é recusado no backend |
@@ -157,4 +161,4 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 
 Nenhum desses itens justifica criar microsserviços ou adiar autenticação, histórico, fila, storage e estrutura modular.
 
-A antiga pendência de definir ordem, pré-condições e compensações do SC-05 foi encerrada no Dia 5 e permanece registrada em A-05-08 e na tabela 4.1. Ainda faltam implantação do simulador privado e smoke tests da versão 0.5.0 para converter a validação local em evidência pública; isso é pendência operacional, não lacuna funcional da saga.
+A antiga pendência de definir ordem, pré-condições e compensações do SC-05 foi encerrada no Dia 5 e permanece registrada em A-05-08 e na tabela 4.1. A versão 0.5.0 foi incorporada à `main` e implantada em web, worker e scheduler após CI verde, mas o quarto serviço previsto para o simulador excedeu o limite do plano Railway. O ajuste co-localizado registrado em A-05-14/A-05-15 ainda precisa de PR, CI, deploy e smoke tests para converter a validação local em evidência pública do SC-05; isso é pendência operacional, não lacuna funcional da saga.

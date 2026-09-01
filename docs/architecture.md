@@ -12,7 +12,7 @@
 
 Esta arquitetura orienta a implementação do portal SheepContabil e das quatro automações selecionadas. Ela prioriza entrega ponta a ponta, rastreabilidade, falha controlada e substituição futura das integrações simuladas.
 
-A solução é um **monólito modular Django**, entregue como uma única unidade de software, mas executado por processos distintos de web, worker e scheduler. A separação de processos não transforma o sistema em microsserviços: todos compartilham código, modelo de domínio, banco, ciclo de versão e implantação. O SC-05 acrescenta um serviço privado de demonstração exclusivamente como fronteira externa sintética; ele não contém a orquestração de negócio.
+A solução é um **monólito modular Django**, entregue como uma única unidade de software, mas executado por processos distintos de web, worker e scheduler. A separação de processos não transforma o sistema em microsserviços: todos compartilham código, modelo de domínio, banco, ciclo de versão e implantação. O SC-05 acrescenta um processo WSGI privado de demonstração exclusivamente como fronteira externa sintética; ele não contém a orquestração de negócio. No Compose esse processo fica em contêiner próprio; na Railway ele é co-localizado no contêiner do worker para respeitar o limite de recursos do plano.
 
 ## 2. Diretrizes
 
@@ -55,10 +55,12 @@ flowchart TB
     Web[Django Web\nGunicorn + HTMX]
     DB[(PostgreSQL)]
     Redis[(Redis)]
-    Worker[Celery Worker\nregras + IA + RPA]
+    subgraph WorkerService[Serviço/container worker na Railway]
+        Worker[Celery Worker\nregras + IA + RPA]
+        Simulator[WSGI SC-05\n127.0.0.1:8000]
+    end
     Cron[Railway Cron\npulso efêmero]
     Bucket[(Storage S3)]
-    Simulator[Portais SC-05 privados]
     OpenAI[OpenAI API]
     Logs[Logs estruturados / Sentry opcional]
 
@@ -71,7 +73,7 @@ flowchart TB
     Worker --> DB
     Worker --> Bucket
     Worker --> OpenAI
-    Worker -->|Playwright / HTTP| Simulator
+    Worker -->|Playwright / HTTP local| Simulator
     Web --> Logs
     Worker --> Logs
     Cron --> Logs
@@ -82,11 +84,13 @@ flowchart TB
 | Processo | Responsabilidade | Escala inicial |
 | --- | --- | --- |
 | `web` | Autenticação, autorização, páginas, comandos, consulta de histórico e downloads autorizados | 1 réplica |
-| `worker` | Execuções demoradas, classificação, OCR, RPA, notificações e geração de artefatos | 1 réplica, concorrência baixa |
+| `worker` | Execuções demoradas, classificação, OCR, RPA, notificações e geração de artefatos; na Railway também hospeda o processo auxiliar WSGI sintético | 1 réplica, concorrência baixa |
 | `cron` | Pulso efêmero que identifica e publica execuções vencidas | 1 execução por pulso |
-| `simulator` | Três portais HTML sintéticos do SC-05, com autenticação própria e falhas determinísticas | 1 serviço privado |
+| `simulator` WSGI | Três portais HTML sintéticos do SC-05, com autenticação própria e falhas determinísticas | Contêiner separado no Compose; subprocesso local do `worker` na Railway |
 
-Web, worker e cron usam a mesma versão do código. O simulador usa a mesma imagem e banco nesta entrega curta, mas tem URLconf e entrypoint WSGI próprios, não recebe domínio público e não é um serviço de domínio da SheepContabil. No Dia 5 essa separação está implementada no Compose e declarada na infraestrutura Railway; a criação e o smoke test do serviço no ambiente público continuam pendentes.
+Web, worker e cron usam a mesma versão do código. O simulador usa a mesma imagem e banco nesta entrega curta, mas mantém URLconf, settings e entrypoint WSGI próprios e não é um serviço de domínio da SheepContabil. Na Railway, o Playwright o acessa por `127.0.0.1:8000`; a porta também escuta na rede privada somente para o healthcheck da plataforma, sem domínio público. Um supervisor valida schema, inicia o WSGI com ambiente sanitizado, confirma liveness, inicia Celery e só então libera readiness; a saída de qualquer filho encerra o outro para que o serviço seja reiniciado de forma coerente.
+
+A co-localização é decisão operacional, não quebra da fronteira lógica: o subprocesso recebe somente runtime Python, segredo Django, fuso, PostgreSQL e credenciais sintéticas. Redis, S3 e OpenAI permanecem fora de seu ambiente. No Compose, onde não existe o mesmo limite de recursos, o contêiner `simulator` continua separado e acessível ao worker apenas pela rede interna.
 
 ## 5. Organização modular
 
@@ -253,7 +257,7 @@ A orquestração implementada é uma saga persistida:
 
 `SC05Client`, `SC05Operation` e `SC05PortalStep` formam a projeção operacional. `SC05StepAttempt` conserva as tentativas de inspeção, aplicação e compensação; tentativas finalizadas e artefatos rejeitam edição/exclusão pela instância, e o admin os expõe somente para leitura. `SC05Artifact` referencia o objeto privado com hash e tamanho, ambos verificados novamente no download. Cada imagem contém somente o cartão do cliente-alvo ou o alerta de falha. Entregas repetidas do broker encerram tentativas interrompidas de forma explícita antes de reconciliar, mas um caso já parcial só volta a executar após retomada autorizada.
 
-O simulador privado implementa fluxo normal e três cenários controlados: falha na aplicação em Tarefas, timeout na aplicação do Contábil e falha combinada em Tarefas com falha de compensação em Arquivos. Somente o administrador escolhe falhas; o operador Tecnologia usa o caminho normal. URLs, credenciais, timeout e seletores não escapam para o serviço da saga, e a troca futura por sistemas reais permanece concentrada nos gateways.
+O simulador privado implementa fluxo normal e três cenários controlados: falha na aplicação em Tarefas, timeout na aplicação do Contábil e falha combinada em Tarefas com falha de compensação em Arquivos. Somente o administrador escolhe falhas; o operador Tecnologia usa o caminho normal. URLs, credenciais, timeout e seletores não escapam para o serviço da saga, e a troca futura por sistemas reais permanece concentrada nos gateways. Em produção, suas credenciais existem somente nas variáveis do `worker` e o gateway usa o endereço loopback; em desenvolvimento, a URL aponta para o serviço Compose separado.
 
 ### 10.3 SC-06 — Briefing societário
 
@@ -321,6 +325,8 @@ Docker multi-stage compila assets e instala dependências travadas. A imagem rod
 
 Docker Compose reproduz localmente web, worker, simulador SC-05, PostgreSQL, Redis e storage S3 compatível. O simulador publica `127.0.0.1:8010` apenas para inspeção local e o worker o acessa pelo nome privado `simulator`. Ele recebe um ambiente mínimo próprio, sem credenciais Redis, S3 ou OpenAI. O mesmo comando efêmero usado pelo Railway Cron pode ser executado sob demanda no ambiente local. Migrations rodam em etapa explícita, não na inicialização concorrente de cada réplica.
 
+Na Railway, o limite do plano muda somente a unidade de hospedagem: `scripts/run_worker_with_simulator.sh` mantém Celery e o WSGI sintético como processos independentes no mesmo contêiner. `env -i` reduz a herança acidental de variáveis, o Playwright usa loopback, não existe domínio público e a credencial SC-05 fica cadastrada apenas no `worker`. Isso não constitui uma fronteira de segurança forte: os processos compartilham UID, namespace e credencial ampla de banco. Essa adaptação não deve ser copiada para uma produção com capacidade para isolamento de serviço; separar novamente o simulador é o caminho preferido quando o limite deixar de existir.
+
 Ambientes:
 
 - `local`: Compose e dados sintéticos;
@@ -332,14 +338,13 @@ Ambientes:
 Um projeto Railway conterá:
 
 - serviço web público;
-- worker privado;
+- worker privado, com Celery e processo auxiliar WSGI do SC-05 no mesmo contêiner;
 - cron privado e efêmero, com pulso de 15 minutos;
-- simulador privado;
 - PostgreSQL gerenciado;
 - Redis;
 - bucket S3.
 
-Web, worker e scheduler da versão 0.4.0 já usam deploy automático de `main` condicionado ao CI. Para a 0.5.0, o serviço `simulator` e suas variáveis estão declarados, mas sua existência, conectividade privada e participação no mesmo fluxo automático ainda precisam ser verificadas na Railway. Até esse smoke test, a topologia acima representa o alvo de implantação, não evidência de que o SC-05 já está público.
+O PR `#5` incorporou a 0.5.0 à `main`; os CIs do PR e do push em `main` ficaram verdes e a integração nativa concluiu deployments de `web`, `worker` e `scheduler` condicionados ao **Wait for CI**. O plano disponível, porém, não permitiu criar um quarto serviço de aplicação, e por isso essa implantação não tornou o SC-05 operacional. A IaC foi reduzida aos três serviços existentes e o ajuste co-localizado ainda precisa de novo PR, CI, deploy do worker e smoke tests. Até esses gates, a 0.5.0 está publicada, mas a automação SC-05 permanece sem evidência pública ponta a ponta.
 
 O web recebe o domínio HTTPS gerado pela plataforma. Domínio próprio é opcional e só será configurado se já estiver sob controle do projeto. O serviço permanecerá em plano sem suspensão durante toda a avaliação.
 
@@ -353,7 +358,7 @@ Deploy da branch `main` ocorre somente após validação no CI. A etapa de relea
 - E2E: login/RBAC e um caminho crítico por módulo;
 - resiliência: timeout, entrada inválida, duplicidade, falha parcial e retomada.
 
-No Dia 5, 37 testes focados exercitam ordem e idempotência da saga, bloqueio e undo tardio, preservação de restrições anteriores, compensação total e parcial, proteção contra estado divergente, retomada, RBAC, integridade de evidência e falha de broker. Quatro testes de contrato iniciam um servidor real e conduzem Chromium sobre bloqueio, desbloqueio, falha visual e retomada parcial nos três portais HTML. A suíte consolidada aprovou 122 testes com 83,83% de cobertura; lint, formatação, tipagem, checks Django, migrations, assets e Compose também passaram. Como o Docker Desktop estava desligado, o build local do contêiner ficou indisponível e deve ser confirmado pelo CI. Esse build, a implantação do simulador e os smoke tests públicos permanecem gates antes de declarar a versão 0.5.0 publicada.
+No Dia 5, 37 testes focados exercitam ordem e idempotência da saga, bloqueio e undo tardio, preservação de restrições anteriores, compensação total e parcial, proteção contra estado divergente, retomada, RBAC, integridade de evidência e falha de broker. Quatro testes de contrato iniciam um servidor real e conduzem Chromium sobre bloqueio, desbloqueio, falha visual e retomada parcial nos três portais HTML. A suíte consolidada aprovou 124 testes com 83,85% de cobertura; lint, formatação, tipagem, sintaxe do supervisor, checks Django, migrations, assets e Compose também passaram. O build de contêiner foi confirmado pelos CIs verdes do PR `#5` e do push em `main`. O deploy atualizado do worker e os smoke tests públicos são gates independentes antes de declarar o SC-05 operacional.
 
 ## 17. Decisões explicitamente fora do escopo
 

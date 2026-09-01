@@ -2,7 +2,7 @@
 
 Portal único para quatro automações contábeis do desafio Sheep Technology. O projeto parte de pouco contexto, registra as premissas adotadas e mantém a lógica real atrás de fronteiras externas simuladas.
 
-> Estado do código: **versão 0.5.0 em validação final** — os quatro processos selecionados estão implementados. O Dia 5 acrescenta o SC-05 com RPA Playwright real sobre três portais HTML sintéticos, saga compensável, retomada explícita e evidência visual privada. O ambiente público continua comprovado na versão 0.4.0 até o merge, o deploy e os smoke tests da 0.5.0; este documento não antecipa essa evidência.
+> Estado do código: **versão 0.5.0 incorporada à `main` e implantada, com ajuste operacional do SC-05 em validação** — os quatro processos selecionados estão implementados. O Dia 5 acrescenta o SC-05 com RPA Playwright real sobre três portais HTML sintéticos, saga compensável, retomada explícita e evidência visual privada. Web, worker e scheduler receberam a 0.5.0 após CI verde; o SC-05 ainda não é declarado operacional no ambiente público até que o novo arranjo co-localizado no worker passe por PR, CI, deploy e smoke tests.
 
 ## Ambientes publicados
 
@@ -13,6 +13,8 @@ Portal único para quatro automações contábeis do desafio Sheep Technology. O
 | Integração contínua | [GitHub Actions](https://github.com/Guilherme-Justo/SheepContabil/actions/workflows/ci.yml) |
 
 Em 2026-08-31, o deploy automático GitHub → Railway foi recuperado e validado pelo [PR `#3`](https://github.com/Guilherme-Justo/SheepContabil/pull/3): o CI terminou verde e `web`, `worker` e `scheduler` aguardaram sua conclusão antes de publicar pela integração nativa.
+
+Em 2026-09-01, o [PR `#5`](https://github.com/Guilherme-Justo/SheepContabil/pull/5) incorporou a versão 0.5.0 à `main` no commit [`d5b71b3`](https://github.com/Guilherme-Justo/SheepContabil/commit/d5b71b384340f4f3cd66e07f801309529790b39f). O CI do PR e o CI do push em `main` foram aprovados, e o deploy automático condicionado ao CI terminou com sucesso nos três serviços existentes. O limite de recursos do plano impediu criar um quarto serviço Railway para o simulador; o ajuste atual mantém a separação no Compose local e executa o WSGI sintético como processo auxiliar supervisionado dentro do serviço `worker` na Railway.
 
 As credenciais do ambiente publicado são sintéticas e devem ser entregues aos avaliadores fora do repositório. O projeto Railway está no período `Trial`; a mudança para um plano pago depende da decisão de billing do proprietário antes do fim do período de avaliação.
 
@@ -37,7 +39,8 @@ A seleção cobre as três naturezas do catálogo e combina dois processos de co
 - Saga SC-05 com snapshots antes/desejado/depois, bloqueio na ordem Arquivos → Contábil → Tarefas, desbloqueio inverso e compensação segura.
 - Storage privado compatível com S3 ativo no SC-04, com objetos endereçados por hash, checagem de integridade e nenhum arquivo persistido no disco do contêiner.
 - O mesmo storage privado conserva screenshots PNG recortados ao cliente/erro do SC-05 por tentativa, com SHA-256 e tamanho verificados no download novamente autorizado.
-- Docker Compose local para web, worker, simulador SC-05, scheduler efêmero, banco, Redis e MinIO; a topologia Railway da 0.5.0 declara também um simulador privado, cuja publicação ainda precisa ser confirmada.
+- Docker Compose local para web, worker, simulador SC-05 separado, scheduler efêmero, banco, Redis e MinIO.
+- Na Railway, a IaC preserva apenas `web`, `worker` e `scheduler`: o worker inicia o WSGI do simulador como processo auxiliar com ambiente sanitizado, sem herdar Redis, S3 ou OpenAI. O Playwright usa `127.0.0.1:8000`; a plataforma alcança a mesma porta apenas pela rede privada para healthcheck, sem domínio público.
 
 Os motivos, consequências e alternativas rejeitadas estão em [`docs/architecture.md`](docs/architecture.md) e nos nove ADRs de [`docs/adr/`](docs/adr/).
 
@@ -94,7 +97,7 @@ docker compose config --quiet
 
 O pipeline em `.github/workflows/ci.yml` instala o Chromium headless e repete lint, tipagem, testes — inclusive contrato RPA com navegador real —, cobertura, conferência de migrations, build dos assets e build da imagem de produção.
 
-No estado final local do Dia 5, a suíte completa aprovou `122` testes com `83,83%` de cobertura; os `37` testes focados do SC-05 também passaram. Ruff, verificação de formatação, Mypy, checks Django, conferência de migrations, build dos assets e validação do Compose estão verdes. O build local da imagem `0.5.0` não pôde ser executado porque o Docker Desktop estava desligado; esse gate permanece atribuído ao job `Container build` do CI antes do merge. Isso ainda não constitui evidência de publicação: o ambiente público comprovado continua na versão `0.4.0`.
+No estado final local do Dia 5, a suíte completa aprovou `124` testes com `83,85%` de cobertura; os `37` testes focados do SC-05 também passaram. Ruff, verificação de formatação, Mypy, sintaxe do supervisor POSIX, checks Django, conferência de migrations, build dos assets e validação do Compose ficaram verdes. O build da imagem `0.5.0`, indisponível localmente com o Docker Desktop desligado, foi aprovado pelos jobs `Container build` do [CI do PR](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33538813847) e do [push em `main`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33539137377). A 0.5.0 foi implantada nos três serviços existentes; isso ainda não constitui evidência operacional do SC-05, pois o ajuste co-localizado do simulador aguarda seu próprio PR, CI, deploy e smoke tests.
 
 ## Estrutura
 
