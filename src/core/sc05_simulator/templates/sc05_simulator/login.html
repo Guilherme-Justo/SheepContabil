@@ -1,0 +1,21 @@
+{% extends "sc05_simulator/base.html" %}
+
+{% block title %}Entrar · Simulador SC-05{% endblock %}
+
+{% block content %}
+<section class="panel" style="max-width: 32rem; margin: 3rem auto;" data-testid="simulator-login-panel">
+  <h1>Acesso aos portais privados</h1>
+  <p>Use exclusivamente as credenciais sintéticas do worker RPA.</p>
+  {% if login_error %}<div class="alert error" role="alert" data-testid="login-error">{{ login_error }}</div>{% endif %}
+  <form method="post" data-testid="simulator-login-form">
+    {% csrf_token %}
+    <label>Usuário
+      <input name="username" autocomplete="username" required data-testid="simulator-username">
+    </label>
+    <label>Senha
+      <input name="password" type="password" autocomplete="current-password" required data-testid="simulator-password">
+    </label>
+    <button type="submit" data-testid="simulator-login-submit">Entrar</button>
+  </form>
+</section>
+{% endblock %}

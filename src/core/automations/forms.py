@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from typing import Any, cast
+from uuid import uuid4
 
 from django import forms
 from django.conf import settings
@@ -16,6 +17,10 @@ from core.automations.models import (
     DocumentStatus,
     DocumentType,
     FiscalClient,
+    SC05Action,
+    SC05Client,
+    SC05ClientStatus,
+    SC05Scenario,
 )
 from core.automations.sc04.contracts import InvalidDocument, ValidatedDocument
 from core.automations.sc04.validation import validate_document
@@ -225,3 +230,46 @@ class BriefingStartForm(forms.Form):
         if len(document) not in {11, 14}:
             raise forms.ValidationError("Informe um CPF ou CNPJ sintético com 11 ou 14 dígitos.")
         return document
+
+
+class SC05OperationForm(forms.Form):
+    client = forms.ModelChoiceField(
+        label="Cliente sintético",
+        queryset=SC05Client.objects.none(),
+        empty_label="Selecione um cliente",
+    )
+    action = forms.ChoiceField(label="Ação", choices=SC05Action.choices)
+    scenario = forms.ChoiceField(
+        label="Cenário demonstrativo",
+        choices=SC05Scenario.choices,
+        help_text="Cenários de falha ficam disponíveis apenas para administradores.",
+    )
+    request_key = forms.UUIDField(widget=forms.HiddenInput())
+
+    def __init__(self, *args: Any, allow_failure_scenarios: bool, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        client_field = cast("forms.ModelChoiceField[SC05Client]", self.fields["client"])
+        client_field.queryset = SC05Client.objects.all()
+        if not self.is_bound:
+            self.initial.setdefault("request_key", uuid4())
+        if not allow_failure_scenarios:
+            scenario_field = cast(forms.ChoiceField, self.fields["scenario"])
+            scenario_field.choices = [(SC05Scenario.HAPPY_PATH, SC05Scenario.HAPPY_PATH.label)]
+            self.initial["scenario"] = SC05Scenario.HAPPY_PATH
+
+    def clean(self) -> dict[str, Any]:
+        cleaned_data = super().clean() or {}
+        client = cast(SC05Client | None, cleaned_data.get("client"))
+        action = cleaned_data.get("action")
+        if client is None or action not in SC05Action.values:
+            return cleaned_data
+        if client.status in {SC05ClientStatus.PARTIAL, SC05ClientStatus.UNKNOWN}:
+            self.add_error(
+                "client",
+                "O cliente possui estado parcial; retome ou reconcilie a execução anterior.",
+            )
+        elif action == SC05Action.BLOCK and client.status == SC05ClientStatus.BLOCKED:
+            self.add_error("action", "O cliente já está bloqueado.")
+        elif action == SC05Action.UNBLOCK and client.status != SC05ClientStatus.BLOCKED:
+            self.add_error("action", "O cliente ainda está ativo.")
+        return cleaned_data

@@ -1,0 +1,42 @@
+{% extends "sc05_simulator/base.html" %}
+
+{% block title %}Portal {{ system_label }} · SC-05{% endblock %}
+
+{% block content %}
+<section data-testid="{{ system }}-portal">
+  <h1>Portal {{ system_label }}</h1>
+  <p>Contas sintéticas operadas pela mesma interface visível ao usuário.</p>
+</section>
+
+<div class="grid" style="margin-top: 1rem;">
+  {% for row in rows %}
+  <article class="client" data-testid="{{ row.dom_prefix }}-row">
+    <div class="row">
+      <div>
+        <strong data-testid="{{ row.dom_prefix }}-name">{{ row.client.name }}</strong><br>
+        <code data-testid="{{ row.dom_prefix }}-document">{{ row.client.document }}</code>
+      </div>
+      <span class="status {% if row.account.is_blocked %}blocked{% endif %}" data-testid="{{ row.dom_prefix }}-status">
+        {% if row.account.is_blocked %}BLOCKED{% else %}ACTIVE{% endif %}
+      </span>
+    </div>
+    <div class="actions">
+      <form method="post" action="{% url action_url_name external_id=row.client.external_id action='block' %}" data-testid="{{ row.dom_prefix }}-block-form">
+        {% csrf_token %}
+        <input type="hidden" name="scenario" value="" data-testid="{{ row.dom_prefix }}-block-scenario">
+        <input type="hidden" name="phase" value="apply" data-testid="{{ row.dom_prefix }}-block-phase">
+        <button class="danger" type="submit" data-testid="{{ row.dom_prefix }}-block-submit">Bloquear</button>
+      </form>
+      <form method="post" action="{% url action_url_name external_id=row.client.external_id action='unblock' %}" data-testid="{{ row.dom_prefix }}-unblock-form">
+        {% csrf_token %}
+        <input type="hidden" name="scenario" value="" data-testid="{{ row.dom_prefix }}-unblock-scenario">
+        <input type="hidden" name="phase" value="apply" data-testid="{{ row.dom_prefix }}-unblock-phase">
+        <button type="submit" data-testid="{{ row.dom_prefix }}-unblock-submit">Desbloquear</button>
+      </form>
+    </div>
+  </article>
+  {% empty %}
+  <p class="panel" data-testid="{{ system }}-empty">Nenhuma conta sintética configurada.</p>
+  {% endfor %}
+</div>
+{% endblock %}

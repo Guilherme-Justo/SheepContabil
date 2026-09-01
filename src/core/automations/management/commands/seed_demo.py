@@ -1,5 +1,6 @@
 import os
 from datetime import timedelta
+from typing import Any, cast
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -20,11 +21,18 @@ from core.automations.models import (
     FiscalClient,
     RunStatus,
     RunTrigger,
+    SC05Client,
     SocietaryBriefing,
     SocietaryBriefingStatus,
 )
 from core.automations.sc06.rules import sanitize_answers
 from core.identity.models import Area, AreaMembership, User, UserRole
+from core.sc05_simulator.models import (
+    SimulatorClient,
+    SimulatorServiceAccount,
+    SimulatorSystem,
+    SimulatorTask,
+)
 
 AREAS = (
     ("fiscal", "Fiscal", "Documentos, tributos e obrigações fiscais."),
@@ -398,6 +406,18 @@ class Command(BaseCommand):
             display_name="Operador Fiscal",
             role=UserRole.OPERATOR,
         )
+        technology_operator = self._upsert_user(
+            username=os.getenv("DEMO_TECHNOLOGY_OPERATOR_USERNAME", "operador.tecnologia"),
+            email=os.getenv(
+                "DEMO_TECHNOLOGY_OPERATOR_EMAIL",
+                "operador.tecnologia@sheepcontabil.local",
+            ),
+            password=os.getenv("DEMO_TECHNOLOGY_OPERATOR_PASSWORD", "")
+            or os.getenv("DEMO_OPERATOR_PASSWORD", "")
+            or "",
+            display_name="Operador de Tecnologia",
+            role=UserRole.OPERATOR,
+        )
         if operator:
             AreaMembership.objects.get_or_create(user=operator, area=areas["processos"])
         if societary_operator:
@@ -410,15 +430,27 @@ class Command(BaseCommand):
                 user=fiscal_operator,
                 area=areas["fiscal"],
             )
+        if technology_operator:
+            AreaMembership.objects.get_or_create(
+                user=technology_operator,
+                area=areas["tecnologia"],
+            )
         template_version = self._seed_sc06_template(admin)
         if admin:
             self._seed_runs(modules, admin)
             self._seed_sc06_briefings(modules, admin, template_version)
         self._seed_certificates()
         self._seed_fiscal_clients()
+        self._seed_sc05_clients()
 
         self.stdout.write(self.style.SUCCESS("Áreas e quatro módulos sintéticos disponíveis."))
-        if not admin or not operator or not societary_operator or not fiscal_operator:
+        if (
+            not admin
+            or not operator
+            or not societary_operator
+            or not fiscal_operator
+            or not technology_operator
+        ):
             self.stdout.write(
                 self.style.WARNING(
                     "Usuários sem senha não foram criados. Defina DEMO_ADMIN_PASSWORD e "
@@ -449,7 +481,7 @@ class Command(BaseCommand):
 
     def _seed_runs(self, modules: dict[str, AutomationModule], admin: User) -> None:
         now = timezone.now()
-        examples = (
+        examples: tuple[tuple[str, str, str, str, str, timedelta], ...] = (
             (
                 "demo-sc04-review",
                 "SC-04",
@@ -636,7 +668,7 @@ class Command(BaseCommand):
 
     def _seed_certificates(self) -> None:
         today = timezone.localdate()
-        examples = (
+        examples: tuple[dict[str, Any], ...] = (
             {
                 "serial_number": "DEMO-CERT-001",
                 "client_name": "Horizonte Comércio Sintético",
@@ -758,3 +790,74 @@ class Command(BaseCommand):
             payload = dict(definition)
             code = str(payload.pop("code"))
             FiscalClient.objects.update_or_create(code=code, defaults=payload)
+
+    def _seed_sc05_clients(self) -> None:
+        examples: tuple[dict[str, Any], ...] = (
+            {
+                "external_reference": "aurora-demo",
+                "name": "Aurora Demonstração Ltda.",
+                "document": "12345678000190",
+                "tasks": (
+                    ("AURORA-FISCAL-01", "Conferir fechamento fiscal", "maria.fiscal", True),
+                    ("AURORA-CONTABIL-02", "Revisar conciliação", "joao.contabil", True),
+                    ("AURORA-ARQUIVO-03", "Arquivo histórico concluído", "ana.arquivos", False),
+                ),
+            },
+            {
+                "external_reference": "horizonte-demo",
+                "name": "Horizonte Comércio Demo Ltda.",
+                "document": "98765432000110",
+                "tasks": (
+                    ("HORIZONTE-FISCAL-01", "Validar documentos do período", "maria.fiscal", True),
+                    ("HORIZONTE-CONTABIL-02", "Importar movimentos", "joao.contabil", True),
+                ),
+            },
+            {
+                "external_reference": "cedro-demo",
+                "name": "Cedro Serviços Fictícios Ltda.",
+                "document": "11222333000181",
+                "tasks": (
+                    ("CEDRO-FISCAL-01", "Acompanhar obrigação sintética", "maria.fiscal", True),
+                ),
+            },
+        )
+        for definition in examples:
+            external_reference = str(definition["external_reference"])
+            client, _ = SC05Client.objects.update_or_create(
+                external_reference=external_reference,
+                defaults={
+                    "name": definition["name"],
+                    "document": definition["document"],
+                },
+            )
+            simulator_client, _ = SimulatorClient.objects.update_or_create(
+                external_id=external_reference,
+                defaults={
+                    "name": client.name,
+                    "document": client.document,
+                },
+            )
+            for system in SimulatorSystem.values:
+                SimulatorServiceAccount.objects.get_or_create(
+                    client=simulator_client,
+                    system=system,
+                    defaults={"is_blocked": False},
+                )
+            tasks = cast(
+                tuple[tuple[str, str, str, bool], ...],
+                definition["tasks"],
+            )
+            for reference, title, assignee, is_open in tasks:
+                task, created = SimulatorTask.objects.get_or_create(
+                    reference=reference,
+                    defaults={
+                        "client": simulator_client,
+                        "title": title,
+                        "assignee": assignee,
+                        "is_open": is_open,
+                    },
+                )
+                if not created and task.client.pk == simulator_client.pk:
+                    task.title = title
+                    task.is_open = is_open
+                    task.save(update_fields=("title", "is_open"))

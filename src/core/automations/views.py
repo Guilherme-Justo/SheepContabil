@@ -2,6 +2,7 @@ import hashlib
 from datetime import timedelta
 from io import BytesIO
 from typing import Any, cast
+from uuid import UUID
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -26,6 +27,7 @@ from core.automations.forms import (
     SC04QueueFilterForm,
     SC04ReviewForm,
     SC04UploadForm,
+    SC05OperationForm,
 )
 from core.automations.models import (
     AutomationModule,
@@ -47,6 +49,10 @@ from core.automations.models import (
     FiscalDocument,
     RunStatus,
     RunTrigger,
+    SC05Artifact,
+    SC05Client,
+    SC05Operation,
+    SC05PortalStep,
     SocietaryBriefing,
     SocietaryBriefingStatus,
 )
@@ -59,6 +65,9 @@ from core.automations.sc04.services import (
 )
 from core.automations.sc04.storage import build_object_storage
 from core.automations.sc04.validation import extension_for_media_type
+from core.automations.sc05.artifacts import build_screenshot_storage
+from core.automations.sc05.contracts import ArtifactStorageError
+from core.automations.sc05.services import create_sc05_run_result, resume_sc05_run
 from core.automations.sc06.forms import BriefingAnswersForm
 from core.automations.sc06.pdf import build_briefing_pdf
 from core.automations.sc06.rules import build_frontend_config
@@ -70,7 +79,7 @@ from core.automations.sc06.services import (
     save_briefing_draft,
 )
 from core.automations.sc20.services import create_sc20_run
-from core.automations.tasks import run_sc04_task, run_sc20_task
+from core.automations.tasks import run_sc04_task, run_sc05_task, run_sc20_task
 from core.identity.models import User
 
 
@@ -105,6 +114,8 @@ def module_detail(request: HttpRequest, slug: str) -> HttpResponse:
         raise Http404("Módulo não encontrado.") from exc
     if module.code == "SC-04":
         return _sc04_detail(request, module)
+    if module.code == "SC-05":
+        return _sc05_detail(request, module)
     if module.code == "SC-06":
         return _sc06_detail(request, module)
     if module.code == "SC-20":
@@ -150,6 +161,16 @@ def run_detail(request: HttpRequest, run_id: str) -> HttpResponse:
         if run.module_id == "SC-04"
         else DocumentRunItem.objects.none()
     )
+    sc05_operation = (
+        SC05Operation.objects.select_related("client").filter(run=run).first()
+        if run.module_id == "SC-05"
+        else None
+    )
+    sc05_steps = (
+        sc05_operation.steps.prefetch_related("attempts__artifacts").all()
+        if sc05_operation is not None
+        else SC05PortalStep.objects.none()
+    )
     return render(
         request,
         "automations/run_detail.html",
@@ -158,6 +179,8 @@ def run_detail(request: HttpRequest, run_id: str) -> HttpResponse:
             "attempts": attempts,
             "briefing": briefing,
             "document_items": document_items,
+            "sc05_operation": sc05_operation,
+            "sc05_steps": sc05_steps,
         },
     )
 
@@ -577,12 +600,159 @@ def _dispatch_sc04(request: HttpRequest, run: AutomationRun) -> None:
             status=RunStatus.FAILED,
             summary="Não foi possível adicionar a triagem ao processamento.",
             error_message="O serviço de execução está temporariamente indisponível.",
-            metadata={"dispatch_error": type(exc).__name__},
+            metadata={**run.metadata, "dispatch_error": type(exc).__name__},
             finished_at=timezone.now(),
         )
         messages.error(request, "A triagem não pôde ser iniciada. Tente novamente mais tarde.")
         return
     messages.success(request, "Triagem adicionada à fila com rastreabilidade.")
+
+
+def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse:
+    allow_failure_scenarios = cast(User, request.user).is_business_administrator
+    form = SC05OperationForm(allow_failure_scenarios=allow_failure_scenarios)
+    if request.method == "POST":
+        form = SC05OperationForm(
+            request.POST,
+            allow_failure_scenarios=allow_failure_scenarios,
+        )
+        if form.is_valid():
+            try:
+                creation = create_sc05_run_result(
+                    module=module,
+                    client=cast(SC05Client, form.cleaned_data["client"]),
+                    action=str(form.cleaned_data["action"]),
+                    scenario=str(form.cleaned_data["scenario"]),
+                    triggered_by=cast(User, request.user),
+                    request_key=form.cleaned_data["request_key"],
+                )
+            except ValidationError as exc:
+                for message in exc.messages:
+                    form.add_error(None, message)
+            else:
+                if creation.created:
+                    _dispatch_sc05(request, creation.run)
+                else:
+                    messages.info(
+                        request,
+                        "Esta solicitação já havia sido registrada; "
+                        "nenhuma execução foi duplicada.",
+                    )
+                return redirect("automations:run-detail", run_id=creation.run.id)
+
+    clients = SC05Client.objects.all()
+    operations = (
+        SC05Operation.objects.select_related("client", "run", "run__triggered_by")
+        .prefetch_related("steps")
+        .all()[:20]
+    )
+    summary = {
+        "total": clients.count(),
+        "active": clients.filter(status="active").count(),
+        "blocked": clients.filter(status="blocked").count(),
+        "partial": clients.filter(status="partial").count(),
+    }
+    return render(
+        request,
+        "automations/sc05_detail.html",
+        {
+            "module": module,
+            "form": form,
+            "clients": clients,
+            "operations": operations,
+            "summary": summary,
+            "allow_failure_scenarios": allow_failure_scenarios,
+        },
+    )
+
+
+@login_required
+@require_POST
+def sc05_resume(request: HttpRequest, run_id: str) -> HttpResponse:
+    operation = _visible_sc05_operation(request, run_id=run_id)
+    try:
+        run = resume_sc05_run(operation.run_id)
+    except ValidationError as exc:
+        messages.error(request, " ".join(exc.messages))
+        return redirect("automations:run-detail", run_id=operation.run_id)
+    _dispatch_sc05(request, run, resumed=True)
+    return redirect("automations:run-detail", run_id=run.id)
+
+
+@login_required
+@require_GET
+def sc05_artifact(request: HttpRequest, artifact_id: str) -> HttpResponse:
+    try:
+        artifact = (
+            SC05Artifact.objects.select_related(
+                "attempt__step__operation__run__module__area",
+            )
+            .filter(attempt__step__operation__run__module__in=_visible_modules(request))
+            .get(pk=artifact_id)
+        )
+    except (SC05Artifact.DoesNotExist, ValueError) as exc:
+        raise Http404("Evidência não encontrada.") from exc
+    try:
+        content = build_screenshot_storage().get(key=artifact.storage_key)
+        if (
+            len(content) != artifact.byte_size
+            or hashlib.sha256(content).hexdigest() != artifact.sha256
+        ):
+            raise ArtifactStorageError("A evidência visual falhou na verificação de integridade.")
+    except ArtifactStorageError:
+        return HttpResponse(
+            "A evidência visual está temporariamente indisponível.",
+            status=503,
+            content_type="text/plain; charset=utf-8",
+        )
+    response = FileResponse(
+        BytesIO(content),
+        as_attachment=False,
+        filename=f"evidencia-sc05-{artifact.id}.png",
+        content_type="image/png",
+    )
+    response["Cache-Control"] = "private, no-store"
+    response["Cross-Origin-Resource-Policy"] = "same-origin"
+    response["X-Content-Type-Options"] = "nosniff"
+    return cast(HttpResponse, response)
+
+
+def _visible_sc05_operation(request: HttpRequest, *, run_id: str) -> SC05Operation:
+    try:
+        return (
+            SC05Operation.objects.select_related("run", "client", "run__module__area")
+            .filter(run__module__in=_visible_modules(request))
+            .get(run_id=UUID(str(run_id)))
+        )
+    except (SC05Operation.DoesNotExist, ValueError) as exc:
+        raise Http404("Operação SC-05 não encontrada.") from exc
+
+
+def _dispatch_sc05(
+    request: HttpRequest,
+    run: AutomationRun,
+    *,
+    resumed: bool = False,
+) -> None:
+    try:
+        run_sc05_task.delay(str(run.id))
+    except Exception as exc:
+        AutomationRun.objects.filter(pk=run.pk).update(
+            status=(RunStatus.PARTIALLY_FAILED if resumed else RunStatus.FAILED),
+            summary=(
+                "A retomada não entrou na fila; o estado residual foi preservado "
+                "para nova tentativa."
+                if resumed
+                else "Não foi possível adicionar o robô ao processamento."
+            ),
+            error_message="O serviço de execução está temporariamente indisponível.",
+            metadata={**run.metadata, "dispatch_error": type(exc).__name__},
+            finished_at=timezone.now(),
+        )
+        messages.error(request, "A operação não pôde ser iniciada. Tente novamente mais tarde.")
+        return
+    label = "Retomada" if resumed else "Operação"
+    messages.success(request, f"{label} adicionada à fila RPA com rastreabilidade.")
 
 
 @login_required

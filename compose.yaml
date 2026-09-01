@@ -31,6 +31,18 @@ x-app-environment: &app-environment
   DEMO_FISCAL_OPERATOR_USERNAME: ${DEMO_FISCAL_OPERATOR_USERNAME:-operador.fiscal}
   DEMO_FISCAL_OPERATOR_EMAIL: ${DEMO_FISCAL_OPERATOR_EMAIL:-operador.fiscal@sheepcontabil.local}
   DEMO_FISCAL_OPERATOR_PASSWORD: ${DEMO_FISCAL_OPERATOR_PASSWORD:-}
+  DEMO_TECHNOLOGY_OPERATOR_USERNAME: ${DEMO_TECHNOLOGY_OPERATOR_USERNAME:-operador.tecnologia}
+  DEMO_TECHNOLOGY_OPERATOR_EMAIL: ${DEMO_TECHNOLOGY_OPERATOR_EMAIL:-operador.tecnologia@sheepcontabil.local}
+  DEMO_TECHNOLOGY_OPERATOR_PASSWORD: ${DEMO_TECHNOLOGY_OPERATOR_PASSWORD:-}
+
+x-simulator-environment: &simulator-environment
+  DJANGO_SETTINGS_MODULE: config.settings.simulator
+  DJANGO_SECRET_KEY: ${SC05_SIMULATOR_DJANGO_SECRET_KEY:-unsafe-compose-simulator-key}
+  DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,simulator
+  APP_TIME_ZONE: America/Sao_Paulo
+  DATABASE_URL: postgresql://sheep:sheep-local-only@postgres:5432/sheepcontabil
+  SC05_SIMULATOR_USERNAME: ${SC05_SIMULATOR_USERNAME:-sheep-rpa}
+  SC05_SIMULATOR_PASSWORD: ${SC05_SIMULATOR_PASSWORD:-sheep-simulator-local}
 
 x-app-service: &app-service
   build:
@@ -71,6 +83,12 @@ services:
   worker:
     <<: *app-service
     command: celery --app config worker --loglevel INFO --concurrency 1
+    environment:
+      <<: *app-environment
+      SC05_SIMULATOR_BASE_URL: http://simulator:8010
+      SC05_SIMULATOR_USERNAME: ${SC05_SIMULATOR_USERNAME:-sheep-rpa}
+      SC05_SIMULATOR_PASSWORD: ${SC05_SIMULATOR_PASSWORD:-sheep-simulator-local}
+      SC05_RPA_TIMEOUT_MS: ${SC05_RPA_TIMEOUT_MS:-10000}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -78,6 +96,30 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      simulator:
+        condition: service_healthy
+
+  simulator:
+    <<: *app-service
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        exec gunicorn config.simulator_wsgi:application --chdir src
+        --bind 0.0.0.0:8010 --workers 1 --threads 2
+        --access-logfile - --error-logfile -
+    ports:
+      - "127.0.0.1:8010:8010"
+    environment:
+      <<: *simulator-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8010/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
   postgres:
     image: postgres:18-alpine

@@ -7,6 +7,7 @@
 | `web` | Domínio HTTPS público | Portal, autenticação, comandos e consulta |
 | `worker` | Privado | Celery, IA, RPA e geração de artefatos |
 | `scheduler` | Privado e efêmero | Pulso de 15 minutos que publica SC-04 diário e SC-20 mensal |
+| `simulator` | Privado, sem domínio público | Três portais HTML sintéticos operados pelo Playwright do SC-05 |
 | PostgreSQL | Privado | Fonte de verdade |
 | Redis | Privado | Broker; não guarda histórico oficial |
 | Bucket | Privado | Originais e resultados via S3 |
@@ -35,19 +36,20 @@ railway config plan
 railway config apply
 ```
 
-Revise o plano antes de aplicar. `.railway/railway.ts` cria web, worker, scheduler, PostgreSQL, Redis e bucket; valores `preserve()` nunca revelam nem substituem um segredo já existente.
+Revise o plano antes de aplicar. `.railway/railway.ts` cria web, worker, scheduler, simulador privado, PostgreSQL, Redis e bucket; valores `preserve()` nunca revelam nem substituem um segredo já existente.
 
 Depois de aplicar:
 
-1. Cadastre `DJANGO_SECRET_KEY`, `DEMO_ADMIN_PASSWORD` e `DEMO_OPERATOR_PASSWORD` no serviço web. A última cria operadores sintéticos de Processos, Societário e Fiscal; use as variáveis específicas somente se precisar separar as senhas.
+1. Cadastre `DJANGO_SECRET_KEY`, `DEMO_ADMIN_PASSWORD`, `DEMO_OPERATOR_PASSWORD`, `DEMO_SOCIETARY_OPERATOR_PASSWORD`, `DEMO_FISCAL_OPERATOR_PASSWORD` e `DEMO_TECHNOLOGY_OPERATOR_PASSWORD` no serviço web. Use valores distintos e entregue-os aos avaliadores fora do Git.
 2. Mantenha `OPENAI_API_KEY` e `OPENAI_MODEL` somente no worker. O modelo deve ser escolhido explicitamente entre os disponíveis na conta e validado com a massa sintética; web e worker compartilham apenas os segredos de infraestrutura necessários.
-3. Confirme que web e worker receberam a fonte `Guilherme-Justo/SheepContabil`, branch `main`, declarada na IaC.
-4. Gere domínio Railway somente no web.
-5. Mantenha o pre-deploy `sh scripts/predeploy.sh` no web.
-6. Para a carga inicial, defina `SEED_DEMO_ON_DEPLOY=true`, publique uma vez e
+3. No `simulator`, configure um `DJANGO_SECRET_KEY` próprio e `SC05_SIMULATOR_USERNAME`/`SC05_SIMULATOR_PASSWORD`. Repita somente usuário e senha do simulador no `worker`; mantenha `SC05_SIMULATOR_BASE_URL=http://simulator.railway.internal:8000`. O simulador não recebe Redis, S3 nem OpenAI.
+4. Confirme que web, worker, scheduler e simulator receberam a fonte `Guilherme-Justo/SheepContabil`, branch `main`, declarada na IaC.
+5. Gere domínio Railway somente no web. O `simulator` deve permanecer acessível exclusivamente pela rede privada.
+6. Mantenha o pre-deploy `sh scripts/predeploy.sh` no web.
+7. Para a carga inicial, defina `SEED_DEMO_ON_DEPLOY=true`, publique uma vez e
    volte a variável para `false` sem novo deploy. O script executa as migrations
    em toda publicação e só executa o seed idempotente quando a flag está ativa.
-7. Registre a URL e as credenciais de avaliação fora do repositório.
+8. Registre a URL e as credenciais de avaliação fora do repositório.
 
 ## Smoke test
 
@@ -61,6 +63,9 @@ Depois de aplicar:
 - Acesso direto do operador a outro módulo retorna 404.
 - Assets, logo e fontes carregam em HTTPS.
 - Worker conecta ao Redis sem possuir domínio público e inicia com concorrência 1 para limitar o consumo do Chromium no primeiro deploy.
+- Simulator responde `200` em sua healthcheck privada, não possui domínio público e aceita login somente com a credencial sintética compartilhada com o worker.
+- O SC-05 bloqueia Arquivos → Contábil → Tarefas, mantém o cliente ativo em Tarefas, registra screenshots privados e restaura exatamente os responsáveis no desbloqueio inverso.
+- O cenário de falha combinada termina `PARTIALLY_FAILED`; a retomada conclui sem novo clique no portal já conforme. Download com RBAC válido confere hash/tamanho e acesso de outra área retorna `404`.
 - O módulo SC-20 lista a massa sintética, executa a janela inclusiva de 60 dias e registra uma falha deliberada disponível para retentativa.
 - Uma segunda execução do SC-20 não repete os avisos já registrados para a mesma validade, canal e política.
 - O SC-06 lista um caso concluído e um rascunho, reage aos caminhos de abertura/alteração, exige o bloco de outra UF e o regime quando houver sócio casado.
@@ -86,7 +91,7 @@ A validação controlada usou o [PR `#3`](https://github.com/Guilherme-Justo/She
 - `worker`: `07732a81-7cc9-4625-9798-4c2a5fb2a45e`;
 - `scheduler`: `858094d8-f740-4630-8aea-99706622503a`.
 
-O portal respondeu `200` em `/health/ready`, encerrando o teste de recuperação. A associação com `main`, o deploy automático e `Wait for CI` devem permanecer ativos nos três serviços. Se `GitHub Repo not found` reaparecer, reautorize a integração e reassocie apenas a fonte afetada; um workflow com token Railway continua sendo fallback de último recurso.
+O portal respondeu `200` em `/health/ready`, encerrando o teste de recuperação. A associação com `main`, o deploy automático e `Wait for CI` devem permanecer ativos nesses três serviços já comprovados. Ao publicar a 0.5.0, o mesmo controle deve ser habilitado e validado no novo `simulator`. Se `GitHub Repo not found` reaparecer, reautorize a integração e reassocie apenas a fonte afetada; um workflow com token Railway continua sendo fallback de último recurso.
 
 ## Scheduler do SC-04 e SC-20
 

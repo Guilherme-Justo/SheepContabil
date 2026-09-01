@@ -1,0 +1,60 @@
+{% extends "sc05_simulator/base.html" %}
+
+{% block title %}Portal de Tarefas · SC-05{% endblock %}
+
+{% block content %}
+<section data-testid="tasks-portal">
+  <h1>Portal de Tarefas</h1>
+  <p>O cliente permanece ativo. Somente as tarefas abertas mudam de responsável.</p>
+</section>
+
+<div class="grid" style="margin-top: 1rem;">
+  {% for row in rows %}
+  <article class="client" data-testid="tasks-client-{{ row.client.external_id }}-row">
+    <div class="row">
+      <div>
+        <strong data-testid="tasks-client-{{ row.client.external_id }}-name">{{ row.client.name }}</strong><br>
+        <code data-testid="tasks-client-{{ row.client.external_id }}-document">{{ row.client.document }}</code><br>
+        Cliente no sistema:
+        <strong data-testid="tasks-client-{{ row.client.external_id }}-active-state">
+          {% if row.client.is_active %}ACTIVE{% else %}INACTIVE{% endif %}
+        </strong>
+      </div>
+      <span class="status {% if row.is_blocked %}blocked{% endif %}" data-testid="tasks-client-{{ row.client.external_id }}-status">
+        {% if row.is_blocked %}BLOCKED{% else %}ACTIVE{% endif %}
+      </span>
+    </div>
+    <div class="actions">
+      <form method="post" action="{% url 'sc05_simulator:tasks-action' external_id=row.client.external_id action='block' %}" data-testid="tasks-client-{{ row.client.external_id }}-block-form">
+        {% csrf_token %}
+        <input type="hidden" name="scenario" value="" data-testid="tasks-client-{{ row.client.external_id }}-block-scenario">
+        <input type="hidden" name="phase" value="apply" data-testid="tasks-client-{{ row.client.external_id }}-block-phase">
+        <button class="danger" type="submit" data-testid="tasks-client-{{ row.client.external_id }}-block-submit">Bloquear tarefas abertas</button>
+      </form>
+      <form method="post" action="{% url 'sc05_simulator:tasks-action' external_id=row.client.external_id action='unblock' %}" data-testid="tasks-client-{{ row.client.external_id }}-unblock-form">
+        {% csrf_token %}
+        <input type="hidden" name="scenario" value="" data-testid="tasks-client-{{ row.client.external_id }}-unblock-scenario">
+        <input type="hidden" name="phase" value="apply" data-testid="tasks-client-{{ row.client.external_id }}-unblock-phase">
+        <button type="submit" data-testid="tasks-client-{{ row.client.external_id }}-unblock-submit">Restaurar responsáveis</button>
+      </form>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Referência</th><th>Título</th><th>Estado</th><th>Responsável atual</th><th>Backup</th></tr></thead>
+        <tbody>
+          {% for task in row.tasks %}
+          <tr data-testid="task-{{ task.reference }}-row">
+            <td><code data-testid="task-{{ task.reference }}-reference">{{ task.reference }}</code></td>
+            <td data-testid="task-{{ task.reference }}-title">{{ task.title }}</td>
+            <td data-testid="task-{{ task.reference }}-state">{% if task.is_open %}OPEN{% else %}CLOSED{% endif %}</td>
+            <td data-testid="task-{{ task.reference }}-assignee">{{ task.assignee }}</td>
+            <td data-testid="task-{{ task.reference }}-previous-assignee">{{ task.previous_assignee|default:"—" }}</td>
+          </tr>
+          {% empty %}<tr><td colspan="5">Nenhuma tarefa.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+  {% empty %}<p class="panel" data-testid="tasks-empty">Nenhuma tarefa sintética configurada.</p>{% endfor %}
+</div>
+{% endblock %}

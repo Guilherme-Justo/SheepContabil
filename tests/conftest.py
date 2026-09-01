@@ -100,3 +100,16 @@ def fiscal_operator(db, areas: dict[str, Area]) -> User:
     )
     AreaMembership.objects.create(user=user, area=areas["fiscal"])
     return user
+
+
+@pytest.fixture
+def technology_operator(db, areas: dict[str, Area]) -> User:
+    user = User.objects.create_user(
+        username="operador.tecnologia",
+        email="operador.tecnologia@example.test",
+        password="safe-test-password",
+        display_name="Operador de Tecnologia",
+        role=UserRole.OPERATOR,
+    )
+    AreaMembership.objects.create(user=user, area=areas["tecnologia"])
+    return user

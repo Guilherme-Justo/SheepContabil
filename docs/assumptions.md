@@ -4,6 +4,7 @@
 | --- | --- |
 | Status | Registro vivo iniciado no Dia 1 |
 | Data-base | 2026-08-27 |
+| Última atualização | 2026-09-01 — decisões do SC-05 congeladas no Dia 5 |
 | Escopo | SC-04, SC-05, SC-06 e SC-20 |
 
 ## 1. Como usar este documento
@@ -63,15 +64,30 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 
 | ID | Status | Premissa | Implicação |
 | --- | --- | --- | --- |
-| A-05-01 | Aceita para o desafio | Haverá um simulador privado representando os portais necessários, incluindo um sistema de tarefas. | A fronteira é HTTP/HTML; o domínio nunca consulta as tabelas internas do simulador. |
-| A-05-02 | Aceita para o desafio | Playwright operará os portais pelo mesmo caminho visível a um usuário. | Alteração direta no banco ou endpoint oculto do simulador não conta como execução RPA. |
-| A-05-03 | Aceita para o desafio | Cada portal terá Page Object e adapter independentes. | Seletores e credenciais podem mudar sem alterar o caso de uso. |
-| A-05-04 | Confirmada | No sistema de tarefas, bloqueio é representado por troca de responsável/marcador, preservando histórico. | O estado anterior deve ser capturado para desbloqueio/compensação. |
-| A-05-05 | Aceita para o desafio | Passos já concluídos são idempotentes e não são repetidos na retomada. | Cada passo recebe chave própria e conserva tentativa/resultado. |
-| A-05-06 | Aceita para o desafio | Falha após sucesso parcial inicia compensação automática apenas quando a ação inversa é conhecida e segura. | Compensação também é auditada; falha de compensação produz `PARTIALLY_FAILED`. |
-| A-05-07 | Aceita para o desafio | O administrador poderá selecionar um cenário determinístico de timeout ou falha para a próxima execução. | A apresentação demonstra resiliência sem erro aleatório. |
-| A-05-08 | Validar | A ordem exata dos portais será definida a partir da reversibilidade e da criticidade. | Antes de codificar a saga, registrar ordem, pré-condições e compensação por etapa. |
-| A-05-09 | Aceita para o desafio | Uma instância de navegador por execução e concorrência baixa bastam ao volume sintético. | Não haverá browser farm nem paralelismo agressivo. |
+| A-05-01 | Aceita para o desafio | Um serviço privado representa Portal de arquivos, Sistema contábil e Sistema de tarefas. | A fronteira é HTTP/HTML autenticada; o domínio nunca consulta as tabelas internas do simulador. |
+| A-05-02 | Aceita para o desafio | Playwright opera os três portais pelo mesmo caminho visível a um usuário. | Leitura e mutação usam DOM e formulários com CSRF; alteração direta no banco ou endpoint oculto não conta como RPA. |
+| A-05-03 | Aceita para o desafio | Cada portal possui gateway independente sobre uma sessão de navegador comum à saga. | URLs, seletores e credenciais permanecem fora do serviço de domínio e podem ser substituídos por integrações reais. |
+| A-05-04 | Confirmada | No sistema de tarefas, o cliente não é desativado: o bloqueio troca o responsável das tarefas abertas por um marcador e preserva o histórico. | O marcador adotado é `BLOQUEADO_INADIMPLENCIA`; tarefas fechadas não mudam e o snapshot anterior precisa permitir restauração exata. |
+| A-05-05 | Aceita para o desafio | Etapas são idempotentes e uma retomada não reaplica mutação quando o portal já está no estado desejado. | O worker sempre inspeciona e compara estado observado e desejado; tentativas permanecem auditáveis em sequência. |
+| A-05-06 | Aceita para o desafio | Falha após sucesso parcial inicia compensação automática apenas quando o portal ainda está exatamente no estado produzido pela saga. | Divergência externa bloqueia sobrescrita; compensação também é auditada e qualquer resíduo produz `PARTIALLY_FAILED`. |
+| A-05-07 | Aceita para o desafio | Somente o administrador pode selecionar cenário determinístico de timeout ou falha; o operador Tecnologia executa o fluxo normal. | A apresentação demonstra resiliência sem erro aleatório nem controles de teste expostos ao perfil operacional. |
+| A-05-08 | Aceita para o desafio | O bloqueio segue Arquivos → Contábil → Tarefas; o desbloqueio segue Tarefas → Contábil → Arquivos. | A ordem inversa libera primeiro os responsáveis e só depois as contas; uma falha compensa os passos alterados na ordem inversa da ação em curso. |
+| A-05-09 | Aceita para o desafio | Uma instância de navegador, contexto e página por execução e concorrência baixa bastam ao volume sintético. | Playwright síncrono roda em uma thread dedicada da saga; não haverá browser farm nem paralelismo agressivo. |
+| A-05-10 | Aceita para o desafio | O desbloqueio só pode começar quando a projeção do cliente está bloqueada e existe snapshot dos responsáveis anteriores. | Estado parcial ou desconhecido exige retomada/reconciliação; não se inventa responsável substituto. |
+| A-05-11 | Aceita para o desafio | Screenshots PNG de inspeção, aplicação, recusa e compensação são evidências privadas, não conteúdo público do simulador. | A imagem é recortada ao cliente ou alerta atual; o objeto recebe chave opaca, hash e tamanho, e o download revalida RBAC e integridade. |
+| A-05-12 | Aceita para o desafio | Desbloquear significa desfazer o efeito do SC-05, não remover restrição preexistente de outro processo. | Arquivos e Contábil retornam ao booleano capturado na última saga de bloqueio bem-sucedida. |
+| A-05-13 | Aceita para o desafio | Mudanças legítimas no ciclo de vida das tarefas podem ocorrer entre bloqueio e renegociação. | O undo restaura os responsáveis das referências alteradas sem reabrir/fechar tarefas nem apagar tarefas novas; divergência de responsável ou marcador sem snapshot é recusada. |
+
+### 4.1 Ordem e compensações congeladas no Dia 5
+
+| Ação | Posição | Portal | Pré-condição relevante | Estado desejado | Compensação segura |
+| --- | ---: | --- | --- | --- | --- |
+| Bloquear | 1 | Arquivos | Cliente identificado de forma única | Conta bloqueada | Restaurar o booleano observado antes da ação, apenas se o estado atual ainda for o produzido pela saga |
+| Bloquear | 2 | Contábil | Cliente identificado de forma única | Conta bloqueada | Mesma comparação e restauração exata do snapshot anterior |
+| Bloquear | 3 | Tarefas | Cliente ativo e lista válida de tarefas | Tarefas abertas com o marcador; fechadas intactas | Restaurar cliente e responsáveis exatamente como capturados |
+| Desbloquear | 1 | Tarefas | Cliente bloqueado e snapshot de restauração disponível | Cliente ativo e responsáveis originais | Voltar ao estado bloqueado capturado, se ainda não houve alteração externa |
+| Desbloquear | 2 | Contábil | Snapshot da última saga de bloqueio disponível | Booleano anterior ao SC-05 | Voltar ao estado bloqueado da ação atual quando seguro |
+| Desbloquear | 3 | Arquivos | Snapshot da última saga de bloqueio disponível | Booleano anterior ao SC-05 | Voltar ao estado bloqueado da ação atual quando seguro |
 
 ## 5. SC-06 — Briefing societário
 
@@ -121,7 +137,7 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 | OpenAI indisponível, lenta ou sem saldo | Média | Alto em SC-04 | Timeout, retentativa limitada, revisão e falha honesta; não usar fake silencioso | Teste de timeout e mensagem no histórico |
 | Saída de IA com schema ou confiança inválida | Média | Alto | Validação estrita e limiar configurável | Documento enviado à revisão |
 | Seletores do RPA frágeis | Média | Alto | Page Objects, seletores estáveis, screenshots e testes de contrato | Falha identifica portal e etapa |
-| Estado parcial em SC-05 | Média | Alto | Saga, estado anterior, compensação e retomada | Cenário `PARTIALLY_FAILED` demonstrável |
+| Estado parcial em SC-05 | Média | Alto | Snapshots antes/desejado/depois, compensação condicional, projeção parcial e retomada explícita | Cenário local `PARTIALLY_FAILED` coberto sem repetir portal já conforme |
 | Duplo disparo do scheduler | Baixa | Alto | Railway Cron curto e constraint de idempotência | Segunda publicação não duplica execução |
 | Perda de arquivo no redeploy | Média sem mitigação | Alto | S3 e metadados no PostgreSQL | Arquivo permanece após nova versão |
 | Regra de SC-06 diverge entre UI e backend | Média | Médio | Mesmo schema/regra avaliado no servidor; testes | Envio inválido é recusado no backend |
@@ -134,10 +150,11 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 
 1. Confirmar tipos documentais e clientes sintéticos do SC-04.
 2. Calibrar o limiar de revisão com a massa sintética.
-3. Registrar ordem, pré-condição e compensação de cada portal do SC-05.
-4. Confirmar se SC-20 terá apenas o aviso de 60 dias ou faixas adicionais.
-5. Confirmar o canal simulado e o conteúdo mínimo das comunicações.
-6. Confirmar a conta Railway, orçamento e período de permanência pública.
-7. Confirmar disponibilidade de credencial OpenAI para o ambiente demonstrável.
+3. Confirmar se SC-20 terá apenas o aviso de 60 dias ou faixas adicionais.
+4. Confirmar o canal simulado e o conteúdo mínimo das comunicações.
+5. Confirmar a conta Railway, orçamento e período de permanência pública.
+6. Confirmar disponibilidade de credencial OpenAI para o ambiente demonstrável.
 
 Nenhum desses itens justifica criar microsserviços ou adiar autenticação, histórico, fila, storage e estrutura modular.
+
+A antiga pendência de definir ordem, pré-condições e compensações do SC-05 foi encerrada no Dia 5 e permanece registrada em A-05-08 e na tabela 4.1. Ainda faltam implantação do simulador privado e smoke tests da versão 0.5.0 para converter a validação local em evidência pública; isso é pendência operacional, não lacuna funcional da saga.

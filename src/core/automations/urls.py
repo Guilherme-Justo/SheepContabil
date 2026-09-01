@@ -45,6 +45,16 @@ urlpatterns = [
         name="sc04-review-resolve",
     ),
     path(
+        "bloqueio-clientes/execucoes/<uuid:run_id>/retomar/",
+        views.sc05_resume,
+        name="sc05-resume",
+    ),
+    path(
+        "bloqueio-clientes/evidencias/<uuid:artifact_id>/",
+        views.sc05_artifact,
+        name="sc05-artifact",
+    ),
+    path(
         "briefings-societarios/<uuid:briefing_id>/",
         views.sc06_briefing_detail,
         name="sc06-briefing-detail",
