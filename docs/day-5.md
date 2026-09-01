@@ -222,7 +222,7 @@ Assim, PR, dois CIs, **Wait for CI**, deploy automático, topologia co-localizad
 - [x] Ajuste co-localizado aprovado no PR `#6` e em dois CIs, com **Wait for CI** preservado nos três serviços.
 - [x] WSGI privado publicado junto ao worker, Playwright em loopback e allowlist de ambiente verificada.
 - [x] Smoke tests de produção registrados.
-- [ ] Release e tag `v0.5.0` publicados.
+- [x] Release e tag `v0.5.0` publicados.
 
 ## Limites conscientes
 
