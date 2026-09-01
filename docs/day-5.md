@@ -149,7 +149,7 @@ O operador da área Tecnologia vê e executa o SC-05 normal. Operadores de outra
 
 ## Massa demonstrativa
 
-O seed idempotente acrescenta `operador.tecnologia`, três clientes SC-05, três contas de serviço por cliente e seis tarefas sintéticas. Há tarefas abertas e fechadas, com responsáveis distintos, para tornar visível que o robô muda somente as abertas e depois restaura os valores exatos.
+O seed idempotente acrescenta `operador.tecnologia`, três clientes SC-05, duas contas de serviço por cliente e seis tarefas sintéticas. Há tarefas abertas e fechadas, com responsáveis distintos, para tornar visível que o robô muda somente as abertas e depois restaura os valores exatos.
 
 Reexecutar o seed não redefine bloqueios nem responsáveis já alterados pelo fluxo. Assim, uma demonstração em andamento não é revertida silenciosamente por preparação de dados.
 
@@ -183,7 +183,7 @@ O ajuste operacional foi incorporado pelo [PR `#6`](https://github.com/Guilherme
 - `worker`: `8101f6cb-4401-489e-850e-02f62075e8e3`;
 - `scheduler`: `348d9edf-8bf4-45de-b8ed-e955f3ff3934`.
 
-O worker registrou Gunicorn em `0.0.0.0:8000` apenas para o healthcheck privado da plataforma e Celery pronto; o RPA usa exclusivamente `http://127.0.0.1:8000`. O marcador de readiness só foi criado depois de schema, banco, WSGI e Celery estarem saudáveis. As credenciais e o segredo Django distintos do simulador ficaram somente no worker, e a allowlist do processo filho exclui Redis, S3 e OpenAI. O portal público respondeu `200` em `/health/ready`.
+O Gunicorn escuta em `0.0.0.0:8000` sem domínio público, permitindo o healthcheck pela rede privada; o RPA usa exclusivamente `http://127.0.0.1:8000`. O marcador de readiness só é criado depois da conferência do schema, da liveness do WSGI e de o processo Celery permanecer vivo durante a janela inicial de três segundos; o endpoint também consulta o banco. O smoke funcional abaixo é a evidência separada de que fila e worker processaram as tarefas. As credenciais e o segredo Django distintos do simulador ficaram somente no worker, e a allowlist do processo filho exclui Redis, S3 e OpenAI. O portal público respondeu `200` em `/health/ready`.
 
 O seed idempotente foi habilitado por um único redeploy web (`cfe0a20c-e358-44ef-870f-5aec6271a24d`) e imediatamente voltou a `false`, sem novo deploy. Em seguida, o smoke autenticado produziu as seguintes evidências:
 
