@@ -12,6 +12,8 @@ Portal único para quatro automações contábeis do desafio Sheep Technology. O
 | Repositório público | [Guilherme-Justo/SheepContabil](https://github.com/Guilherme-Justo/SheepContabil) |
 | Integração contínua | [GitHub Actions](https://github.com/Guilherme-Justo/SheepContabil/actions/workflows/ci.yml) |
 
+Em 2026-08-31, o deploy automático GitHub → Railway foi recuperado e validado pelo [PR `#3`](https://github.com/Guilherme-Justo/SheepContabil/pull/3): o CI terminou verde e `web`, `worker` e `scheduler` aguardaram sua conclusão antes de publicar pela integração nativa.
+
 As credenciais do ambiente publicado são sintéticas e devem ser entregues aos avaliadores fora do repositório. O projeto Railway está no período `Trial`; a mudança para um plano pago depende da decisão de billing do proprietário antes do fim do período de avaliação.
 
 ## Processos selecionados
