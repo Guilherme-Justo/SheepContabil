@@ -18,10 +18,12 @@ from core.automations.models import (
     FiscalClient,
     RunStatus,
     RunTrigger,
+    SC05Client,
     SocietaryBriefing,
     SocietaryBriefingStatus,
 )
 from core.identity.models import Area, AreaMembership, User, UserRole
+from core.sc05_simulator.models import SimulatorClient, SimulatorServiceAccount, SimulatorTask
 
 pytestmark = pytest.mark.django_db
 
@@ -43,7 +45,11 @@ def test_demo_seed_is_complete_and_idempotent(monkeypatch: pytest.MonkeyPatch) -
     assert AutomationRun.objects.count() == 5
     assert DigitalCertificate.objects.count() == 7
     assert FiscalClient.objects.count() == 4
-    assert User.objects.count() == 4
+    assert User.objects.count() == 5
+    assert SC05Client.objects.count() == 3
+    assert SimulatorClient.objects.count() == 3
+    assert SimulatorServiceAccount.objects.count() == 6
+    assert SimulatorTask.objects.count() == 6
     assert BriefingTemplate.objects.count() == 1
     assert BriefingTemplateVersion.objects.count() == 1
     assert SocietaryBriefing.objects.count() == 2
@@ -92,6 +98,7 @@ def test_demo_seed_is_complete_and_idempotent(monkeypatch: pytest.MonkeyPatch) -
     operator = User.objects.get(username="operador.processos")
     societary_operator = User.objects.get(username="operador.societario")
     fiscal_operator = User.objects.get(username="operador.fiscal")
+    technology_operator = User.objects.get(username="operador.tecnologia")
     assert admin.role == UserRole.ADMINISTRATOR
     assert admin.check_password("safe-seed-admin-password")
     completed_briefing = SocietaryBriefing.objects.get(status=SocietaryBriefingStatus.COMPLETED)
@@ -105,6 +112,10 @@ def test_demo_seed_is_complete_and_idempotent(monkeypatch: pytest.MonkeyPatch) -
         area__code="societario",
     ).exists()
     assert AreaMembership.objects.filter(user=fiscal_operator, area__code="fiscal").exists()
+    assert AreaMembership.objects.filter(
+        user=technology_operator,
+        area__code="tecnologia",
+    ).exists()
 
 
 def test_run_exposes_duration_and_safe_status_tone(

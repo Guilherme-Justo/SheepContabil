@@ -20,6 +20,11 @@ from core.automations.models import (
     DocumentRunItem,
     FiscalClient,
     FiscalDocument,
+    SC05Artifact,
+    SC05Client,
+    SC05Operation,
+    SC05PortalStep,
+    SC05StepAttempt,
     SocietaryBriefing,
     SocietaryBriefingStatus,
 )
@@ -63,6 +68,39 @@ admin.site.register(
         DocumentRouting,
     ),
     SC04EvidenceAdmin,
+)
+
+
+@admin.register(SC05Client)
+class SC05ClientAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    list_display = ("external_reference", "name", "document", "status", "updated_at")
+    list_filter = ("status",)
+    search_fields = ("external_reference", "name", "document")
+    readonly_fields = ("task_restore_snapshot", "created_at", "updated_at")
+
+
+class SC05EvidenceAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    """SC-05 saga evidence is inspectable but never edited through maintenance UI."""
+
+    list_per_page = 50
+
+    def get_readonly_fields(
+        self,
+        request: HttpRequest,
+        obj: object | None = None,
+    ) -> tuple[str, ...]:
+        return tuple(field.name for field in self.model._meta.fields)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: object | None = None) -> bool:
+        return False
+
+
+admin.site.register(
+    (SC05Operation, SC05PortalStep, SC05StepAttempt, SC05Artifact),
+    SC05EvidenceAdmin,
 )
 
 

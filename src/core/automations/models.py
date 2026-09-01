@@ -1324,3 +1324,367 @@ class SocietaryBriefing(models.Model):
         if self.status == SocietaryBriefingStatus.CANCELLED:
             return "neutral"
         return "warning"
+
+
+class SC05ClientStatus(models.TextChoices):
+    ACTIVE = "active", "Ativo"
+    BLOCKED = "blocked", "Bloqueado"
+    PARTIAL = "partial", "Estado parcial"
+    UNKNOWN = "unknown", "A reconciliar"
+
+
+class SC05Action(models.TextChoices):
+    BLOCK = "block", "Bloquear"
+    UNBLOCK = "unblock", "Desbloquear"
+
+
+class SC05Scenario(models.TextChoices):
+    HAPPY_PATH = "happy_path", "Fluxo normal"
+    FAIL_TASKS_APPLY = "fail_tasks_apply", "Falha ao bloquear tarefas"
+    TIMEOUT_ACCOUNTING_APPLY = (
+        "timeout_accounting_apply",
+        "Timeout no sistema contábil",
+    )
+    FAIL_TASKS_AND_FILES_COMPENSATION = (
+        "fail_tasks_apply_and_files_compensation",
+        "Falha em tarefas e na compensação de arquivos",
+    )
+
+
+class SC05Portal(models.TextChoices):
+    FILES = "files", "Portal de arquivos"
+    ACCOUNTING = "accounting", "Sistema contábil"
+    TASKS = "tasks", "Sistema de tarefas"
+
+
+class SC05StepStatus(models.TextChoices):
+    PENDING = "pending", "Pendente"
+    RUNNING = "running", "Em execução"
+    APPLIED = "applied", "Aplicado"
+    UNCHANGED = "unchanged", "Já estava correto"
+    FAILED = "failed", "Falhou"
+    COMPENSATED = "compensated", "Compensado"
+    COMPENSATION_FAILED = "compensation_failed", "Compensação falhou"
+
+
+class SC05AttemptOperation(models.TextChoices):
+    INSPECT = "inspect", "Capturar estado"
+    APPLY = "apply", "Aplicar"
+    COMPENSATE = "compensate", "Compensar"
+
+
+class SC05AttemptStatus(models.TextChoices):
+    RUNNING = "running", "Em execução"
+    SUCCEEDED = "succeeded", "Concluída"
+    FAILED = "failed", "Falhou"
+
+
+class SC05ArtifactKind(models.TextChoices):
+    SCREENSHOT = "screenshot", "Captura de tela"
+
+
+class SC05Client(models.Model):
+    """Synthetic client projection owned by the SC-05 orchestration module."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    external_reference = models.SlugField("referência externa", max_length=80, unique=True)
+    name = models.CharField("cliente", max_length=180)
+    document = models.CharField("documento sintético", max_length=24, unique=True)
+    status = models.CharField(
+        "estado operacional",
+        max_length=16,
+        choices=SC05ClientStatus.choices,
+        default=SC05ClientStatus.ACTIVE,
+        db_index=True,
+    )
+    task_restore_snapshot = models.JSONField(
+        "responsáveis anteriores das tarefas",
+        default=dict,
+        blank=True,
+    )
+    created_at = models.DateTimeField("criado em", auto_now_add=True)
+    updated_at = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        ordering = ("name",)
+        verbose_name = "cliente do SC-05"
+        verbose_name_plural = "clientes do SC-05"
+
+    def __str__(self) -> str:
+        return self.name
+
+    @property
+    def status_tone(self) -> str:
+        if self.status == SC05ClientStatus.ACTIVE:
+            return "success"
+        if self.status == SC05ClientStatus.BLOCKED:
+            return "warning"
+        if self.status == SC05ClientStatus.PARTIAL:
+            return "danger"
+        return "neutral"
+
+
+class SC05Operation(models.Model):
+    """One auditable block or unblock saga bound to the common run."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    run = models.OneToOneField(
+        AutomationRun,
+        on_delete=models.PROTECT,
+        related_name="sc05_operation",
+        verbose_name="execução",
+    )
+    client = models.ForeignKey(
+        SC05Client,
+        on_delete=models.PROTECT,
+        related_name="operations",
+        verbose_name="cliente",
+    )
+    action = models.CharField("ação", max_length=12, choices=SC05Action.choices)
+    scenario = models.CharField(
+        "cenário demonstrativo",
+        max_length=64,
+        choices=SC05Scenario.choices,
+        default=SC05Scenario.HAPPY_PATH,
+    )
+    resume_count = models.PositiveSmallIntegerField("retomadas", default=0)
+    created_at = models.DateTimeField("criada em", auto_now_add=True)
+    updated_at = models.DateTimeField("atualizada em", auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=("client", "-created_at"), name="sc05_op_client_created_idx"),
+        ]
+        verbose_name = "operação do SC-05"
+        verbose_name_plural = "operações do SC-05"
+
+    def __str__(self) -> str:
+        return f"{self.client.name} · {self.get_action_display()}"
+
+
+class SC05PortalStep(models.Model):
+    """Current projection of one logical saga step; attempts remain append-only."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    operation = models.ForeignKey(
+        SC05Operation,
+        on_delete=models.PROTECT,
+        related_name="steps",
+        verbose_name="operação",
+    )
+    portal = models.CharField("portal", max_length=20, choices=SC05Portal.choices)
+    position = models.PositiveSmallIntegerField("ordem")
+    status = models.CharField(
+        "estado",
+        max_length=32,
+        choices=SC05StepStatus.choices,
+        default=SC05StepStatus.PENDING,
+    )
+    before_state = models.JSONField("estado anterior", default=dict, blank=True)
+    desired_state = models.JSONField("estado desejado", default=dict, blank=True)
+    after_state = models.JSONField("estado confirmado", default=dict, blank=True)
+    error_message = models.TextField("erro operacional", blank=True)
+    started_at = models.DateTimeField("iniciado em", null=True, blank=True)
+    finished_at = models.DateTimeField("finalizado em", null=True, blank=True)
+    updated_at = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        ordering = ("position",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("operation", "portal"),
+                name="uniq_sc05_operation_portal",
+            ),
+            models.UniqueConstraint(
+                fields=("operation", "position"),
+                name="uniq_sc05_operation_position",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("operation", "status"), name="sc05_step_operation_status_idx"),
+        ]
+        verbose_name = "etapa de portal do SC-05"
+        verbose_name_plural = "etapas de portal do SC-05"
+
+    def __str__(self) -> str:
+        return f"{self.operation} · {self.get_portal_display()}"
+
+    @property
+    def status_tone(self) -> str:
+        if self.status in {SC05StepStatus.APPLIED, SC05StepStatus.UNCHANGED}:
+            return "success"
+        if self.status == SC05StepStatus.COMPENSATED:
+            return "neutral"
+        if self.status in {SC05StepStatus.FAILED, SC05StepStatus.COMPENSATION_FAILED}:
+            return "danger"
+        return "warning"
+
+    @property
+    def before_state_label(self) -> str:
+        return self._state_label(self.before_state)
+
+    @property
+    def desired_state_label(self) -> str:
+        return self._state_label(self.desired_state)
+
+    @property
+    def after_state_label(self) -> str:
+        return self._state_label(self.after_state)
+
+    def _state_label(self, state: dict[str, Any]) -> str:
+        if not state:
+            return "Não capturado"
+        if self.portal in {SC05Portal.FILES, SC05Portal.ACCOUNTING}:
+            blocked = state.get("blocked")
+            if blocked is True:
+                return "Bloqueado"
+            if blocked is False:
+                return "Ativo"
+            return "Estado inválido"
+        tasks = state.get("tasks")
+        if state.get("client_active") is not True or not isinstance(tasks, list):
+            return "Estado inválido"
+        open_tasks = [item for item in tasks if isinstance(item, dict) and item.get("is_open")]
+        blocked_tasks = [
+            item for item in open_tasks if item.get("assignee") == "BLOQUEADO_INADIMPLENCIA"
+        ]
+        return (
+            f"Cliente ativo · {len(blocked_tasks)} de {len(open_tasks)} tarefa(s) "
+            "aberta(s) com marcador"
+        )
+
+
+class SC05StepAttempt(models.Model):
+    """Append-only evidence of an inspect, mutation, or compensation call."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    step = models.ForeignKey(
+        SC05PortalStep,
+        on_delete=models.PROTECT,
+        related_name="attempts",
+        verbose_name="etapa",
+    )
+    sequence = models.PositiveSmallIntegerField("tentativa")
+    operation = models.CharField(
+        "operação",
+        max_length=16,
+        choices=SC05AttemptOperation.choices,
+    )
+    status = models.CharField(
+        "estado",
+        max_length=16,
+        choices=SC05AttemptStatus.choices,
+        default=SC05AttemptStatus.RUNNING,
+    )
+    state_before = models.JSONField("estado antes", default=dict, blank=True)
+    state_after = models.JSONField("estado depois", default=dict, blank=True)
+    error_code = models.CharField("código de erro", max_length=80, blank=True)
+    error_message = models.TextField("erro operacional", blank=True)
+    created_at = models.DateTimeField("criada em", auto_now_add=True)
+    finished_at = models.DateTimeField("finalizada em", null=True, blank=True)
+
+    class Meta:
+        ordering = ("sequence",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("step", "sequence"),
+                name="uniq_sc05_step_attempt_sequence",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status=SC05AttemptStatus.RUNNING,
+                        finished_at__isnull=True,
+                        error_code="",
+                        error_message="",
+                    )
+                    | models.Q(
+                        status=SC05AttemptStatus.SUCCEEDED,
+                        finished_at__isnull=False,
+                        error_code="",
+                        error_message="",
+                    )
+                    | models.Q(
+                        status=SC05AttemptStatus.FAILED,
+                        finished_at__isnull=False,
+                    )
+                    & ~models.Q(error_code="")
+                    & ~models.Q(error_message="")
+                ),
+                name="sc05_attempt_status_consistent",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("step", "status"), name="sc05_attempt_step_status_idx"),
+        ]
+        verbose_name = "tentativa de etapa do SC-05"
+        verbose_name_plural = "tentativas de etapa do SC-05"
+
+    def __str__(self) -> str:
+        return f"{self.step} · tentativa {self.sequence}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            previous = type(self).objects.filter(pk=self.pk).first()
+            if previous is not None and previous.status != SC05AttemptStatus.RUNNING:
+                raise ValidationError("Uma tentativa finalizada do SC-05 é imutável.")
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        raise ValidationError("Tentativas do SC-05 são evidências append-only.")
+
+    @property
+    def status_tone(self) -> str:
+        if self.status == SC05AttemptStatus.SUCCEEDED:
+            return "success"
+        if self.status == SC05AttemptStatus.FAILED:
+            return "danger"
+        return "warning"
+
+
+class SC05Artifact(models.Model):
+    """Immutable private RPA artifact linked to exactly one browser attempt."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    attempt = models.ForeignKey(
+        SC05StepAttempt,
+        on_delete=models.PROTECT,
+        related_name="artifacts",
+        verbose_name="tentativa",
+    )
+    kind = models.CharField(
+        "tipo",
+        max_length=16,
+        choices=SC05ArtifactKind.choices,
+        default=SC05ArtifactKind.SCREENSHOT,
+    )
+    storage_key = models.CharField("chave privada", max_length=500, unique=True)
+    sha256 = models.CharField("SHA-256", max_length=64)
+    content_type = models.CharField("tipo de mídia", max_length=100, default="image/png")
+    byte_size = models.PositiveIntegerField("tamanho em bytes")
+    created_at = models.DateTimeField("criado em", auto_now_add=True)
+
+    class Meta:
+        ordering = ("created_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("attempt", "kind"),
+                name="uniq_sc05_attempt_artifact_kind",
+            ),
+        ]
+        verbose_name = "artefato RPA do SC-05"
+        verbose_name_plural = "artefatos RPA do SC-05"
+
+    def __str__(self) -> str:
+        return self.storage_key
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding and type(self).objects.filter(pk=self.pk).exists():
+            raise ValidationError("Um artefato RPA concluído é imutável.")
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        raise ValidationError("Artefatos RPA são evidências append-only.")

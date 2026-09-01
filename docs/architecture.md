@@ -2,8 +2,9 @@
 
 | Campo | Valor |
 | --- | --- |
-| Status | Baseline aprovada para o Dia 1 |
-| Data | 2026-08-27 |
+| Status | Baseline vigente, atualizada com a implementação do Dia 5 |
+| Data da baseline | 2026-08-27 |
+| Última atualização | 2026-09-01 |
 | Escopo funcional | SC-04, SC-05, SC-06 e SC-20 |
 | Horizonte | Entrega pública e demonstrável em uma semana |
 
@@ -11,7 +12,7 @@
 
 Esta arquitetura orienta a implementação do portal SheepContabil e das quatro automações selecionadas. Ela prioriza entrega ponta a ponta, rastreabilidade, falha controlada e substituição futura das integrações simuladas.
 
-A solução será um **monólito modular Django**, entregue como uma única unidade de software, mas executado por processos distintos de web, worker e scheduler. A separação de processos não transforma o sistema em microsserviços: todos compartilham código, modelo de domínio, banco, ciclo de versão e implantação.
+A solução é um **monólito modular Django**, entregue como uma única unidade de software, mas executado por processos distintos de web, worker e scheduler. A separação de processos não transforma o sistema em microsserviços: todos compartilham código, modelo de domínio, banco, ciclo de versão e implantação. O SC-05 acrescenta um serviço privado de demonstração exclusivamente como fronteira externa sintética; ele não contém a orquestração de negócio.
 
 ## 2. Diretrizes
 
@@ -57,7 +58,7 @@ flowchart TB
     Worker[Celery Worker\nregras + IA + RPA]
     Cron[Railway Cron\npulso efêmero]
     Bucket[(Storage S3)]
-    Simulator[Simuladores privados]
+    Simulator[Portais SC-05 privados]
     OpenAI[OpenAI API]
     Logs[Logs estruturados / Sentry opcional]
 
@@ -83,30 +84,23 @@ flowchart TB
 | `web` | Autenticação, autorização, páginas, comandos, consulta de histórico e downloads autorizados | 1 réplica |
 | `worker` | Execuções demoradas, classificação, OCR, RPA, notificações e geração de artefatos | 1 réplica, concorrência baixa |
 | `cron` | Pulso efêmero que identifica e publica execuções vencidas | 1 execução por pulso |
-| `simulator` | Fronteiras sintéticas de caixa de entrada, portais e comunicação | 1 serviço privado |
+| `simulator` | Três portais HTML sintéticos do SC-05, com autenticação própria e falhas determinísticas | 1 serviço privado |
 
-Web, worker e cron usam a mesma versão do código. O simulador é infraestrutura de demonstração, não um serviço de domínio da SheepContabil.
+Web, worker e cron usam a mesma versão do código. O simulador usa a mesma imagem e banco nesta entrega curta, mas tem URLconf e entrypoint WSGI próprios, não recebe domínio público e não é um serviço de domínio da SheepContabil. No Dia 5 essa separação está implementada no Compose e declarada na infraestrutura Railway; a criação e o smoke test do serviço no ambiente público continuam pendentes.
 
 ## 5. Organização modular
 
 ```text
 src/
-├── config/                 # settings, URLs e entrypoints
+├── config/                 # settings, URLs e entrypoints web/simulador
 ├── core/
 │   ├── identity/           # usuário, sessão, áreas e políticas
-│   ├── clients/            # cadastro sintético compartilhado
-│   ├── executions/         # execução, etapa, estado e idempotência
-│   ├── audit/              # trilha de auditoria
-│   ├── files/              # metadados e port S3
-│   └── notifications/      # tentativas e port de comunicação
-├── modules/
-│   ├── sc04_triage/
-│   ├── sc05_blocking/
-│   ├── sc06_briefing/
-│   └── sc20_certificates/
-├── simulators/             # implementações sintéticas das fronteiras
+│   ├── automations/        # execução comum e domínios SC-04/05/06/20
+│   │   └── sc05/           # saga, ports, Playwright e screenshots
+│   └── sc05_simulator/     # estado e páginas HTML dos três portais
 ├── templates/              # páginas e componentes HTMX
-└── static/                 # design system SheepContabil
+├── static_src/             # fontes do design system SheepContabil
+└── static/                 # assets compilados e marca
 ```
 
 Regras de dependência:
@@ -171,7 +165,7 @@ Redis não é usado como fonte de verdade nem como histórico de resultado. Esta
 
 ### 7.2 Storage S3
 
-Arquivos originais, screenshots, relatórios e downloads ficam em storage compatível com S3. O banco guarda metadados, hash SHA-256 e chave do objeto. O disco do contêiner é apenas temporário.
+Arquivos originais, screenshots, relatórios e downloads ficam em storage compatível com S3. O banco guarda metadados, hash SHA-256 e chave do objeto. No SC-05 cada screenshot PNG pertence a uma tentativa específica e usa chave determinística sob o UUID da execução. O disco do contêiner é apenas temporário.
 
 Downloads passam por autorização e usam URL assinada de curta duração ou proxy do backend. Nomes originais não são usados como chaves. Originais relevantes para auditoria são imutáveis.
 
@@ -201,7 +195,7 @@ Controles mínimos:
 
 Django Templates renderiza as páginas; HTMX realiza atualizações parciais, submissões e polling; Alpine.js é limitado a comportamento local de interface. Tailwind CSS implementa tokens e componentes da identidade SheepContabil.
 
-Não haverá SPA nem estado de domínio duplicado no navegador. Componentes previstos:
+Não há SPA nem estado de domínio duplicado no navegador. Componentes entregues ao longo dos cinco dias:
 
 - shell, navegação e home de módulos;
 - tabela e filtros de execuções;
@@ -231,18 +225,35 @@ O modelo nunca escreve diretamente no banco nem move arquivos. Ausência, timeou
 
 ### 10.2 SC-05 — Bloqueio e desbloqueio
 
-O worker usa Playwright contra portais simulados, preservando a natureza RPA. Cada portal possui Page Object e adapter próprios. URLs, credenciais e seletores não escapam para o domínio.
+O worker usa Playwright Chromium contra páginas HTML autenticadas, preservando a natureza RPA. Não há chamada a endpoint oculto nem alteração direta no banco do simulador: o adapter autentica, lê estado visível, preenche os controles e aciona formulários com CSRF. Os três gateways compartilham um navegador, um contexto e uma página por saga; a API síncrona do Playwright roda em uma thread dedicada para não misturar seu event loop com o contexto do worker e o acesso ORM.
 
-A orquestração é uma saga simples:
+A ordem foi congelada a partir de reversibilidade e risco:
 
-1. capturar o estado anterior;
-2. executar passos idempotentes em sequência;
-3. registrar resultado e screenshot por passo;
-4. em falha, compensar em ordem inversa quando seguro;
-5. registrar `PARTIALLY_FAILED` se ação ou compensação permanecer pendente;
-6. permitir retomada explícita sem repetir passos concluídos.
+| Ação | Ordem |
+| --- | --- |
+| Bloquear | Portal de arquivos → Sistema contábil → Sistema de tarefas |
+| Desbloquear | Sistema de tarefas → Sistema contábil → Portal de arquivos |
 
-Os simuladores oferecem falhas determinísticas para timeout e indisponibilidade. O domínio nunca altera diretamente as tabelas dos portais simulados.
+O sistema de tarefas preserva a exceção obrigatória do desafio. O adapter lê do DOM o estado ativo do cliente e as ações nunca o alteram; somente tarefas abertas recebem o responsável `BLOQUEADO_INADIMPLENCIA`. Tarefas fechadas não são alteradas. O estado anterior — inclusive cada responsável afetado — é conservado para desbloqueio e compensação exatos; se esse snapshot não existir, o desbloqueio é recusado em vez de inventar um destino. O undo restaura responsáveis sem congelar o ciclo de vida: fechamento posterior e tarefas novas normais são preservados, enquanto referência ausente, marcador inesperado ou reatribuição por terceiro gera conflito.
+
+Arquivos e Contábil também desfazem para o booleano capturado na última saga de bloqueio bem-sucedida. Assim, uma conta que já estava bloqueada por outro motivo antes do SC-05 não é ativada indevidamente na renegociação.
+
+A orquestração implementada é uma saga persistida:
+
+1. bloquear o cliente no banco para impedir duas operações concorrentes e materializar as três etapas;
+2. capturar o estado visível anterior de cada portal;
+3. derivar e persistir o estado desejado, sem confiar apenas na resposta do clique;
+4. não executar mutação quando o portal já estiver conforme;
+5. aplicar a ação e confirmar novamente o estado pela interface;
+6. registrar tentativa, estado antes/depois, duração, erro seguro e screenshot privado por interação concluída ou recusada;
+7. em falha, inspecionar de novo e compensar passos alterados em ordem inversa;
+8. restaurar somente quando o estado atual ainda for exatamente o produzido pela saga, evitando sobrescrever mudança externa;
+9. finalizar como `FAILED` quando toda compensação restaurar o estado inicial ou como `PARTIALLY_FAILED` quando houver resíduo;
+10. permitir retomada explícita apenas da falha parcial, preservar o evento e cenário original e não repetir mutação já conforme.
+
+`SC05Client`, `SC05Operation` e `SC05PortalStep` formam a projeção operacional. `SC05StepAttempt` conserva as tentativas de inspeção, aplicação e compensação; tentativas finalizadas e artefatos rejeitam edição/exclusão pela instância, e o admin os expõe somente para leitura. `SC05Artifact` referencia o objeto privado com hash e tamanho, ambos verificados novamente no download. Cada imagem contém somente o cartão do cliente-alvo ou o alerta de falha. Entregas repetidas do broker encerram tentativas interrompidas de forma explícita antes de reconciliar, mas um caso já parcial só volta a executar após retomada autorizada.
+
+O simulador privado implementa fluxo normal e três cenários controlados: falha na aplicação em Tarefas, timeout na aplicação do Contábil e falha combinada em Tarefas com falha de compensação em Arquivos. Somente o administrador escolhe falhas; o operador Tecnologia usa o caminho normal. URLs, credenciais, timeout e seletores não escapam para o serviço da saga, e a troca futura por sistemas reais permanece concentrada nos gateways.
 
 ### 10.3 SC-06 — Briefing societário
 
@@ -274,7 +285,7 @@ Ports iniciais:
 - `DocumentInbox`;
 - `DocumentClassifier`;
 - `ObjectStorage`;
-- um `PortalGateway` por sistema do SC-05;
+- `PortalGatewaySession` e um `PortalGateway` por sistema do SC-05;
 - `NotificationGateway`;
 - `Clock` para regras temporais testáveis.
 
@@ -288,7 +299,7 @@ Cada adapter deve ter testes de contrato. Fakes são permitidos em testes, mas o
 - reconciliação de execuções presas;
 - idempotência no domínio e nas integrações;
 - falha parcial explícita;
-- screenshot/trace de RPA quando útil;
+- screenshot privado recortado e snapshot de estado por interação RPA concluída ou recusada;
 - hash e preservação do documento original;
 - eventos de auditoria append-only para ações relevantes;
 - mensagem operacional separada do detalhe técnico.
@@ -308,7 +319,7 @@ Não serão introduzidos Prometheus, Grafana ou tracing distribuído no prazo in
 
 Docker multi-stage compila assets e instala dependências travadas. A imagem roda como usuário não-root. Web, worker e cron usam comandos diferentes da mesma imagem; o worker inclui as dependências de navegador necessárias ao Playwright.
 
-Docker Compose reproduz localmente web, worker, PostgreSQL, Redis e storage S3 compatível. O mesmo comando efêmero usado pelo Railway Cron poderá ser executado sob demanda no ambiente local. Migrations rodam em etapa explícita, não na inicialização concorrente de cada réplica.
+Docker Compose reproduz localmente web, worker, simulador SC-05, PostgreSQL, Redis e storage S3 compatível. O simulador publica `127.0.0.1:8010` apenas para inspeção local e o worker o acessa pelo nome privado `simulator`. Ele recebe um ambiente mínimo próprio, sem credenciais Redis, S3 ou OpenAI. O mesmo comando efêmero usado pelo Railway Cron pode ser executado sob demanda no ambiente local. Migrations rodam em etapa explícita, não na inicialização concorrente de cada réplica.
 
 Ambientes:
 
@@ -328,6 +339,8 @@ Um projeto Railway conterá:
 - Redis;
 - bucket S3.
 
+Web, worker e scheduler da versão 0.4.0 já usam deploy automático de `main` condicionado ao CI. Para a 0.5.0, o serviço `simulator` e suas variáveis estão declarados, mas sua existência, conectividade privada e participação no mesmo fluxo automático ainda precisam ser verificadas na Railway. Até esse smoke test, a topologia acima representa o alvo de implantação, não evidência de que o SC-05 já está público.
+
 O web recebe o domínio HTTPS gerado pela plataforma. Domínio próprio é opcional e só será configurado se já estiver sob controle do projeto. O serviço permanecerá em plano sem suspensão durante toda a avaliação.
 
 Deploy da branch `main` ocorre somente após validação no CI. A etapa de release executa migrations; depois, um smoke test consulta `health/ready` e autenticação. Backups do banco e restauração documentada fazem parte da preparação final.
@@ -339,6 +352,8 @@ Deploy da branch `main` ocorre somente após validação no CI. A etapa de relea
 - contrato: cada port contra sua implementação simulada;
 - E2E: login/RBAC e um caminho crítico por módulo;
 - resiliência: timeout, entrada inválida, duplicidade, falha parcial e retomada.
+
+No Dia 5, 37 testes focados exercitam ordem e idempotência da saga, bloqueio e undo tardio, preservação de restrições anteriores, compensação total e parcial, proteção contra estado divergente, retomada, RBAC, integridade de evidência e falha de broker. Quatro testes de contrato iniciam um servidor real e conduzem Chromium sobre bloqueio, desbloqueio, falha visual e retomada parcial nos três portais HTML. A suíte consolidada aprovou 122 testes com 83,83% de cobertura; lint, formatação, tipagem, checks Django, migrations, assets e Compose também passaram. Como o Docker Desktop estava desligado, o build local do contêiner ficou indisponível e deve ser confirmado pelo CI. Esse build, a implantação do simulador e os smoke tests públicos permanecem gates antes de declarar a versão 0.5.0 publicada.
 
 ## 17. Decisões explicitamente fora do escopo
 

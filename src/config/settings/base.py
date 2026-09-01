@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "django_htmx",
     "core.identity",
     "core.automations",
+    "core.sc05_simulator",
 ]
 
 MIDDLEWARE = [
@@ -137,6 +138,11 @@ SC04_OPENAI_TIMEOUT_SECONDS = env.int("SC04_OPENAI_TIMEOUT_SECONDS", default=30)
 SC04_AUTO_ROUTE_THRESHOLD = env.float("SC04_AUTO_ROUTE_THRESHOLD", default=0.85)
 SC04_DAILY_HOUR = env.int("SC04_DAILY_HOUR", default=8)
 SC04_TESSERACT_LANGUAGE = env("SC04_TESSERACT_LANGUAGE", default="por")
+
+SC05_SIMULATOR_BASE_URL = env("SC05_SIMULATOR_BASE_URL", default="http://localhost:8010")
+SC05_SIMULATOR_USERNAME = env("SC05_SIMULATOR_USERNAME", default="")
+SC05_SIMULATOR_PASSWORD = env("SC05_SIMULATOR_PASSWORD", default="")
+SC05_RPA_TIMEOUT_MS = env.int("SC05_RPA_TIMEOUT_MS", default=10_000)
 
 LOGGING = {
     "version": 1,

@@ -33,6 +33,9 @@ jobs:
       - name: Install Python dependencies
         run: uv sync --frozen --all-groups
 
+      - name: Install Chromium for the SC-05 RPA contract
+        run: uv run playwright install --with-deps --only-shell chromium
+
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -61,6 +64,14 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.settings.production
           DJANGO_SECRET_KEY: ci-only-validation-key-8rX3pQ7vN2mK5tW9cL4sH6jF1aD0zB7y
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+        run: uv run python src/manage.py check --deploy --fail-level ERROR
+
+      - name: Check private simulator settings
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.simulator
+          DJANGO_SECRET_KEY: ci-only-validation-key-8rX3pQ7vN2mK5tW9cL4sH6jF1aD0zB7y
+          DJANGO_ALLOWED_HOSTS: healthcheck.railway.app,simulator.railway.internal
           DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
         run: uv run python src/manage.py check --deploy --fail-level ERROR
 

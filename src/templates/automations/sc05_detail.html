@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}{{ module.code }} · SheepContabil{% endblock %}
+
+{% block content %}
+<nav class="breadcrumbs" aria-label="Navegação estrutural">
+  <a href="{% url 'automations:dashboard' %}">Automações</a><span aria-hidden="true">/</span><strong>{{ module.code }}</strong>
+</nav>
+
+<section class="mt-6 grid gap-7 xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-stretch">
+  <div class="self-center">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="module-code">{{ module.code }}</span>
+      <span class="soft-badge">RPA por navegador</span>
+      <span class="soft-badge">Sob demanda</span>
+    </div>
+    <h1 class="page-title mt-5">{{ module.name }}</h1>
+    <p class="page-subtitle">{{ module.short_description }}</p>
+  </div>
+
+  <aside class="sc05-action-panel" aria-labelledby="sc05-action-title">
+    <div>
+      <p class="eyebrow text-turquesa">Comando único</p>
+      <h2 id="sc05-action-title" class="mt-3 font-display text-xl font-semibold text-white">Operar os três sistemas</h2>
+      <p class="mt-2 text-sm leading-6 text-white/65">O worker captura o estado anterior, executa a sequência e compensa alterações quando um passo falha.</p>
+    </div>
+    <form method="post" class="mt-6 space-y-4" novalidate>
+      {% csrf_token %}
+      {{ form.request_key }}
+      {% if form.non_field_errors %}<div class="sc05-dark-error" role="alert">{{ form.non_field_errors.0 }}</div>{% endif %}
+      {% for field in form.visible_fields %}
+      <div class="sc05-dark-field">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<p>{{ field.help_text }}</p>{% endif %}
+        {% if field.errors %}<span role="alert">{{ field.errors.0 }}</span>{% endif %}
+      </div>
+      {% endfor %}
+      <button type="submit" class="sc05-execute-button w-full">Executar sequência <span aria-hidden="true">→</span></button>
+    </form>
+  </aside>
+</section>
+
+<section class="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumo de clientes">
+  <article class="sc05-summary-card"><span class="sc05-summary-icon" aria-hidden="true">◎</span><div><p>Monitorados</p><strong>{{ summary.total }}</strong><small>clientes sintéticos</small></div></article>
+  <article class="sc05-summary-card sc05-summary-success"><span class="sc05-summary-icon" aria-hidden="true">✓</span><div><p>Ativos</p><strong>{{ summary.active }}</strong><small>sem restrição projetada</small></div></article>
+  <article class="sc05-summary-card sc05-summary-warning"><span class="sc05-summary-icon" aria-hidden="true">‖</span><div><p>Bloqueados</p><strong>{{ summary.blocked }}</strong><small>reversão disponível</small></div></article>
+  <article class="sc05-summary-card {% if summary.partial %}sc05-summary-danger{% endif %}"><span class="sc05-summary-icon" aria-hidden="true">!</span><div><p>Estado parcial</p><strong>{{ summary.partial }}</strong><small>exige retomada</small></div></article>
+</section>
+
+<div class="sc05-guidance mt-6" role="note">
+  <span class="sc05-guidance-icon" aria-hidden="true">i</span>
+  <p><strong>Regra do sistema de tarefas.</strong> O cliente nunca é desativado. Somente tarefas abertas recebem o marcador <span class="font-mono">BLOQUEADO_INADIMPLENCIA</span>; cada responsável anterior fica preservado para a volta.</p>
+</div>
+
+<section class="mt-10" aria-labelledby="sc05-clients-title">
+  <div class="section-heading">
+    <p class="eyebrow">Projeção operacional</p>
+    <h2 id="sc05-clients-title">Clientes do fluxo</h2>
+    <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">O estado abaixo é atualizado apenas depois que os três portais confirmam a operação.</p>
+  </div>
+  <div class="table-shell mt-5 overflow-x-auto">
+    <table class="data-table sc05-clients-table">
+      <caption class="sr-only">Clientes sintéticos disponíveis no SC-05</caption>
+      <thead><tr><th scope="col">Cliente</th><th scope="col">Documento</th><th scope="col">Estado</th><th scope="col">Próxima ação</th></tr></thead>
+      <tbody>
+        {% for client in clients %}
+        <tr>
+          <td><strong>{{ client.name }}</strong><span class="mt-1 block font-mono text-xs">{{ client.external_reference }}</span></td>
+          <td class="font-mono text-xs">{{ client.document }}</td>
+          <td><span class="status-badge status-{{ client.status_tone }}"><i></i>{{ client.get_status_display }}</span></td>
+          <td>
+            {% if client.status == 'active' %}<span class="text-sm text-grafite">Bloquear</span>
+            {% elif client.status == 'blocked' %}<span class="text-sm text-grafite">Desbloquear</span>
+            {% else %}<span class="text-sm text-carmim">Retomar execução parcial</span>{% endif %}
+          </td>
+        </tr>
+        {% empty %}<tr><td colspan="4" class="py-10 text-center text-grafite">Nenhum cliente sintético foi carregado.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="mt-12" aria-labelledby="sc05-history-title">
+  <div class="section-heading">
+    <p class="eyebrow">Rastreabilidade</p>
+    <h2 id="sc05-history-title">Operações recentes</h2>
+    <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Cada operação conserva autor, duração, cenário e resultado por sistema.</p>
+  </div>
+  <div class="table-shell mt-5 overflow-x-auto">
+    <table class="data-table sc05-history-table">
+      <caption class="sr-only">Histórico de bloqueios e desbloqueios</caption>
+      <thead><tr><th scope="col">Data</th><th scope="col">Cliente</th><th scope="col">Ação</th><th scope="col">Responsável</th><th scope="col">Estado</th><th scope="col" class="text-right">Resultado</th></tr></thead>
+      <tbody>
+        {% for operation in operations %}
+        <tr>
+          <td class="font-mono text-xs">{{ operation.created_at|date:"d/m/Y H:i" }}</td>
+          <td><strong>{{ operation.client.name }}</strong></td>
+          <td>{{ operation.get_action_display }}</td>
+          <td>{% if operation.run.triggered_by %}{{ operation.run.triggered_by.label }}{% else %}Sistema{% endif %}</td>
+          <td><span class="status-badge status-{{ operation.run.status_tone }}"><i></i>{{ operation.run.get_status_display }}</span></td>
+          <td class="text-right"><a class="table-link" href="{% url 'automations:run-detail' operation.run_id %}">Ver sistemas</a></td>
+        </tr>
+        {% empty %}<tr><td colspan="6" class="py-10 text-center text-grafite">Nenhuma operação funcional registrada.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

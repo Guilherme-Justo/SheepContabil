@@ -112,5 +112,69 @@
   </article>
 </section>
 {% endif %}
+
+{% if sc05_operation %}
+<section class="mt-8" aria-labelledby="sc05-run-evidence-title">
+  <div class="sc05-run-header">
+    <div>
+      <p class="eyebrow text-turquesa">Evidências do SC-05</p>
+      <h2 id="sc05-run-evidence-title">{{ sc05_operation.get_action_display }} · {{ sc05_operation.client.name }}</h2>
+      <p>Cenário: {{ sc05_operation.get_scenario_display }}{% if sc05_operation.resume_count %} · {{ sc05_operation.resume_count }} retomada{{ sc05_operation.resume_count|pluralize }}{% endif %}</p>
+    </div>
+    {% if run.status == 'partially_failed' %}
+    <form method="post" action="{% url 'automations:sc05-resume' run.id %}">
+      {% csrf_token %}
+      <button type="submit" class="sc05-resume-button">Retomar pendências <span aria-hidden="true">→</span></button>
+    </form>
+    {% endif %}
+  </div>
+
+  <ol class="sc05-step-list mt-5">
+    {% for step in sc05_steps %}
+    <li class="sc05-step-card">
+      <header>
+        <span class="sc05-step-number">{{ step.position|stringformat:"02d" }}</span>
+        <div>
+          <h3>{{ step.get_portal_display }}</h3>
+          <p>{% if step.finished_at %}Confirmado em {{ step.finished_at|date:"d/m/Y H:i:s" }}{% else %}Aguardando confirmação do worker{% endif %}</p>
+        </div>
+        <span class="status-badge status-{{ step.status_tone }}"><i></i>{{ step.get_status_display }}</span>
+      </header>
+
+      <dl class="sc05-state-grid">
+        <div><dt>Antes</dt><dd>{{ step.before_state_label }}</dd></div>
+        <div><dt>Objetivo</dt><dd>{{ step.desired_state_label }}</dd></div>
+        <div><dt>Última confirmação</dt><dd>{{ step.after_state_label }}</dd></div>
+      </dl>
+      {% if step.error_message %}<p class="sc05-step-error" role="alert">{{ step.error_message }}</p>{% endif %}
+
+      <details class="sc05-attempts">
+        <summary>Ver tentativas e capturas</summary>
+        <div class="mt-3 overflow-x-auto">
+          <table class="data-table">
+            <thead><tr><th scope="col">#</th><th scope="col">Operação</th><th scope="col">Estado</th><th scope="col">Horário</th><th scope="col" class="text-right">Evidência</th></tr></thead>
+            <tbody>
+              {% for attempt in step.attempts.all %}
+              <tr>
+                <td class="font-mono text-xs">{{ attempt.sequence|stringformat:"02d" }}</td>
+                <td>{{ attempt.get_operation_display }}</td>
+                <td><span class="status-badge status-{{ attempt.status_tone }}"><i></i>{{ attempt.get_status_display }}</span>{% if attempt.error_message %}<span class="mt-2 block max-w-md text-xs text-carmim">{{ attempt.error_message }}</span>{% endif %}</td>
+                <td class="font-mono text-xs">{{ attempt.created_at|date:"d/m/Y H:i:s" }}</td>
+                <td class="text-right">
+                  {% for artifact in attempt.artifacts.all %}
+                  <a class="table-link" href="{% url 'automations:sc05-artifact' artifact.id %}" target="_blank" rel="noopener">Abrir captura</a>
+                  {% empty %}<span class="text-xs text-grafite">Não produzida</span>{% endfor %}
+                </td>
+              </tr>
+              {% empty %}<tr><td colspan="5" class="py-8 text-center text-grafite">A etapa ainda não possui tentativa registrada.</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endif %}
 </div>
 {% endblock %}

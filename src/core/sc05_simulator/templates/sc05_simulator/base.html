@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Simulador SC-05{% endblock %}</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, sans-serif; color: #182c32; background: #f3f7f6; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { display: flex; gap: 1rem; align-items: center; justify-content: space-between; padding: 1rem 1.5rem; background: #143f46; color: white; }
+    header strong { white-space: nowrap; }
+    nav { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+    nav a { color: #8ce7dc; }
+    main { width: min(1100px, calc(100% - 2rem)); margin: 2rem auto; }
+    section, article, .panel { background: white; border: 1px solid #d4e1de; border-radius: .75rem; padding: 1rem; }
+    .grid { display: grid; gap: 1rem; }
+    .client { display: grid; gap: .75rem; }
+    .row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: space-between; }
+    .actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+    button { border: 0; border-radius: .45rem; padding: .65rem .9rem; cursor: pointer; background: #0f766e; color: white; font-weight: 700; }
+    button.secondary { background: #53646a; }
+    button.danger { background: #a73a43; }
+    input { width: 100%; padding: .7rem; border: 1px solid #9eb3af; border-radius: .4rem; }
+    label { display: grid; gap: .35rem; margin: .8rem 0; }
+    .status { display: inline-block; border-radius: 999px; padding: .3rem .6rem; background: #d9f2ed; font: 700 .8rem monospace; }
+    .status.blocked { color: #8e252d; background: #f8dadd; }
+    .alert { margin-bottom: 1rem; border-radius: .5rem; padding: .8rem 1rem; background: #def7ec; }
+    .alert.error { color: #7d2028; background: #fbe4e6; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: .6rem; border-bottom: 1px solid #e0e9e7; text-align: left; }
+    code { font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <header data-testid="simulator-header">
+    <strong>SC-05 · Portais privados</strong>
+    {% if simulator_authenticated %}
+    <nav aria-label="Portais do simulador">
+      <a href="{% url 'sc05_simulator:files' %}" data-testid="portal-files-link">Arquivos</a>
+      <a href="{% url 'sc05_simulator:accounting' %}" data-testid="portal-accounting-link">Contábil</a>
+      <a href="{% url 'sc05_simulator:tasks' %}" data-testid="portal-tasks-link">Tarefas</a>
+      <form method="post" action="{% url 'sc05_simulator:logout' %}" data-testid="simulator-logout-form">
+        {% csrf_token %}
+        <button class="secondary" type="submit" data-testid="simulator-logout-submit">Sair</button>
+      </form>
+    </nav>
+    {% endif %}
+  </header>
+  <main>
+    {% for message in messages %}
+      <div class="alert" role="status" data-testid="operation-result">{{ message }}</div>
+    {% endfor %}
+    {% if operation_error %}
+      <div class="alert error" role="alert" data-testid="operation-error">{{ operation_error }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
