@@ -6,8 +6,8 @@
 | Versão | 0.4.0 |
 | Processo | SC-04 — Triagem da caixa de arquivos |
 | Natureza preservada | Agente de IA |
-| Estado local | Implementado e validado para release |
-| Estado externo | Aguardando credencial e modelo OpenAI no worker Railway |
+| Estado local | Concluído |
+| Estado externo | Concluído no ambiente `production` da Railway |
 
 ## Resultado entregue
 
@@ -120,6 +120,18 @@ Todos os nomes, documentos e conteúdos são fictícios.
 - Build dos assets concluído e configuração Docker Compose válida.
 - Imagem Linux `sheepcontabil:0.4.0` construída integralmente com Python 3.13, Tesseract e idioma português.
 
+## Evidências de produção
+
+- [PR `#2`](https://github.com/Guilherme-Justo/SheepContabil/pull/2) incorporado em `main` no commit [`280916068e938a5df6ff24bde0a904a72aec7162`](https://github.com/Guilherme-Justo/SheepContabil/commit/280916068e938a5df6ff24bde0a904a72aec7162); execução [GitHub Actions `33415227011`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33415227011) aprovada em testes/qualidade e build do contêiner.
+- Deploys Railway concluídos para `web` (`74f2241e-af8e-4c51-af56-bd3884c62c82`), `worker` (`03246195-2f22-44ed-a411-f3d5ab0fa33d`) e `scheduler` (`bcc72f6c-764c-4971-a734-f945e4b12c49`).
+- O release foi enviado pela Railway CLI depois do CI verde porque a integração GitHub exibia `GitHub Repo not found`; a recuperação do deploy automático está documentada separadamente em [`deployment.md`](deployment.md#recuperação-do-deploy-automático-após-merge).
+- Migração `0006_sc04_document_classification` aplicada; o redeploy controlado `23d98c69-8837-40f5-9259-10ed1c19ea9f` executou o seed idempotente e respondeu `200` em `/health/ready`. `SEED_DEMO_ON_DEPLOY` voltou a `false` sem nova carga.
+- O pulso cron publicou uma única execução diária, `50dbb2a5-2f0a-48d1-9fbe-e667cb54eca5`, e preservou a competência já registrada do SC-20.
+- O worker recebeu 5 anexos, registrou 1 duplicidade, processou os 4 conteúdos novos e terminou com 0 falhas de aplicação. O painel do bucket privado indicou aproximadamente 32,8 KB.
+- Antes da ativação dos créditos, a credencial e o modelo chegaram corretamente ao adapter e as requisições alcançaram `POST /v1/responses`, mas o provedor respondeu `429`. O resultado seguro foi 4 revisões humanas, 0 roteamentos e nenhum sucesso de IA fabricado.
+- Após a ativação dos créditos, o smoke inédito `999f3a19-32f5-456b-bb02-854e639ce26a` foi enfileirado na task `29141b65-54ff-4b8a-9b9c-310b230e925e` e concluído sem falhas. O snapshot `gpt-5.4-mini-2026-03-17` retornou resposta estruturada válida, identificou `invoice` com confiança `0,9800` e marcou a resposta como não ambígua. A política determinística preservou o match de `aurora-participacoes` e atribuiu confiança `1,0000` ao cliente.
+- A tentativa registrou identificador de resposta do provedor, a decisão foi `automatic`, o documento terminou em `routed` e o registro de roteamento confirmou a cópia no destino autorizado. A execução consolidou 1 recebido, 1 encaminhado, 0 revisões, 0 duplicidades e 0 falhas.
+
 ## Critérios de aceite
 
 - [x] Migração versionada com domínio relacional, constraints e índices.
@@ -138,8 +150,10 @@ Todos os nomes, documentos e conteúdos são fictícios.
 - [x] Seed sintético e operador Fiscal.
 - [x] Testes de adapters, serviços, views, scheduler, regressão e seed.
 - [x] Imagem de produção construída com OCR em português e assets compilados.
-- [ ] Credencial/modelo OpenAI configurados e smoke real concluído na Railway.
-- [ ] Release 0.4.0 publicado em web, worker e scheduler.
+- [x] Credencial/modelo OpenAI configurados e chamada real confirmada na Railway.
+- [x] Falha externa `429` convertida em revisão humana sem perda, roteamento indevido ou falso positivo.
+- [x] Resposta estruturada bem-sucedida e ao menos um roteamento automático com a cota da API ativa.
+- [x] Release 0.4.0 publicado em web, worker e scheduler.
 
 ## Limites conscientes
 
@@ -148,3 +162,4 @@ Todos os nomes, documentos e conteúdos são fictícios.
 - A caixa é um adapter sintético determinístico; Gmail/Outlook não entram no escopo do desafio.
 - Não há antivírus, DLP, lifecycle ou retenção legal para arquivos reais. Antes de produção, esses controles e a base jurídica para envio à IA precisam de validação.
 - Banco/Redis estão em região distinta de web/worker no ambiente Trial; a topologia deve ser alinhada antes de carga real.
+- A demonstração positiva da IA depende de saldo e limites disponíveis na API OpenAI; se forem esgotados, o fluxo retorna de forma segura para revisão humana.

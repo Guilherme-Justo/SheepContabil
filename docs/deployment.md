@@ -76,6 +76,21 @@ O deploy de `main` só deve ocorrer depois do CI verde. Migrations precisam ser 
 
 O healthcheck da Railway é de ativação de deploy, não monitoramento contínuo. Um monitor externo de uptime pode ser adicionado antes da entrega final.
 
+### Recuperação do deploy automático após merge
+
+Diagnóstico de 2026-08-31: o GitHub confirma `Guilherme-Justo/SheepContabil` como repositório público com branch padrão `main`, e o CI do merge do SC-04 terminou verde. Na Railway, `web`, `worker` e `scheduler` ainda exibem o nome da fonte, mas a branch aparece como `GitHub Repo not found`; o seletor `Wait for CI` está desativado. Portanto, a configuração de build está preservada, mas a integração GitHub da Railway não consegue mais resolver a fonte ou receber corretamente seus eventos. A declaração `github(...)` da IaC não substitui a autorização OAuth/GitHub App da conta.
+
+Plano de correção:
+
+1. Reautorizar a integração GitHub no workspace Railway e conceder acesso explícito a `Guilherme-Justo/SheepContabil`.
+2. Em **Settings → Source → Edit** de `web`, `worker` e `scheduler`, selecionar novamente o mesmo repositório e a branch `main`, sem alterar diretório raiz ou Dockerfile.
+3. Ativar **Wait for CI** nos três serviços, garantindo que a publicação só comece depois de todos os workflows do GitHub Actions acionados pelo push concluírem com sucesso.
+4. Revisar que `web` conserva pre-deploy e healthcheck, `worker` conserva o comando Celery e `scheduler` conserva cron, comando e política `NEVER`.
+5. Abrir um PR documental mínimo, incorporá-lo em `main` e usar seu SHA como teste controlado. Os três deployments devem registrar o mesmo `commitHash`, `branch: main` e origem GitHub, sem `cliCaller`.
+6. Confirmar `/health/ready = 200`, Celery `ready` com as duas tasks e o próximo pulso cron. Se um serviço não disparar, corrigir somente sua associação de fonte e repetir o teste.
+
+Se a integração nativa continuar indisponível após reautorização, o fallback é um workflow de deploy com token Railway de escopo mínimo e jobs separados para os três serviços. Esse fallback só deve ser implementado depois de esgotar a integração nativa, pois adiciona segredo e lógica operacional ao GitHub Actions.
+
 ## Scheduler do SC-04 e SC-20
 
 A Railway executa `python src/manage.py dispatch_due_schedules` a cada 15 minutos em UTC. O comando converte as regras para `America/Sao_Paulo`: após 08:00 cria no máximo uma chave diária `sc04:scheduled:AAAA-MM-DD`; para o SC-20, só considera a competência vencida após o primeiro dia do mês às 08:00 e cria `sc20:scheduled:AAAA-MM`. A data-base mensal permanece ancorada no primeiro dia mesmo se o pulso atrasar.
