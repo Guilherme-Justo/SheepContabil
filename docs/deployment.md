@@ -103,7 +103,17 @@ O [PR `#5`](https://github.com/Guilherme-Justo/SheepContabil/pull/5) foi incorpo
 - `worker`: `5cba6372-cbdc-4ead-a8f0-a5a0f87c56f2`;
 - `scheduler`: `ef6c395d-e250-49f3-9eed-c5d0d2b62865`.
 
-Essa evidência confirma merge, CI, imagem e autodeploy da 0.5.0 nos três serviços existentes. Ela não confirma o SC-05 ponta a ponta: a topologia daquele commit ainda dependia de um quarto recurso que o plano não permitiu criar. A co-localização do WSGI no worker é um ajuste posterior e, até o registro de novo PR/CI/deploy e dos smoke tests, deve permanecer descrita como pendente.
+Essa evidência confirma merge, CI, imagem e autodeploy da base 0.5.0 nos três serviços existentes. A topologia daquele commit ainda dependia de um quarto recurso que o plano não permitiu criar; por isso, a comprovação ponta a ponta foi concluída no ajuste seguinte.
+
+O [PR `#6`](https://github.com/Guilherme-Justo/SheepContabil/pull/6), merge [`4ab7af38ccd0259d89c80a00b82679d3754d5ac3`](https://github.com/Guilherme-Justo/SheepContabil/commit/4ab7af38ccd0259d89c80a00b82679d3754d5ac3), passou pelo [CI do PR `33556800150`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33556800150) e pelo [CI de `main` `33557162559`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33557162559). Ambos aprovaram qualidade, 124 testes, cobertura e imagem antes do autodeploy:
+
+- `web`: `4c35c556-9f52-4ee9-b0c7-a092a703f1b8`;
+- `worker`: `8101f6cb-4401-489e-850e-02f62075e8e3`;
+- `scheduler`: `348d9edf-8bf4-45de-b8ed-e955f3ff3934`.
+
+Uma fila duplicada do worker (`4c39a415-f7a0-473b-81dc-f14007fcf87c`) foi cancelada depois que o deployment `8101f6cb-4401-489e-850e-02f62075e8e3` já estava saudável; ela não substitui nem invalida a promoção ativa. O WSGI respondeu ao healthcheck privado, Celery chegou a `ready`, o portal público respondeu `200` em `/health/ready` e o Playwright permaneceu em loopback. O seed controlado posterior terminou no web `cfe0a20c-e358-44ef-870f-5aec6271a24d`; `SEED_DEMO_ON_DEPLOY` foi novamente definido como `false` sem disparar outro deploy.
+
+O smoke autenticado bloqueou e desbloqueou Aurora, validou três portais, seis PNGs privados e negação `404` para outra área, provocou `PARTIALLY_FAILED`, retomou a mesma execução e restaurou o cliente a `Ativo`. Os UUIDs e a evidência detalhada estão em [Dia 5](day-5.md#publicação-e-validação-de-produção). Esse resultado encerra a pendência operacional do SC-05 na entrega demonstrativa.
 
 ## Scheduler do SC-04 e SC-20
 

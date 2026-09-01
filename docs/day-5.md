@@ -9,7 +9,7 @@
 | Frequência | Sob demanda |
 | Área | Tecnologia |
 | Estado local | Implementado; 124 testes e gates locais disponíveis aprovados |
-| Estado externo | 0.5.0 implantada em web/worker/scheduler; SC-05 aguarda ajuste co-localizado e smoke tests |
+| Estado externo | 0.5.0 implantada e SC-05 validado ponta a ponta no ambiente público |
 
 ## Resultado entregue
 
@@ -165,28 +165,35 @@ Até este documento, `37` testes focados do SC-05 foram aprovados:
 
 No estado final local, a suíte completa aprovou `124` testes com cobertura total de `83,85%`, acima do piso obrigatório de `75%`. Os `37` testes focados descritos acima também passaram. Ruff, verificação de formatação, Mypy, sintaxe POSIX do supervisor, checks Django, ausência de migrations pendentes, build de assets e validação da configuração Compose estão verdes.
 
-O único gate de build que não pôde ser reproduzido localmente foi a imagem `0.5.0`, porque o Docker Desktop estava desligado e o daemon Linux não estava disponível. Esse gate foi posteriormente aprovado pelos jobs `Container build` do CI do PR `#5` e do push em `main`.
+O único gate de build que não pôde ser reproduzido localmente foi a imagem `0.5.0`, porque o Docker Desktop estava desligado e o daemon Linux não estava disponível. Esse gate foi posteriormente aprovado pelos jobs `Container build` dos CIs do PR `#5`, de seu push em `main`, do PR `#6` e do push final em `main`.
 
-O plano Railway original foi validado sem aplicação: `1` recurso a criar, `10` ajustes e `0` remoções. A criação correspondia ao quarto serviço `simulator`, mas o limite do plano não permitiu materializá-lo. A decisão operacional seguinte preservou o simulador separado no Compose e o co-localizou no worker somente na Railway. A IaC revisada passa a declarar apenas as três fontes GitHub já existentes — web, worker e scheduler —, todas com `checkSuites: true` para preservar **Wait for CI**. O plano final foi novamente revisado com `0` recursos novos, `10` ajustes e `0` remoções. Esse novo ajuste ainda não possui evidência de CI, deploy nem smoke test.
+O plano Railway original foi validado sem aplicação: `1` recurso a criar, `10` ajustes e `0` remoções. A criação correspondia ao quarto serviço `simulator`, mas o limite do plano não permitiu materializá-lo. A decisão operacional seguinte preservou o simulador separado no Compose e o co-localizou no worker somente na Railway. A IaC revisada declara apenas as três fontes GitHub já existentes — web, worker e scheduler —, todas com `checkSuites: true` para preservar **Wait for CI**. O plano final foi revisado com `0` recursos novos, `10` ajustes e `0` remoções e então aplicado com sucesso.
 
-## Publicação e pendência operacional
+## Publicação e validação de produção
 
-O [PR `#5`](https://github.com/Guilherme-Justo/SheepContabil/pull/5) incorporou a 0.5.0 à `main` no commit [`d5b71b384340f4f3cd66e07f801309529790b39f`](https://github.com/Guilherme-Justo/SheepContabil/commit/d5b71b384340f4f3cd66e07f801309529790b39f). O [CI do PR](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33538813847) e o [CI do push em `main`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33539137377) concluíram os jobs de qualidade, testes e imagem com sucesso. Depois do CI verde, a integração nativa da Railway concluiu os deployments:
+O [PR `#5`](https://github.com/Guilherme-Justo/SheepContabil/pull/5) incorporou a 0.5.0 à `main` no commit [`d5b71b384340f4f3cd66e07f801309529790b39f`](https://github.com/Guilherme-Justo/SheepContabil/commit/d5b71b384340f4f3cd66e07f801309529790b39f). O [CI do PR](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33538813847) e o [CI do push em `main`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33539137377) concluíram os jobs de qualidade, testes e imagem com sucesso. Depois do CI verde, a integração nativa da Railway concluiu os deployments iniciais:
 
 - `web`: `e07e22d8-1d4c-4901-994c-7d41bbb78c7c`;
 - `worker`: `5cba6372-cbdc-4ead-a8f0-a5a0f87c56f2`;
 - `scheduler`: `ef6c395d-e250-49f3-9eed-c5d0d2b62865`.
 
-A 0.5.0 está, portanto, publicada nos três serviços existentes, com deploy automático condicionado ao CI comprovado. Isso não prova o SC-05 em produção: sem o quarto recurso, o worker implantado pelo PR `#5` não possuía uma fronteira de simulador alcançável.
+O ajuste operacional foi incorporado pelo [PR `#6`](https://github.com/Guilherme-Justo/SheepContabil/pull/6), merge [`4ab7af38ccd0259d89c80a00b82679d3754d5ac3`](https://github.com/Guilherme-Justo/SheepContabil/commit/4ab7af38ccd0259d89c80a00b82679d3754d5ac3). O [CI do PR `33556800150`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33556800150) e o [CI de `main` `33557162559`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33557162559) aprovaram `Quality and tests` e `Container build`. Somente após o CI verde, a integração GitHub da Railway promoveu:
 
-Antes de declarar o SC-05 operacional, ainda é necessário:
+- `web`: `4c35c556-9f52-4ee9-b0c7-a092a703f1b8`;
+- `worker`: `8101f6cb-4401-489e-850e-02f62075e8e3`;
+- `scheduler`: `348d9edf-8bf4-45de-b8ed-e955f3ff3934`.
 
-1. aprovar em novo PR e CI o supervisor que inicia WSGI e Celery no mesmo worker;
-2. publicar a IaC sem recurso `simulator` e confirmar **Wait for CI** em web, worker e scheduler;
-3. manter `SC05_SIMULATOR_USERNAME`/`SC05_SIMULATOR_PASSWORD` somente no worker e conferir a allowlist do ambiente filho;
-4. confirmar readiness em `http://127.0.0.1:8000` dentro do worker, sem domínio ou conectividade externa;
-5. executar smoke tests de bloqueio, desbloqueio, compensação parcial, retomada e download autorizado de screenshot;
-6. registrar os novos IDs de PR, CI, deploy e execuções somente depois que existirem.
+O Gunicorn escuta em `0.0.0.0:8000` sem domínio público, permitindo o healthcheck pela rede privada; o RPA usa exclusivamente `http://127.0.0.1:8000`. O marcador de readiness só é criado depois da conferência do schema, da liveness do WSGI e de o processo Celery permanecer vivo durante a janela inicial de três segundos; o endpoint também consulta o banco. O smoke funcional abaixo é a evidência separada de que fila e worker processaram as tarefas. As credenciais e o segredo Django distintos do simulador ficaram somente no worker, e a allowlist do processo filho exclui Redis, S3 e OpenAI. O portal público respondeu `200` em `/health/ready`.
+
+O seed idempotente foi habilitado por um único redeploy web (`cfe0a20c-e358-44ef-870f-5aec6271a24d`) e imediatamente voltou a `false`, sem novo deploy. Em seguida, o smoke autenticado produziu as seguintes evidências:
+
+- bloqueio em fluxo normal: execução `4ee4eb62-c22b-40e1-a534-981969212c45`, três portais e seis screenshots PNG privadas;
+- desbloqueio em fluxo normal: execução `c9cbbefa-d1a4-4caf-97bf-0f91d621f123`;
+- falha injetada em Tarefas e na compensação de Arquivos: execução `d410661f-62a5-42f8-adf2-c5bf32e96c59`, encerrada primeiro como `PARTIALLY_FAILED` e depois retomada explicitamente com o mesmo UUID e uma retomada registrada;
+- restauração final: execução `3896a0e5-1091-4e94-8183-dba05d38ce66`, deixando Aurora novamente `Ativo`;
+- uma captura de `10.996` bytes foi baixada como `image/png`, com assinatura válida e `Cache-Control: private, no-store`; módulo e artefato retornaram `404` ao operador de outra área.
+
+Assim, PR, dois CIs, **Wait for CI**, deploy automático, topologia co-localizada, readiness, compensação parcial, retomada, storage privado e RBAC possuem evidência operacional no ambiente público. Nenhum valor secreto foi registrado neste documento.
 
 ## Critérios de aceite do Dia 5
 
@@ -212,10 +219,10 @@ Antes de declarar o SC-05 operacional, ainda é necessário:
 - [x] Imagem da 0.5.0 aprovada pelos CIs públicos; build local indisponível com Docker Desktop desligado.
 - [x] PR `#5`, merge em `main` e deploy automático de web/worker/scheduler aprovados.
 - [x] Limite do plano Railway registrado e topologia-alvo reduzida aos três serviços existentes.
-- [ ] Ajuste co-localizado aprovado em novo PR e CI, com **Wait for CI** preservado nos três serviços.
-- [ ] WSGI privado publicado junto ao worker, Playwright em loopback e allowlist de ambiente verificada.
-- [ ] Smoke tests de produção registrados.
-- [ ] Release e tag `v0.5.0` publicados.
+- [x] Ajuste co-localizado aprovado no PR `#6` e em dois CIs, com **Wait for CI** preservado nos três serviços.
+- [x] WSGI privado publicado junto ao worker, Playwright em loopback e allowlist de ambiente verificada.
+- [x] Smoke tests de produção registrados.
+- [x] Release e tag `v0.5.0` publicados.
 
 ## Limites conscientes
 

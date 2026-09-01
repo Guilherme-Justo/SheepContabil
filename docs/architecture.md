@@ -88,7 +88,7 @@ flowchart TB
 | `cron` | Pulso efêmero que identifica e publica execuções vencidas | 1 execução por pulso |
 | `simulator` WSGI | Três portais HTML sintéticos do SC-05, com autenticação própria e falhas determinísticas | Contêiner separado no Compose; subprocesso local do `worker` na Railway |
 
-Web, worker e cron usam a mesma versão do código. O simulador usa a mesma imagem e banco nesta entrega curta, mas mantém URLconf, settings e entrypoint WSGI próprios e não é um serviço de domínio da SheepContabil. Na Railway, o Playwright o acessa por `127.0.0.1:8000`; a porta também escuta na rede privada somente para o healthcheck da plataforma, sem domínio público. Um supervisor valida schema, inicia o WSGI com ambiente sanitizado, confirma liveness, inicia Celery e só então libera readiness; a saída de qualquer filho encerra o outro para que o serviço seja reiniciado de forma coerente.
+Web, worker e cron usam a mesma versão do código. O simulador usa a mesma imagem e banco nesta entrega curta, mas mantém URLconf, settings e entrypoint WSGI próprios e não é um serviço de domínio da SheepContabil. Na Railway, o Playwright o acessa por `127.0.0.1:8000`; o bind também permite o healthcheck pela rede privada, sem domínio público. Um supervisor valida schema, inicia o WSGI com ambiente sanitizado, confirma liveness, inicia Celery e libera readiness depois que o processo sobrevive à janela inicial; a saída de qualquer filho encerra o outro para que o serviço seja reiniciado de forma coerente. O smoke funcional comprova separadamente o consumo da fila.
 
 A co-localização é decisão operacional, não quebra da fronteira lógica: o subprocesso recebe somente runtime Python, segredo Django, fuso, PostgreSQL e credenciais sintéticas. Redis, S3 e OpenAI permanecem fora de seu ambiente. No Compose, onde não existe o mesmo limite de recursos, o contêiner `simulator` continua separado e acessível ao worker apenas pela rede interna.
 
@@ -344,7 +344,7 @@ Um projeto Railway conterá:
 - Redis;
 - bucket S3.
 
-O PR `#5` incorporou a 0.5.0 à `main`; os CIs do PR e do push em `main` ficaram verdes e a integração nativa concluiu deployments de `web`, `worker` e `scheduler` condicionados ao **Wait for CI**. O plano disponível, porém, não permitiu criar um quarto serviço de aplicação, e por isso essa implantação não tornou o SC-05 operacional. A IaC foi reduzida aos três serviços existentes e o ajuste co-localizado ainda precisa de novo PR, CI, deploy do worker e smoke tests. Até esses gates, a 0.5.0 está publicada, mas a automação SC-05 permanece sem evidência pública ponta a ponta.
+O PR `#5` incorporou a 0.5.0 à `main`; os CIs do PR e do push em `main` ficaram verdes e a integração nativa concluiu deployments de `web`, `worker` e `scheduler` condicionados ao **Wait for CI**. Como o plano não permitiu um quarto serviço de aplicação, a IaC foi reduzida aos três serviços existentes e o WSGI sintético foi co-localizado no worker. Esse ajuste passou pelo PR `#6`, pelos CIs do PR e de `main`, pelo deploy automático e pelo smoke no ambiente público de bloqueio, desbloqueio, evidência privada, falha parcial, retomada e RBAC. A limitação de isolamento permanece consciente, mas a automação SC-05 possui evidência operacional ponta a ponta no ambiente publicado.
 
 O web recebe o domínio HTTPS gerado pela plataforma. Domínio próprio é opcional e só será configurado se já estiver sob controle do projeto. O serviço permanecerá em plano sem suspensão durante toda a avaliação.
 
@@ -358,7 +358,7 @@ Deploy da branch `main` ocorre somente após validação no CI. A etapa de relea
 - E2E: login/RBAC e um caminho crítico por módulo;
 - resiliência: timeout, entrada inválida, duplicidade, falha parcial e retomada.
 
-No Dia 5, 37 testes focados exercitam ordem e idempotência da saga, bloqueio e undo tardio, preservação de restrições anteriores, compensação total e parcial, proteção contra estado divergente, retomada, RBAC, integridade de evidência e falha de broker. Quatro testes de contrato iniciam um servidor real e conduzem Chromium sobre bloqueio, desbloqueio, falha visual e retomada parcial nos três portais HTML. A suíte consolidada aprovou 124 testes com 83,85% de cobertura; lint, formatação, tipagem, sintaxe do supervisor, checks Django, migrations, assets e Compose também passaram. O build de contêiner foi confirmado pelos CIs verdes do PR `#5` e do push em `main`. O deploy atualizado do worker e os smoke tests públicos são gates independentes antes de declarar o SC-05 operacional.
+No Dia 5, 37 testes focados exercitam ordem e idempotência da saga, bloqueio e undo tardio, preservação de restrições anteriores, compensação total e parcial, proteção contra estado divergente, retomada, RBAC, integridade de evidência e falha de broker. Quatro testes de contrato iniciam um servidor real e conduzem Chromium sobre bloqueio, desbloqueio, falha visual e retomada parcial nos três portais HTML. A suíte consolidada aprovou 124 testes com 83,85% de cobertura; lint, formatação, tipagem, sintaxe do supervisor, checks Django, migrations, assets e Compose também passaram. O build de contêiner foi confirmado pelos CIs verdes dos PRs `#5` e `#6` e de seus pushes em `main`. O deploy atualizado do worker e os smoke tests públicos também foram aprovados, encerrando os gates do SC-05.
 
 ## 17. Decisões explicitamente fora do escopo
 
