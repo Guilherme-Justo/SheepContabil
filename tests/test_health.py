@@ -30,6 +30,21 @@ def test_readiness_reports_database_failure(client: Client, monkeypatch) -> None
     assert response.json() == {"status": "not-ready", "database": "unavailable"}
 
 
+def test_readiness_waits_for_optional_worker_marker(client: Client, db, tmp_path) -> None:
+    marker = tmp_path / "worker-ready"
+
+    with override_settings(SC05_SIMULATOR_READY_FILE=str(marker)):
+        response = client.get(reverse("health-ready"))
+        assert response.status_code == 503
+        assert response.json() == {"status": "not-ready", "worker": "starting"}
+
+        marker.touch()
+        response = client.get(reverse("health-ready"))
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ready", "database": "ok"}
+
+
 @override_settings(
     SECURE_SSL_REDIRECT=True,
     SECURE_REDIRECT_EXEMPT=[r"^health/(?:live|ready)$"],

@@ -8,8 +8,8 @@
 | Natureza preservada | RPA |
 | Frequência | Sob demanda |
 | Área | Tecnologia |
-| Estado local | Implementado; 122 testes e gates locais disponíveis aprovados |
-| Estado externo | Não publicado nem validado em produção nesta versão |
+| Estado local | Implementado; 124 testes e gates locais disponíveis aprovados |
+| Estado externo | 0.5.0 implantada em web/worker/scheduler; SC-05 aguarda ajuste co-localizado e smoke tests |
 
 ## Resultado entregue
 
@@ -43,10 +43,13 @@ Operador Tecnologia / Administrador
                  │ UUID da execução
                  ▼
        Worker + Playwright Chromium
-                 │ login e HTML visível
+                 │ HTTP loopback na Railway
+                 ▼
+          WSGI sintético privado
+                 │ HTML visível
         ┌────────┼─────────┐
         ▼        ▼         ▼
-    Arquivos  Contábil  Tarefas     serviço privado sintético
+    Arquivos  Contábil  Tarefas
         │        │         │
         └────────┼─────────┘
                  │ snapshots + tentativas
@@ -56,7 +59,9 @@ Operador Tecnologia / Administrador
                     screenshots PNG
 ```
 
-Web, worker e scheduler permanecem processos do mesmo monólito modular. O `simulator` possui URLconf e entrypoint WSGI próprios e representa apenas os três sistemas externos. Ele não contém a saga, não oferece atalho de integração ao worker e não precisa de URL pública.
+Web, worker e scheduler permanecem processos do mesmo monólito modular. O simulador possui settings, URLconf e entrypoint WSGI próprios e representa apenas os três sistemas externos. Ele não contém a saga, não oferece atalho de integração ao worker e não precisa de URL pública.
+
+O Compose mantém esse WSGI em contêiner separado. O limite do plano Railway impediu criar um quarto serviço de aplicação; por isso, a implantação-alvo inicia o simulador como subprocesso auxiliar do mesmo contêiner do `worker`. O Playwright o acessa em `127.0.0.1:8000`; a Railway alcança `/health/ready` apenas pela rede privada, sem domínio público. A co-localização é apenas física: o subprocesso recebe ambiente reconstruído por allowlist sem herdar Redis, S3 ou OpenAI, e as credenciais SC-05 existem somente no serviço `worker`.
 
 ## Ordem, pré-condições e compensações
 
@@ -158,26 +163,30 @@ Até este documento, `37` testes focados do SC-05 foram aprovados:
 - `4` testes de contrato que iniciam servidor real e usam Chromium nos três portais, cobrindo bloqueio, desbloqueio, evidência da página de erro e falha parcial seguida de retomada sem novo clique no portal já conforme;
 - `1` teste isolado do WSGI privado, URLconf e política HTTP interna.
 
-No estado final local, a suíte completa aprovou `122` testes com cobertura total de `83,83%`, acima do piso obrigatório de `75%`. Os `37` testes focados descritos acima também passaram. Ruff, verificação de formatação, Mypy, checks Django, ausência de migrations pendentes, build de assets e validação da configuração Compose estão verdes.
+No estado final local, a suíte completa aprovou `124` testes com cobertura total de `83,85%`, acima do piso obrigatório de `75%`. Os `37` testes focados descritos acima também passaram. Ruff, verificação de formatação, Mypy, sintaxe POSIX do supervisor, checks Django, ausência de migrations pendentes, build de assets e validação da configuração Compose estão verdes.
 
-O único gate de build que não pôde ser reproduzido localmente foi a imagem `0.5.0`, porque o Docker Desktop estava desligado e o daemon Linux não estava disponível. Isso não representa falha conhecida da imagem: o job `Container build` do CI deve construí-la sobre o mesmo commit e permanece obrigatório antes do merge.
+O único gate de build que não pôde ser reproduzido localmente foi a imagem `0.5.0`, porque o Docker Desktop estava desligado e o daemon Linux não estava disponível. Esse gate foi posteriormente aprovado pelos jobs `Container build` do CI do PR `#5` e do push em `main`.
 
-O plano Railway foi validado sem aplicação: `1` recurso a criar, `10` ajustes e `0` remoções. A criação corresponde ao `simulator`; os ajustes acrescentam apenas variáveis declaradas ao web/worker e as referências do SC-05. `checkSuites: true` ficou explícito nas quatro fontes GitHub para preservar o bloqueio **Wait for CI**. Os smoke tests públicos continuam pendentes.
+O plano Railway original foi validado sem aplicação: `1` recurso a criar, `10` ajustes e `0` remoções. A criação correspondia ao quarto serviço `simulator`, mas o limite do plano não permitiu materializá-lo. A decisão operacional seguinte preservou o simulador separado no Compose e o co-localizou no worker somente na Railway. A IaC revisada passa a declarar apenas as três fontes GitHub já existentes — web, worker e scheduler —, todas com `checkSuites: true` para preservar **Wait for CI**. O plano final foi novamente revisado com `0` recursos novos, `10` ajustes e `0` remoções. Esse novo ajuste ainda não possui evidência de CI, deploy nem smoke test.
 
-## Publicação ainda pendente
+## Publicação e pendência operacional
 
-Não há evidência de produção da versão 0.5.0 neste documento. Antes de declarar o Dia 5 publicado, ainda é necessário:
+O [PR `#5`](https://github.com/Guilherme-Justo/SheepContabil/pull/5) incorporou a 0.5.0 à `main` no commit [`d5b71b384340f4f3cd66e07f801309529790b39f`](https://github.com/Guilherme-Justo/SheepContabil/commit/d5b71b384340f4f3cd66e07f801309529790b39f). O [CI do PR](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33538813847) e o [CI do push em `main`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33539137377) concluíram os jobs de qualidade, testes e imagem com sucesso. Depois do CI verde, a integração nativa da Railway concluiu os deployments:
 
-1. obter CI verde da branch, incluindo o build da imagem de produção que ficou indisponível localmente;
-2. criar ou reconciliar o serviço privado `simulator` na Railway;
-3. configurar no simulador e no worker as mesmas credenciais sintéticas;
-4. confirmar a URL privada `http://simulator.railway.internal:8000` a partir do worker;
-5. aplicar a migration do SC-05 e executar o seed idempotente uma vez;
-6. confirmar deploy automático de `main` condicionado ao CI para `web`, `worker`, `scheduler` e `simulator`;
-7. executar smoke tests de bloqueio, desbloqueio, compensação parcial, retomada e download autorizado de screenshot;
-8. registrar IDs de PR, CI, deploy e execuções somente depois que existirem.
+- `web`: `e07e22d8-1d4c-4901-994c-7d41bbb78c7c`;
+- `worker`: `5cba6372-cbdc-4ead-a8f0-a5a0f87c56f2`;
+- `scheduler`: `ef6c395d-e250-49f3-9eed-c5d0d2b62865`.
 
-A URL pública já comprovada continua sendo a do portal 0.4.0. O simulador não deve receber domínio público.
+A 0.5.0 está, portanto, publicada nos três serviços existentes, com deploy automático condicionado ao CI comprovado. Isso não prova o SC-05 em produção: sem o quarto recurso, o worker implantado pelo PR `#5` não possuía uma fronteira de simulador alcançável.
+
+Antes de declarar o SC-05 operacional, ainda é necessário:
+
+1. aprovar em novo PR e CI o supervisor que inicia WSGI e Celery no mesmo worker;
+2. publicar a IaC sem recurso `simulator` e confirmar **Wait for CI** em web, worker e scheduler;
+3. manter `SC05_SIMULATOR_USERNAME`/`SC05_SIMULATOR_PASSWORD` somente no worker e conferir a allowlist do ambiente filho;
+4. confirmar readiness em `http://127.0.0.1:8000` dentro do worker, sem domínio ou conectividade externa;
+5. executar smoke tests de bloqueio, desbloqueio, compensação parcial, retomada e download autorizado de screenshot;
+6. registrar os novos IDs de PR, CI, deploy e execuções somente depois que existirem.
 
 ## Critérios de aceite do Dia 5
 
@@ -198,12 +207,13 @@ A URL pública já comprovada continua sendo a do portal 0.4.0. O simulador não
 - [x] Operador Tecnologia e isolamento entre áreas cobertos.
 - [x] Seed sintético e idempotente sem reset operacional.
 - [x] Teste de contrato usa navegador real, não fake do RPA.
-- [x] Suíte completa com `122` testes e cobertura de `83,83%` aprovada sobre o estado final.
+- [x] Suíte completa com `124` testes e cobertura de `83,85%` aprovada sobre o estado final.
 - [x] Ruff, formatação, Mypy, checks Django, migrations, assets e Compose aprovados.
-- [x] Plano Railway revisado, sem remoções e com **Wait for CI** preservado.
-- [ ] Imagem da 0.5.0 aprovada pelo CI; build local indisponível com Docker Desktop desligado.
-- [ ] PR e CI públicos aprovados.
-- [ ] Serviço privado do simulador publicado e acessível pelo worker.
+- [x] Imagem da 0.5.0 aprovada pelos CIs públicos; build local indisponível com Docker Desktop desligado.
+- [x] PR `#5`, merge em `main` e deploy automático de web/worker/scheduler aprovados.
+- [x] Limite do plano Railway registrado e topologia-alvo reduzida aos três serviços existentes.
+- [ ] Ajuste co-localizado aprovado em novo PR e CI, com **Wait for CI** preservado nos três serviços.
+- [ ] WSGI privado publicado junto ao worker, Playwright em loopback e allowlist de ambiente verificada.
 - [ ] Smoke tests de produção registrados.
 - [ ] Release e tag `v0.5.0` publicados.
 
@@ -214,4 +224,4 @@ A URL pública já comprovada continua sendo a do portal 0.4.0. O simulador não
 - O snapshot de tarefas usa JSON por representar estado externo heterogêneo. Mudanças de schema do sistema real exigirão versionamento e migração do contrato.
 - A compensação é uma tentativa segura de restauração, não uma transação distribuída. Estado divergente permanece parcial por escolha deliberada.
 - Screenshots são recortados ao cliente ou erro atual, mas ainda podem conter dados visíveis; apenas dados sintéticos são permitidos nesta entrega e políticas reais de retenção/DLP continuam fora do escopo.
-- O serviço privado compartilha imagem e banco para reduzir risco de entrega, mas não recebe Redis, S3 nem OpenAI. Em produção real, um usuário ou banco PostgreSQL dedicado e TLS serviço-a-serviço devem ser avaliados.
+- Na Railway demonstrativa, Celery e WSGI compartilham contêiner, UID e ciclo de disponibilidade para caber no plano; isso reduz isolamento de segurança, falha e escala. A allowlist impede herança acidental de Redis, S3 e OpenAI, mas não equivale a uma fronteira de processo forte. Em produção real, o simulador deve voltar a um serviço separado, com usuário/banco dedicado e TLS serviço-a-serviço quando aplicável.

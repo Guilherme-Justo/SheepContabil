@@ -1,6 +1,6 @@
 # ADR-0006 — Playwright para o RPA do SC-05
 
-- **Status:** Aceita
+- **Status:** Aceita; implantação Railway ajustada em 2026-09-01
 - **Data:** 2026-08-27
 - **Decisores:** Engenharia/Arquitetura SheepContabil
 
@@ -12,7 +12,9 @@ O fluxo também pode terminar parcialmente aplicado e precisa de reversão ou re
 
 ## Decisão
 
-Usar Playwright/Chromium no Celery worker para operar portais HTML simulados. Os simuladores ficam em serviço privado e possuem dados e falhas determinísticas.
+Usar Playwright/Chromium no Celery worker para operar portais HTML simulados. Os simuladores ficam em processo WSGI privado e possuem dados e falhas determinísticas.
+
+No Compose, esse WSGI permanece em contêiner separado. Na Railway, o limite do plano exige hospedá-lo como subprocesso auxiliar do contêiner `worker`. O Playwright usa exclusivamente `127.0.0.1:8000`; a plataforma alcança a porta pela rede privada apenas para healthcheck, sem domínio público. A fronteira continua sendo HTTP/HTML: Playwright não consulta o banco nem usa endpoint privilegiado. O processo filho nasce com ambiente reconstruído por allowlist e não herda Redis, S3 ou OpenAI; as credenciais sintéticas ficam cadastradas somente no serviço worker.
 
 Para cada portal:
 
@@ -49,6 +51,7 @@ O caso de uso implementa saga:
 - automação de UI é mais lenta e frágil que API;
 - seletores e sincronização exigem testes;
 - concorrência deve ser limitada para controlar memória.
+- na Railway demonstrativa, falha ou escala de Celery e simulador compartilham a mesma unidade de disponibilidade.
 
 ## Alternativas consideradas
 
@@ -70,5 +73,4 @@ Rejeitada por volume e complexidade desnecessários.
 
 ## Critérios de revisão
 
-Preferir adapter de API oficial quando existir contrato estável e autorizado. Separar um worker RPA especializado se consumo ou frequência exigirem isolamento próprio.
-
+Preferir adapter de API oficial quando existir contrato estável e autorizado. Separar novamente o simulador e/ou um worker RPA especializado quando o plano, consumo ou frequência permitirem e exigirem isolamento próprio.
