@@ -124,7 +124,9 @@ Todos os nomes, documentos e conteúdos são fictícios.
 
 - [PR `#2`](https://github.com/Guilherme-Justo/SheepContabil/pull/2) incorporado em `main` no commit [`280916068e938a5df6ff24bde0a904a72aec7162`](https://github.com/Guilherme-Justo/SheepContabil/commit/280916068e938a5df6ff24bde0a904a72aec7162); execução [GitHub Actions `33415227011`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33415227011) aprovada em testes/qualidade e build do contêiner.
 - Deploys Railway concluídos para `web` (`74f2241e-af8e-4c51-af56-bd3884c62c82`), `worker` (`03246195-2f22-44ed-a411-f3d5ab0fa33d`) e `scheduler` (`bcc72f6c-764c-4971-a734-f945e4b12c49`).
-- O release foi enviado pela Railway CLI depois do CI verde porque a integração GitHub exibia `GitHub Repo not found`; a recuperação do deploy automático está documentada separadamente em [`deployment.md`](deployment.md#recuperação-do-deploy-automático-após-merge).
+- O release funcional inicial foi enviado pela Railway CLI depois do CI verde porque a integração GitHub exibia `GitHub Repo not found`.
+- A integração nativa foi recuperada e validada pelo [PR `#3`](https://github.com/Guilherme-Justo/SheepContabil/pull/3), incorporado em `main` no commit [`b5e86cd44cb53fd7083a40881111a7d7f7f3e999`](https://github.com/Guilherme-Justo/SheepContabil/commit/b5e86cd44cb53fd7083a40881111a7d7f7f3e999). A execução [GitHub Actions `33458151242`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33458151242) aprovou `Quality and tests` e `Container build`.
+- Com `Wait for CI` ativo nos três serviços, a Railway publicou via GitHub `web` (`58e133bd-b9d3-45cd-a5f0-a4d0dceb79aa`), `worker` (`07732a81-7cc9-4625-9798-4c2a5fb2a45e`) e `scheduler` (`858094d8-f740-4630-8aea-99706622503a`); `/health/ready` respondeu `200`. Os detalhes operacionais estão em [`deployment.md`](deployment.md#recuperação-do-deploy-automático-após-merge).
 - Migração `0006_sc04_document_classification` aplicada; o redeploy controlado `23d98c69-8837-40f5-9259-10ed1c19ea9f` executou o seed idempotente e respondeu `200` em `/health/ready`. `SEED_DEMO_ON_DEPLOY` voltou a `false` sem nova carga.
 - O pulso cron publicou uma única execução diária, `50dbb2a5-2f0a-48d1-9fbe-e667cb54eca5`, e preservou a competência já registrada do SC-20.
 - O worker recebeu 5 anexos, registrou 1 duplicidade, processou os 4 conteúdos novos e terminou com 0 falhas de aplicação. O painel do bucket privado indicou aproximadamente 32,8 KB.
@@ -154,6 +156,7 @@ Todos os nomes, documentos e conteúdos são fictícios.
 - [x] Falha externa `429` convertida em revisão humana sem perda, roteamento indevido ou falso positivo.
 - [x] Resposta estruturada bem-sucedida e ao menos um roteamento automático com a cota da API ativa.
 - [x] Release 0.4.0 publicado em web, worker e scheduler.
+- [x] Deploy automático de `main` via GitHub, condicionado ao CI verde, validado nos três serviços.
 
 ## Limites conscientes
 

@@ -78,18 +78,15 @@ O healthcheck da Railway é de ativação de deploy, não monitoramento contínu
 
 ### Recuperação do deploy automático após merge
 
-Diagnóstico de 2026-08-31: o GitHub confirma `Guilherme-Justo/SheepContabil` como repositório público com branch padrão `main`, e o CI do merge do SC-04 terminou verde. Na Railway, `web`, `worker` e `scheduler` ainda exibem o nome da fonte, mas a branch aparece como `GitHub Repo not found`; o seletor `Wait for CI` está desativado. Portanto, a configuração de build está preservada, mas a integração GitHub da Railway não consegue mais resolver a fonte ou receber corretamente seus eventos. A declaração `github(...)` da IaC não substitui a autorização OAuth/GitHub App da conta.
+Recuperação concluída em 2026-08-31. A integração GitHub da Railway foi reautorizada somente para `Guilherme-Justo/SheepContabil`; a fonte `main` foi reassociada a `web`, `worker` e `scheduler`, o deploy automático foi habilitado e `Wait for CI` ficou ativo nos três serviços.
 
-Plano de correção:
+A validação controlada usou o [PR `#3`](https://github.com/Guilherme-Justo/SheepContabil/pull/3), incorporado no commit [`b5e86cd44cb53fd7083a40881111a7d7f7f3e999`](https://github.com/Guilherme-Justo/SheepContabil/commit/b5e86cd44cb53fd7083a40881111a7d7f7f3e999). A execução [GitHub Actions `33458151242`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33458151242) concluiu `Quality and tests` e `Container build` com sucesso. Somente depois do CI verde, a Railway iniciou pela origem GitHub os deployments:
 
-1. Reautorizar a integração GitHub no workspace Railway e conceder acesso explícito a `Guilherme-Justo/SheepContabil`.
-2. Em **Settings → Source → Edit** de `web`, `worker` e `scheduler`, selecionar novamente o mesmo repositório e a branch `main`, sem alterar diretório raiz ou Dockerfile.
-3. Ativar **Wait for CI** nos três serviços, garantindo que a publicação só comece depois de todos os workflows do GitHub Actions acionados pelo push concluírem com sucesso.
-4. Revisar que `web` conserva pre-deploy e healthcheck, `worker` conserva o comando Celery e `scheduler` conserva cron, comando e política `NEVER`.
-5. Abrir um PR documental mínimo, incorporá-lo em `main` e usar seu SHA como teste controlado. Os três deployments devem registrar o mesmo `commitHash`, `branch: main` e origem GitHub, sem `cliCaller`.
-6. Confirmar `/health/ready = 200`, Celery `ready` com as duas tasks e o próximo pulso cron. Se um serviço não disparar, corrigir somente sua associação de fonte e repetir o teste.
+- `web`: `58e133bd-b9d3-45cd-a5f0-a4d0dceb79aa`;
+- `worker`: `07732a81-7cc9-4625-9798-4c2a5fb2a45e`;
+- `scheduler`: `858094d8-f740-4630-8aea-99706622503a`.
 
-Se a integração nativa continuar indisponível após reautorização, o fallback é um workflow de deploy com token Railway de escopo mínimo e jobs separados para os três serviços. Esse fallback só deve ser implementado depois de esgotar a integração nativa, pois adiciona segredo e lógica operacional ao GitHub Actions.
+O portal respondeu `200` em `/health/ready`, encerrando o teste de recuperação. A associação com `main`, o deploy automático e `Wait for CI` devem permanecer ativos nos três serviços. Se `GitHub Repo not found` reaparecer, reautorize a integração e reassocie apenas a fonte afetada; um workflow com token Railway continua sendo fallback de último recurso.
 
 ## Scheduler do SC-04 e SC-20
 
