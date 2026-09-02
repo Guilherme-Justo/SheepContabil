@@ -576,7 +576,7 @@
   .sc05-execute-button, .sc05-resume-button { transition: none; }
 }
 
-@media (prefers-color-scheme: dark) {
+.dark {
   :root {
     --color-nevoa: #091216;
   }
@@ -601,4 +601,5 @@
   .empty-state { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.1); }
   .status-dot { box-shadow: 0 0 0 4px rgba(31,166,154,.25); }
 }
+
 
