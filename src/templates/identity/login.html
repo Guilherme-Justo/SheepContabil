@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load a11y_tags %}
 {% load static %}
 
 {% block title %}Entrar · SheepContabil{% endblock %}
@@ -40,12 +41,12 @@
         {% endif %}
         <div>
           <label for="{{ form.username.id_for_label }}" class="form-label">{{ form.username.label }}</label>
-          {{ form.username }}
+          {{ form.username|a11y }}
           {% if form.username.errors %}<p class="field-error">{{ form.username.errors.0 }}</p>{% endif %}
         </div>
         <div>
           <label for="{{ form.password.id_for_label }}" class="form-label">{{ form.password.label }}</label>
-          {{ form.password }}
+          {{ form.password|a11y }}
           {% if form.password.errors %}<p class="field-error">{{ form.password.errors.0 }}</p>{% endif %}
         </div>
         {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}

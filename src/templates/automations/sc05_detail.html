@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load a11y_tags %}
 
 {% block title %}{{ module.code }} · SheepContabil{% endblock %}
 
@@ -26,12 +27,12 @@
     </div>
     <form method="post" class="mt-6 space-y-4" novalidate>
       {% csrf_token %}
-      {{ form.request_key }}
+      {{ form.request_key|a11y }}
       {% if form.non_field_errors %}<div class="sc05-dark-error" role="alert">{{ form.non_field_errors.0 }}</div>{% endif %}
       {% for field in form.visible_fields %}
       <div class="sc05-dark-field">
         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-        {{ field }}
+        {{ field|a11y }}
         {% if field.help_text %}<p>{{ field.help_text }}</p>{% endif %}
         {% if field.errors %}<span role="alert">{{ field.errors.0 }}</span>{% endif %}
       </div>

@@ -38,7 +38,7 @@
         <label for="{{ field.id_for_label }}" class="sc06-dark-label">
           {{ field.label }}{% if field.field.required %}<span aria-hidden="true"> *</span><span class="sr-only"> (obrigatório)</span>{% endif %}
         </label>
-        <div class="sc06-dark-field">{{ field }}</div>
+        <div class="sc06-dark-field">{{ field|a11y }}</div>
         {% if field.help_text %}<p class="sc06-dark-help">{{ field.help_text|safe }}</p>{% endif %}
         {% if field.errors %}<p class="sc06-dark-field-error" role="alert">{{ field.errors.0 }}</p>{% endif %}
       </div>
