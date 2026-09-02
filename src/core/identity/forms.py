@@ -20,7 +20,7 @@ class A11yFormMixin:
             if described_by:
                 existing = attrs.get("aria-describedby", "")
                 attrs["aria-describedby"] = (existing + " " + " ".join(described_by)).strip()
-        return context
+        return context  # type: ignore[no-any-return]
 
 
 class PortalAuthenticationForm(A11yFormMixin, AuthenticationForm):
