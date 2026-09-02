@@ -11,8 +11,8 @@ from core.automations.sc06.rules import get_active_questions
 class A11yFormMixin:
     """Injeta propriedades de acessibilidade ARIA nos widgets (WCAG AA)."""
 
-    def get_context(self):
-        context = super().get_context()
+    def get_context(self) -> dict[str, Any]:
+        context = super().get_context()  # type: ignore[misc]
         for bound_field in context["form"]:
             attrs = bound_field.field.widget.attrs
             described_by = []
