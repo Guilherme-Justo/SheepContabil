@@ -191,23 +191,51 @@ def test_queue_and_document_poll_only_while_work_is_active(
     modules: dict[str, AutomationModule],
     fiscal_operator: User,
 ) -> None:
-    _, document, _, _ = _document_case(modules["SC-04"], suffix="poll")
+    run, document, _, _ = _document_case(modules["SC-04"], suffix="poll")
     client.force_login(fiscal_operator)
 
     queue = client.get(reverse("automations:sc04-queue-fragment"))
     state = client.get(
         reverse("automations:sc04-document-state", kwargs={"document_id": document.id})
     )
+    detail = client.get(
+        reverse("automations:sc04-document-detail", kwargs={"document_id": document.id})
+    )
     assert 'hx-trigger="every 5s"' in queue.content.decode()
     assert 'hx-trigger="every 2s"' in state.content.decode()
+    assert 'id="sc04-file-metadata"' in state.content.decode()
+    assert 'hx-swap-oob="true"' in state.content.decode()
+    assert 'id="sc04-file-metadata"' in detail.content.decode()
+    assert 'hx-swap-oob="true"' not in detail.content.decode()
 
     FiscalDocument.objects.filter(pk=document.pk).update(status=DocumentStatus.AWAITING_REVIEW)
+    attempt = DocumentClassificationAttempt.objects.create(
+        document=document,
+        run=run,
+        sequence=1,
+        status=ClassificationAttemptStatus.FAILED,
+        provider="openai",
+        error_code="classifier_unavailable",
+        error_message="A classificação por IA ainda não está configurada.",
+        finished_at=timezone.now(),
+    )
+    DocumentReview.objects.create(
+        document=document,
+        run=run,
+        suggested_attempt=attempt,
+        reason=DocumentReviewReason.CLASSIFIER_UNAVAILABLE,
+        policy_version="v1",
+    )
     queue = client.get(reverse("automations:sc04-queue-fragment"))
     state = client.get(
         reverse("automations:sc04-document-state", kwargs={"document_id": document.id})
     )
     assert 'hx-trigger="every 5s"' not in queue.content.decode()
     assert 'hx-trigger="every 2s"' not in state.content.decode()
+    assert 'id="sc04-file-metadata"' in state.content.decode()
+    assert 'hx-swap-oob="true"' in state.content.decode()
+    assert "Classificador indisponível" in state.content.decode()
+    assert "dark:text-white font-semibold" in state.content.decode()
 
 
 def test_preview_and_download_stream_only_to_authorized_area(

@@ -58,7 +58,7 @@
   <article class="sc04-review-card" aria-labelledby="sc04-review-title">
     <p class="eyebrow text-ambar">Revisão necessária</p>
     <h2 id="sc04-review-title" class="mt-2 font-display text-xl font-semibold">Confirmar classificação</h2>
-    <p class="mt-2 text-sm leading-6 text-grafite">Motivo: <strong class="text-tinta">{{ review.get_reason_display }}</strong></p>
+    <p class="mt-2 text-sm leading-6 text-grafite">Motivo: <strong class="text-tinta dark:text-white font-semibold">{{ review.get_reason_display }}</strong></p>
 
     <div class="sc04-confidence-grid mt-5" aria-label="Sugestão registrada">
       <div>
@@ -126,3 +126,15 @@
   </article>
   {% endif %}
 </aside>
+
+{% if is_partial %}
+<dl id="sc04-file-metadata" class="sc04-file-metadata mt-5" hx-swap-oob="true">
+  <div><dt>Formato</dt><dd>{{ document.media_type }}</dd></div>
+  <div><dt>Tamanho</dt><dd>{{ document.byte_size|filesizeformat }}</dd></div>
+  <div><dt>Extração</dt><dd>{% if document.extraction_method %}{{ document.get_extraction_method_display }}{% else %}Aguardando{% endif %}</dd></div>
+  <div><dt>Páginas</dt><dd>{{ document.page_count|default:"—" }}</dd></div>
+</dl>
+{% if preview_kind == "text" and document.extracted_excerpt %}
+<pre id="sc04-text-preview" class="sc04-text-preview" tabindex="0" hx-swap-oob="true">{{ document.extracted_excerpt }}</pre>
+{% endif %}
+{% endif %}

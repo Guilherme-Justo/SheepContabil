@@ -266,10 +266,12 @@ def sc04_document_detail(request: HttpRequest, document_id: str) -> HttpResponse
 def sc04_document_state(request: HttpRequest, document_id: str) -> HttpResponse:
     module = _visible_sc04_module(request)
     document = _visible_sc04_document(request, document_id)
+    context = _sc04_document_context(module, document)
+    context["is_partial"] = True
     response = render(
         request,
         "automations/partials/sc04_document_state.html",
-        _sc04_document_context(module, document),
+        context,
     )
     response["Cache-Control"] = "private, no-store"
     return response

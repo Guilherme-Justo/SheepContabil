@@ -40,11 +40,11 @@
           <p>Seu navegador não oferece pré-visualização de PDF. <a href="{% url 'automations:sc04-document-download' document.id %}">Baixe o original.</a></p>
         </iframe>
       {% else %}
-        <pre class="sc04-text-preview" tabindex="0">{{ document.extracted_excerpt|default:"O texto estará disponível após a etapa de extração." }}</pre>
+        <pre id="sc04-text-preview" class="sc04-text-preview" tabindex="0">{{ document.extracted_excerpt|default:"O texto estará disponível após a etapa de extração." }}</pre>
       {% endif %}
     </div>
 
-    <dl class="sc04-file-metadata mt-5">
+    <dl id="sc04-file-metadata" class="sc04-file-metadata mt-5">
       <div><dt>Formato</dt><dd>{{ document.media_type }}</dd></div>
       <div><dt>Tamanho</dt><dd>{{ document.byte_size|filesizeformat }}</dd></div>
       <div><dt>Extração</dt><dd>{% if document.extraction_method %}{{ document.get_extraction_method_display }}{% else %}Aguardando{% endif %}</dd></div>

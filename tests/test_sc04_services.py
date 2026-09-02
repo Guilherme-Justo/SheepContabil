@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -42,6 +43,7 @@ from core.automations.sc04.contracts import (
     IncomingDocument,
     StorageOperationError,
     StoredObject,
+    ValidatedDocument,
 )
 from core.automations.sc04.services import (
     create_manual_sc04_inbox_run,
@@ -604,3 +606,29 @@ def test_dispatch_command_publishes_sc04_daily_once(
     assert run.idempotency_key == "sc04:scheduled:2026-08-31"
     assert sc04_dispatched == [str(run.id)]
     assert len(sc20_dispatched) == 1
+
+
+def test_ingest_document_persists_page_count_at_creation(
+    modules: dict[str, AutomationModule],
+) -> None:
+    storage = MemoryStorage()
+    validated = ValidatedDocument(
+        filename="extrato.pdf",
+        media_type="application/pdf",
+        extension=".pdf",
+        content=b"%PDF-1.4-simulated",
+        sha256=hashlib.sha256(b"%PDF-1.4-simulated").hexdigest(),
+        page_count=3,
+    )
+    run = _run(modules["SC-04"], suffix="ingest-page-count")
+
+    result = ingest_document(
+        run=run,
+        source=DocumentSource.SIMULATED_INBOX,
+        source_reference="inbox:test:page-count",
+        validated=validated,
+        storage=storage,
+    )
+
+    doc = FiscalDocument.objects.get(pk=result.document_id)
+    assert doc.page_count == 3
