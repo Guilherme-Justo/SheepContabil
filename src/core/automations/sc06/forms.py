@@ -8,7 +8,26 @@ from django import forms
 from core.automations.sc06.rules import get_active_questions
 
 
-class BriefingAnswersForm(forms.Form):
+class A11yFormMixin:
+    """Injeta propriedades de acessibilidade ARIA nos widgets (WCAG AA)."""
+
+    def get_context(self) -> dict[str, Any]:
+        context = super().get_context()  # type: ignore[misc]
+        for bound_field in context["form"]:
+            attrs = bound_field.field.widget.attrs
+            described_by = []
+            if bound_field.help_text:
+                described_by.append(f"{bound_field.id_for_label}_helptext")
+            if bound_field.errors:
+                attrs["aria-invalid"] = "true"
+                described_by.append(f"{bound_field.id_for_label}_errors")
+            if described_by:
+                existing = attrs.get("aria-describedby", "")
+                attrs["aria-describedby"] = (existing + " " + " ".join(described_by)).strip()
+        return context  # type: ignore[no-any-return]
+
+
+class BriefingAnswersForm(A11yFormMixin, forms.Form):
     """Build a bounded Django form from one already-validated template version."""
 
     def __init__(

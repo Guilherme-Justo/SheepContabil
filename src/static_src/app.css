@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 @import "@fontsource/archivo/600.css";
 @import "@fontsource/archivo/700.css";
 @import "@fontsource/ibm-plex-sans/400.css";
@@ -40,7 +40,7 @@
     font-family: "Archivo", sans-serif; font-size: .68rem; font-weight: 700;
     letter-spacing: .16em; text-transform: uppercase; color: #5a7078;
   }
-  .sidebar-label { color: rgba(255,255,255,.42); }
+  .sidebar-label { color: rgba(255,255,255,.72); }
   .sidebar-link {
     display: grid; grid-template-columns: 2.8rem 1fr; align-items: center; gap: .5rem;
     border-radius: .8rem; padding: .72rem .75rem; color: rgba(255,255,255,.72);
@@ -116,7 +116,7 @@
   .login-proof { border-top: 1px solid rgba(255,255,255,.13); padding-top: 1rem; }
   .login-proof strong, .login-proof span { display: block; }
   .login-proof strong { font-family: "Archivo", sans-serif; font-size: 1.35rem; color: white; }
-  .login-proof span { margin-top: .3rem; font-size: .68rem; color: rgba(255,255,255,.48); }
+  .login-proof span { margin-top: .3rem; font-size: .68rem; color: rgba(255,255,255,.72); }
   .login-form-panel { display: flex; min-height: 100vh; align-items: center; justify-content: center; padding: 2rem 1.4rem; background: #fff; }
   .form-label { display: block; margin-bottom: .55rem; font-size: .75rem; font-weight: 600; color: #0b1a20; }
   .form-input { width: 100%; border: 1px solid rgba(90,112,120,.28); border-radius: .8rem; background: white; padding: .78rem .9rem; color: #0b1a20; outline: none; transition: border-color .15s, box-shadow .15s; }
@@ -212,7 +212,7 @@
   }
   .sc05-dark-field select option { color: #0b1a20; }
   .sc05-dark-field select:focus { border-color: #79d8cf; box-shadow: 0 0 0 4px rgba(31,166,154,.18); }
-  .sc05-dark-field p { margin-top: .35rem; color: rgba(255,255,255,.48); font-size: .6rem; line-height: 1.45; }
+  .sc05-dark-field p { margin-top: .35rem; color: rgba(255,255,255,.72); font-size: .6rem; line-height: 1.45; }
   .sc05-dark-field span { display: block; margin-top: .35rem; color: #ffb9b5; font-size: .65rem; }
   .sc05-dark-error { border-left: 3px solid #ff8d85; border-radius: .55rem; background: rgba(196,69,61,.2); padding: .7rem .8rem; color: #ffe9e7; font-size: .7rem; }
   .sc05-execute-button, .sc05-resume-button {
@@ -394,7 +394,7 @@
   .sc06-dark-field input:focus, .sc06-dark-field select:focus {
     border-color: rgba(121,216,207,.85); background: rgba(255,255,255,.13); box-shadow: 0 0 0 4px rgba(31,166,154,.2);
   }
-  .sc06-dark-help { margin-top: .35rem; color: rgba(255,255,255,.48); font-size: .62rem; line-height: 1.45; }
+  .sc06-dark-help { margin-top: .35rem; color: rgba(255,255,255,.72); font-size: .62rem; line-height: 1.45; }
   .sc06-dark-field-error { margin-top: .4rem; color: #ffb9b5; font-size: .67rem; line-height: 1.45; }
   .sc06-dark-form-error { border-left: 3px solid #ff8d85; border-radius: .55rem; background: rgba(196,69,61,.2); padding: .7rem .8rem; color: #ffe9e7; font-size: .72rem; line-height: 1.5; }
   .sc06-start-button {
@@ -575,3 +575,30 @@
   .sc04-execute-button, .sc04-secondary-button, .sc04-retry-button, .skip-link { transition: none; }
   .sc05-execute-button, .sc05-resume-button { transition: none; }
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-nevoa: #091216;
+  }
+  body { background: var(--color-nevoa); color: rgba(255,255,255,.9); }
+  .portal-topbar, .module-card, .info-card, .stat-card, .content-card, .table-shell, .date-card, .login-form-panel {
+    background: #0b1a20;
+    border-color: rgba(255,255,255,.1);
+    box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  }
+  .module-card { background: #0b1a20; }
+  .page-subtitle, .metric-label, .date-card small, .info-card dt, .stat-card span, .data-table th, .data-table td, .breadcrumbs { color: rgba(255,255,255,.7); }
+  .page-title, .metric-value, .date-card strong, .info-card dd, .stat-card strong, .breadcrumbs strong, .data-table td strong, .section-heading h2, .form-label { color: white; }
+  .data-table th { background: rgba(255,255,255,.05); }
+  .data-table td { border-top-color: rgba(255,255,255,.08); }
+  .table-link { color: var(--color-turquesa); }
+  .table-link:hover { color: white; }
+  .form-input { background: #091216; border-color: rgba(255,255,255,.15); color: white; }
+  .form-input:focus { border-color: var(--color-turquesa); }
+  .soft-badge, .status-neutral { background: rgba(255,255,255,.08); color: rgba(255,255,255,.75); border-color: transparent; }
+  .card-arrow { background: rgba(255,255,255,.1); color: white; }
+  .notice { background: rgba(255,255,255,.05); color: rgba(255,255,255,.9); }
+  .empty-state { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.1); }
+  .status-dot { box-shadow: 0 0 0 4px rgba(31,166,154,.25); }
+}
+
