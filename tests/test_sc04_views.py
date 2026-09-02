@@ -364,3 +364,50 @@ def test_sc04_run_detail_lists_new_and_duplicate_items(
     assert "documento-run-detail.txt" in page
     assert "documento-repetido.txt" in page
     assert "Conteúdo duplicado" in page
+
+
+def test_sc04_queue_is_paginated_and_preserves_filters(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    fiscal_operator: User,
+) -> None:
+    sc04 = modules["SC-04"]
+    for i in range(15):
+        _document_case(sc04, suffix=f"paginated-{i:02d}")
+
+    client.force_login(fiscal_operator)
+
+    # Page 1
+    resp_p1 = client.get(reverse("automations:module-detail", kwargs={"slug": sc04.slug}))
+    assert resp_p1.status_code == 200
+    page1 = resp_p1.content.decode()
+    assert "Mostrando" in page1
+    assert "1</strong> a" in page1
+    assert "10</strong> de" in page1
+    assert "15</strong> arquivos" in page1
+    assert ">1</strong> de" in page1
+    assert ">2</strong>" in page1
+    assert "page=2" in page1
+
+    # Page 2
+    resp_p2 = client.get(
+        reverse("automations:module-detail", kwargs={"slug": sc04.slug}),
+        {"page": "2"},
+    )
+    assert resp_p2.status_code == 200
+    page2 = resp_p2.content.decode()
+    assert "11</strong> a" in page2
+    assert "15</strong> de" in page2
+    assert ">2</strong> de" in page2
+    assert "page=1" in page2
+
+    # Queue fragment with filter + page
+    resp_fragment = client.get(
+        reverse("automations:sc04-queue-fragment"),
+        {"q": "paginated", "page": "2"},
+    )
+    assert resp_fragment.status_code == 200
+    frag = resp_fragment.content.decode()
+    assert "11</strong> a" in frag
+    assert "q=paginated" in frag
+    assert "page=2" in frag

@@ -7,6 +7,7 @@ from uuid import UUID
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.db.models import Count, Max, Q
 from django.http import (
     FileResponse,
@@ -399,8 +400,11 @@ def _sc04_dashboard_context(
 ) -> dict[str, Any]:
     filter_form = SC04QueueFilterForm(request.GET or None)
     queue = _sc04_queue_queryset(module, filter_form)
+    paginator = Paginator(queue, per_page=10)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
     queue_rows = []
-    for item in queue[:30]:
+    for item in page_obj.object_list:
         document = item.intake.document
         queue_rows.append(
             {
@@ -433,6 +437,9 @@ def _sc04_dashboard_context(
         .exclude(outcome=DocumentRunOutcome.NEW)
         .count(),
     }
+    query_params = request.GET.copy()
+    query_params.pop("page", None)
+    filter_querystring = query_params.urlencode()
     query = request.GET.urlencode()
     queue_refresh_url = reverse("automations:sc04-queue-fragment")
     if query:
@@ -443,6 +450,10 @@ def _sc04_dashboard_context(
         "queue_filter_form": filter_form,
         "summary": summary,
         "queue_rows": queue_rows,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "is_paginated": page_obj.has_other_pages(),
+        "filter_querystring": filter_querystring,
         "queue_refresh_url": queue_refresh_url,
         "has_active_queue": documents.filter(
             status__in=(DocumentStatus.QUEUED, DocumentStatus.PROCESSING)
