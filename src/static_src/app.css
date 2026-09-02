@@ -597,6 +597,11 @@
   .form-input { background: #091216; border-color: rgba(255,255,255,.15); color: white; }
   .form-input:focus { border-color: var(--color-turquesa); }
   .soft-badge, .status-neutral { background: rgba(255,255,255,.08); color: rgba(255,255,255,.75); border-color: transparent; }
+  .environment-badge { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: rgba(255,255,255,.85); }
+  .nature-ai { background: rgba(31,166,154,.18); color: #1fa69a; }
+  .nature-rpa { background: rgba(232,163,61,.18); color: #e8a33d; }
+  .nature-control { background: rgba(31,166,154,.15); color: #5ec0b7; }
+  .module-card:hover { border-color: rgba(31,166,154,.5); box-shadow: 0 20px 52px rgba(0,0,0,.6); }
   .card-arrow { background: rgba(255,255,255,.1); color: white; }
   .notice { background: rgba(255,255,255,.05); color: rgba(255,255,255,.9); }
   .empty-state { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.1); }

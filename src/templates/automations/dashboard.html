@@ -19,14 +19,14 @@
   {% for module in modules %}
     <a href="{% url 'automations:module-detail' module.slug %}" class="module-card group">
       <div class="flex items-start justify-between gap-4">
-        <span class="module-code">{{ module.code }}</span>
+        <span class="module-code dark:bg-white/10 dark:border dark:border-white/15 dark:text-white">{{ module.code }}</span>
         {% if module.nature == 'ai_agent' %}<span class="nature-badge nature-ai">IA</span>
         {% elif module.nature == 'rpa' %}<span class="nature-badge nature-rpa">RPA</span>
         {% else %}<span class="nature-badge nature-control">CONTROLE</span>{% endif %}
       </div>
-      <h2 class="mt-7 font-display text-xl font-semibold leading-tight text-tinta group-hover:text-petroleo">{{ module.name }}</h2>
-      <p class="mt-3 line-clamp-3 text-sm leading-6 text-grafite">{{ module.short_description }}</p>
-      <div class="mt-7 flex items-end justify-between border-t border-grafite/10 pt-5">
+      <h2 class="mt-7 font-display text-xl font-semibold leading-tight text-tinta group-hover:text-petroleo dark:text-white dark:group-hover:text-turquesa">{{ module.name }}</h2>
+      <p class="mt-3 line-clamp-3 text-sm leading-6 text-grafite dark:text-nevoa/80">{{ module.short_description }}</p>
+      <div class="mt-7 flex items-end justify-between border-t border-grafite/10 dark:border-white/10 pt-5">
         <div><p class="metric-value">{{ module.run_count }}</p><p class="metric-label">execuções</p></div>
         <span class="card-arrow" aria-hidden="true">→</span>
       </div>
