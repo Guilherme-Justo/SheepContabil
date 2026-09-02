@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 from typing import Any
 
 import boto3
@@ -86,11 +87,71 @@ def _is_precondition_failed(exc: ClientError) -> bool:
     return status == 412 or code in {"412", "PreconditionFailed"}
 
 
+class FileSystemScreenshotStorage:
+    def __init__(self, *, base_path: Path) -> None:
+        self._base_path = base_path
+
+    def put(self, *, key: str, content: bytes) -> StoredScreenshot:
+        if not content or len(content) > MAX_SCREENSHOT_BYTES:
+            raise ArtifactStorageError("A captura de tela gerada é inválida ou excede 5 MiB.")
+        sha256 = hashlib.sha256(content).hexdigest()
+        file_path = self._base_path / key
+        try:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_bytes(content)
+        except OSError as exc:
+            raise ArtifactStorageError() from exc
+        return StoredScreenshot(key=key, sha256=sha256, byte_size=len(content))
+
+    def get(self, *, key: str) -> bytes:
+        file_path = self._base_path / key
+        if not file_path.exists():
+            raise ArtifactStorageError(
+                "A captura de tela não pôde ser recuperada do storage privado."
+            )
+        try:
+            content = file_path.read_bytes()
+        except OSError as exc:
+            raise ArtifactStorageError(
+                "A captura de tela não pôde ser recuperada do storage privado."
+            ) from exc
+        if len(content) > MAX_SCREENSHOT_BYTES:
+            raise ArtifactStorageError("A captura armazenada excede o limite permitido.")
+        return content
+
+
 def build_screenshot_storage() -> ScreenshotStorage:
     endpoint = str(settings.S3_ENDPOINT_URL).strip()
     access_key = str(settings.S3_ACCESS_KEY_ID).strip()
     secret_key = str(settings.S3_SECRET_ACCESS_KEY).strip()
     bucket = str(settings.S3_BUCKET_NAME).strip()
+
+    if getattr(settings, "DEBUG", False):
+        if not all((endpoint, access_key, secret_key, bucket)):
+            storage_dir = Path(settings.PROJECT_DIR) / "var" / "storage" / "sc05"
+            return FileSystemScreenshotStorage(base_path=storage_dir)
+        try:
+            config = Config(
+                signature_version="s3v4",
+                connect_timeout=1,
+                read_timeout=2,
+                retries={"mode": "standard", "max_attempts": 1},
+                s3={"addressing_style": str(settings.S3_ADDRESSING_STYLE)},
+            )
+            client = boto3.client(
+                "s3",
+                endpoint_url=endpoint,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=str(settings.S3_REGION),
+                config=config,
+            )
+            client.head_bucket(Bucket=bucket)
+            return S3ScreenshotStorage(client=client, bucket=bucket)
+        except Exception:
+            storage_dir = Path(settings.PROJECT_DIR) / "var" / "storage" / "sc05"
+            return FileSystemScreenshotStorage(base_path=storage_dir)
+
     if not all((endpoint, access_key, secret_key, bucket)):
         raise ArtifactStorageError("O storage privado de evidências não está configurado.")
     config = Config(

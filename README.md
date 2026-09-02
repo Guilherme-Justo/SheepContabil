@@ -41,6 +41,7 @@ A seleção cobre as três naturezas do catálogo e combina dois processos de co
 - Saga SC-05 com snapshots antes/desejado/depois, bloqueio na ordem Arquivos → Contábil → Tarefas, desbloqueio inverso e compensação segura.
 - Storage privado compatível com S3 ativo no SC-04, com objetos endereçados por hash, checagem de integridade e nenhum arquivo persistido no disco do contêiner.
 - O mesmo storage privado conserva screenshots PNG recortados ao cliente/erro do SC-05 por tentativa, com SHA-256 e tamanho verificados no download novamente autorizado.
+- Resiliência em desenvolvimento local: fallback automático e transparente para SQLite (`var/dev.sqlite3`) e FileSystem Storage (`var/storage/`) em modo `DEBUG` quando executado fora do Docker.
 - Docker Compose local para web, worker, simulador SC-05 separado, scheduler efêmero, banco, Redis e MinIO.
 - Na Railway, a IaC preserva apenas `web`, `worker` e `scheduler`: o worker inicia o WSGI do simulador como processo auxiliar com ambiente sanitizado, sem herdar Redis, S3 ou OpenAI. O Playwright usa `127.0.0.1:8000`; a plataforma alcança a mesma porta apenas pela rede privada para healthcheck, sem domínio público.
 
@@ -99,7 +100,8 @@ No arquivo `.env` recém-criado, defina as senhas dos usuários locais para o se
 DEMO_ADMIN_PASSWORD=admin123
 DEMO_OPERATOR_PASSWORD=operator123
 ```
-*(Nota: com `DATABASE_URL` vazio, o projeto utiliza automaticamente SQLite local em `var/dev.sqlite3`, sem necessidade de instalar ou configurar PostgreSQL.)*
+*(Nota de Banco de Dados: com `DATABASE_URL` vazio, o projeto utiliza automaticamente SQLite local em `var/dev.sqlite3`, sem necessidade de instalar ou configurar PostgreSQL.)*
+*(Nota de Storage: com `S3_ENDPOINT_URL` apontando para porta local inativa ou vazio em desenvolvimento, o projeto utiliza automaticamente o diretório isolado `var/storage/`, permitindo upload no SC-04 e capturas no SC-05 de forma 100% autônoma sem necessidade de Docker.)*
 
 ### 3. Banco de Dados e Inicialização do Servidor
 

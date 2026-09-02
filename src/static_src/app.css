@@ -124,8 +124,34 @@
   .form-input { width: 100%; border: 1px solid rgba(90,112,120,.28); border-radius: .8rem; background: white; padding: .78rem .9rem; color: #0b1a20; outline: none; transition: border-color .15s, box-shadow .15s; }
   .form-input:focus { border-color: #1fa69a; box-shadow: 0 0 0 4px rgba(31,166,154,.12); }
   .form-input::placeholder { color: rgba(90,112,120,.55); }
-  .primary-button { border: 0; border-radius: .8rem; background: #10505f; padding: .82rem 1rem; color: white; font-weight: 600; box-shadow: 0 12px 26px rgba(16,80,95,.17); transition: background .15s, transform .15s; }
+  .sc04-action-panel p:not(.eyebrow),
+  .sc05-action-panel p:not(.eyebrow),
+  .sc06-start-panel p:not(.eyebrow),
+  .sc20-action-panel p:not(.eyebrow) {
+    color: #eef3f4;
+    opacity: 0.95;
+  }
+
+  .primary-button { border: 0; border-radius: .8rem; background: #10505f; padding: .82rem 1rem; color: white; font-weight: 600; box-shadow: 0 12px 26px rgba(16,80,95,.17); transition: background .15s, transform .15s, box-shadow .15s; }
   .primary-button:hover { background: #1fa69a; transform: translateY(-1px); }
+  .primary-button:active,
+  .sc04-execute-button:active,
+  .sc04-secondary-button:active,
+  .sc04-retry-button:active,
+  .sc05-execute-button:active,
+  .sc05-resume-button:active,
+  .sc05-retry-button:active,
+  .sc06-start-button:active,
+  .sc06-save-button:active,
+  .sc06-pdf-button:active,
+  .sc20-execute-button:active,
+  .sc20-retry-button:active,
+  .sidebar-signout:active,
+  .sc06-case-primary-link:active,
+  .theme-toggle:active {
+    transform: scale(0.97) translateY(1px);
+    box-shadow: 0 2px 8px rgba(16,80,95,.2);
+  }
   .form-error { border-left: 3px solid #c4453d; border-radius: .55rem; background: rgba(196,69,61,.08); padding: .75rem .85rem; color: #91312c; font-size: .75rem; line-height: 1.5; }
   .field-error { margin-top: .4rem; font-size: .7rem; color: #c4453d; }
   .notice { border-left: 3px solid #1fa69a; border-radius: .65rem; background: white; padding: .8rem 1rem; font-size: .78rem; }
@@ -316,10 +342,17 @@
     width: 100%; border: 1px solid rgba(90,112,120,.28); border-radius: .8rem; background: white;
     padding: .72rem .82rem; color: #0b1a20; outline: none; transition: border-color .15s, box-shadow .15s;
   }
-  .sc04-file-control input[type="file"] { padding: .55rem; font-size: .7rem; }
+  .sc04-file-control input[type="file"] { padding: .55rem; font-size: .7rem; cursor: pointer; }
   .sc04-file-control input[type="file"]::file-selector-button {
     margin-right: .7rem; border: 0; border-radius: .55rem; background: #eef3f4; padding: .45rem .65rem;
-    color: #10505f; font-weight: 600;
+    color: #10505f; font-weight: 600; cursor: pointer;
+    transition: background .15s ease, color .15s ease, transform .1s ease, box-shadow .15s ease;
+  }
+  .sc04-file-control input[type="file"]::file-selector-button:hover {
+    background: #10505f; color: #ffffff; box-shadow: 0 2px 6px rgba(16,80,95,.25);
+  }
+  .sc04-file-control input[type="file"]::file-selector-button:active {
+    transform: scale(0.97);
   }
   .sc04-file-control input:focus, .sc04-form-control select:focus, .sc04-form-control textarea:focus,
   .sc04-filter-bar input:focus, .sc04-filter-bar select:focus {
@@ -715,8 +748,18 @@
     box-shadow: 0 0 0 4px rgba(31,166,154,.18);
   }
   .sc04-file-control input[type="file"]::file-selector-button {
-    background: rgba(255,255,255,.1);
+    background: rgba(255,255,255,.12);
     color: white;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, transform .1s ease;
+  }
+  .sc04-file-control input[type="file"]::file-selector-button:hover {
+    background: #1fa69a;
+    color: #0b1a20;
+    box-shadow: 0 2px 8px rgba(31,166,154,.3);
+  }
+  .sc04-file-control input[type="file"]::file-selector-button:active {
+    transform: scale(0.97);
   }
   .sc04-secondary-button {
     background: rgba(255,255,255,.08);

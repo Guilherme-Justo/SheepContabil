@@ -45,7 +45,7 @@
         </nav>
         <div class="mt-auto border-t border-white/10 pt-5">
           <p class="text-sm font-semibold text-white">{{ request.user.label }}</p>
-          <p class="mt-1 text-xs text-nevoa/70">{{ request.user.get_role_display }}</p>
+          <p class="mt-1 text-xs text-white/75">{{ request.user.get_role_display }}</p>
           <form action="{% url 'identity:logout' %}" method="post" class="mt-4">
             {% csrf_token %}
             <button type="submit" class="sidebar-signout">Sair com segurança</button>
@@ -66,7 +66,7 @@
               @click="isDark = !isDark;
                       document.documentElement.classList.toggle('dark', isDark);
                       localStorage.theme = isDark ? 'dark' : 'light'"
-              class="flex h-9 w-9 items-center justify-center rounded-lg bg-petroleo/5 text-petroleo transition hover:bg-petroleo/15 dark:bg-white/10 dark:text-turquesa dark:hover:bg-white/20"
+              class="theme-toggle flex h-9 w-9 items-center justify-center rounded-lg bg-petroleo/5 text-petroleo transition hover:bg-petroleo/15 dark:bg-white/10 dark:text-turquesa dark:hover:bg-white/20"
               :aria-label="isDark ? 'Ativar modo claro' : 'Ativar modo escuro'"
               title="Alternar tema"
             >
