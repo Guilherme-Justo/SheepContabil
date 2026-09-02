@@ -64,9 +64,12 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
+_raw_db_url = (
+    env("DATABASE_URL", default="").strip() or f"sqlite:///{PROJECT_DIR / 'var' / 'dev.sqlite3'}"
+)
 DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{PROJECT_DIR / 'var' / 'dev.sqlite3'}",
+    "default": dj_database_url.parse(
+        _raw_db_url,
         conn_max_age=60,
         conn_health_checks=True,
     )

@@ -68,6 +68,9 @@ PostgreSQL, Redis, MinIO e o simulador privado do SC-05 são inicializados pelo 
 
 Pré-requisitos: Python 3.12 ou 3.13 e Node.js 24.
 
+### 1. Preparação do ambiente e dependências
+
+**No Windows (PowerShell):**
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install uv
@@ -76,14 +79,53 @@ npm ci
 npm run build
 Copy-Item .env.example .env
 .\.venv\Scripts\python.exe -m playwright install chromium
-.\.venv\Scripts\python.exe src\manage.py migrate
-.\.venv\Scripts\python.exe src\manage.py seed_demo
-.\.venv\Scripts\python.exe src\manage.py runserver
 ```
 
-Com `DATABASE_URL` vazio, o desenvolvimento local usa SQLite em `var/dev.sqlite3`. As senhas precisam estar preenchidas em `.env` antes do seed. O comando é idempotente: pode ser repetido sem duplicar áreas, módulos, acessos ou execuções sintéticas.
+**No Linux / macOS (Bash):**
+```bash
+python3 -m venv .venv
+./.venv/bin/python -m pip install uv
+./.venv/bin/uv sync --all-groups
+npm ci
+npm run build
+cp .env.example .env
+./.venv/bin/python -m playwright install chromium
+```
 
-Esse caminho sobe apenas o processo web. Para executar o SC-05 de ponta a ponta também são necessários Redis, worker Celery e o WSGI privado `config.simulator_wsgi` na porta configurada por `SC05_SIMULATOR_BASE_URL`. O Compose é o caminho suportado mais curto para iniciar esse conjunto sem divergência entre processos.
+### 2. Configuração de Variáveis de Ambiente (`.env`)
+
+No arquivo `.env` recém-criado, defina as senhas dos usuários locais para o seed:
+```ini
+DEMO_ADMIN_PASSWORD=admin123
+DEMO_OPERATOR_PASSWORD=operator123
+```
+*(Nota: com `DATABASE_URL` vazio, o projeto utiliza automaticamente SQLite local em `var/dev.sqlite3`, sem necessidade de instalar ou configurar PostgreSQL.)*
+
+### 3. Banco de Dados e Inicialização do Servidor
+
+**No Windows (PowerShell):**
+```powershell
+.\.venv\Scripts\python.exe src\manage.py migrate
+.\.venv\Scripts\python.exe src\manage.py seed_demo
+.\.venv\Scripts\python.exe src\manage.py runserver 127.0.0.1:8000
+```
+
+**No Linux / macOS (Bash):**
+```bash
+./.venv/bin/python src/manage.py migrate
+./.venv/bin/python src/manage.py seed_demo
+./.venv/bin/python src/manage.py runserver 127.0.0.1:8000
+```
+
+### 4. Acesso ao Portal
+
+Abra no navegador `http://localhost:8000`:
+- **Administrador**: usuário `admin` / senha definida em `DEMO_ADMIN_PASSWORD` (ex: `admin123`).
+- **Operador**: usuário `operador.processos` (ou `operador.fiscal`, `operador.societario`, `operador.tecnologia`) / senha definida em `DEMO_OPERATOR_PASSWORD` (ex: `operator123`).
+
+O comando `seed_demo` é idempotente: pode ser executado a qualquer momento para restaurar os dados de demonstração sem duplicar registros.
+
+> **Nota para execução completa do SC-05**: O caminho acima sobe o portal web completo com todos os módulos (SC-04, SC-06 e SC-20 prontos para uso). Para executar a automação de RPA do SC-05 de ponta a ponta, também são necessários Redis, worker Celery e o WSGI privado do simulador (`config.simulator_wsgi`). Para subir toda essa infraestrutura em um único comando, recomenda-se o uso do **Docker Compose** descrito acima.
 
 ## Verificações
 
