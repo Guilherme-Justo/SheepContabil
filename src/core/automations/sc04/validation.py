@@ -34,7 +34,7 @@ def validate_document(
         raise InvalidDocument(f"O arquivo ultrapassa o limite de {max_bytes // (1024 * 1024)} MiB.")
 
     media_type, extension = _detect_media_type(content)
-    _validate_structure(media_type=media_type, content=content)
+    page_count = _validate_structure(media_type=media_type, content=content)
     safe_filename = sanitize_filename(filename, extension=extension)
     return ValidatedDocument(
         filename=safe_filename,
@@ -42,6 +42,7 @@ def validate_document(
         extension=extension,
         content=content,
         sha256=hashlib.sha256(content).hexdigest(),
+        page_count=page_count,
     )
 
 
@@ -99,11 +100,11 @@ def _detect_media_type(content: bytes) -> tuple[str, str]:
     return TEXT_MEDIA_TYPE, ".txt"
 
 
-def _validate_structure(*, media_type: str, content: bytes) -> None:
+def _validate_structure(*, media_type: str, content: bytes) -> int | None:
     if media_type == TEXT_MEDIA_TYPE:
         if not content.decode("utf-8").strip():
             raise InvalidDocument("O TXT não contém texto para classificação.")
-        return
+        return None
     if media_type == PDF_MEDIA_TYPE:
         try:
             reader = PdfReader(BytesIO(content), strict=True)
@@ -113,11 +114,11 @@ def _validate_structure(*, media_type: str, content: bytes) -> None:
                 raise InvalidDocument(
                     f"O PDF ultrapassa o limite de {settings.SC04_MAX_PDF_PAGES} páginas."
                 )
+            return len(reader.pages)
         except InvalidDocument:
             raise
         except (PdfReadError, OSError, ValueError) as exc:
             raise InvalidDocument("O PDF está corrompido ou incompleto.") from exc
-        return
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
@@ -125,6 +126,7 @@ def _validate_structure(*, media_type: str, content: bytes) -> None:
                 if image.width * image.height > int(settings.SC04_MAX_IMAGE_PIXELS):
                     raise InvalidDocument("A imagem excede o limite seguro de pixels.")
                 image.verify()
+        return 1
     except InvalidDocument:
         raise
     except (Image.DecompressionBombError, Image.DecompressionBombWarning, OSError) as exc:

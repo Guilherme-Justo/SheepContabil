@@ -51,6 +51,35 @@ def test_validation_sniffs_content_and_sanitizes_untrusted_filename() -> None:
     assert validated.media_type == validation.TEXT_MEDIA_TYPE
     assert validated.extension == ".txt"
     assert validated.sha256 == hashlib.sha256(content).hexdigest()
+    assert validated.page_count is None
+
+
+def test_validation_detects_page_count_for_pdf_and_image(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Reader:
+        pages = [object(), object()]
+
+        def __init__(self, source: BytesIO, *, strict: bool) -> None:
+            assert strict is True
+
+    monkeypatch.setattr(validation, "PdfReader", Reader)
+
+    pdf_validated = validate_document(
+        filename="relatorio.pdf",
+        declared_content_type="application/pdf",
+        content=b"%PDF-1.4-simulated",
+    )
+    assert pdf_validated.page_count == 2
+    assert pdf_validated.media_type == validation.PDF_MEDIA_TYPE
+
+    image_validated = validate_document(
+        filename="nota.png",
+        declared_content_type="image/png",
+        content=_png_bytes(),
+    )
+    assert image_validated.page_count == 1
+    assert image_validated.media_type == validation.PNG_MEDIA_TYPE
 
 
 @override_settings(SC04_MAX_UPLOAD_BYTES=4)

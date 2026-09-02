@@ -274,10 +274,16 @@ def ingest_document(
                 "storage_key": storage_key,
                 "media_type": validated.media_type,
                 "byte_size": len(validated.content),
+                "page_count": validated.page_count,
                 "status": DocumentStatus.QUEUED,
             },
         )
         is_duplicate_hash = not created
+    elif existing_document.page_count is None and validated.page_count is not None:
+        FiscalDocument.objects.filter(pk=existing_document.pk).update(
+            page_count=validated.page_count
+        )
+        existing_document.page_count = validated.page_count
 
     intake_status = (
         DocumentIntakeStatus.DUPLICATE if is_duplicate_hash else DocumentIntakeStatus.QUEUED

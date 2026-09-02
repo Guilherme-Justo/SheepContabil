@@ -19,6 +19,7 @@ class ValidatedDocument:
     extension: str
     content: bytes
     sha256: str
+    page_count: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
