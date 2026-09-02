@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 @import "@fontsource/archivo/600.css";
 @import "@fontsource/archivo/700.css";
 @import "@fontsource/ibm-plex-sans/400.css";
@@ -8,6 +8,8 @@
 
 @source "../templates/**/*.html";
 @source "../core/**/*.py";
+
+@custom-variant dark (&:where(.dark *));
 
 @theme {
   --font-sans: "IBM Plex Sans", sans-serif;
@@ -577,9 +579,8 @@
 }
 
 .dark {
-  :root {
-    --color-nevoa: #091216;
-  }
+  --color-nevoa: #091216;
+
   body { background: var(--color-nevoa); color: rgba(255,255,255,.9); }
   .portal-topbar, .module-card, .info-card, .stat-card, .content-card, .table-shell, .date-card, .login-form-panel {
     background: #0b1a20;
