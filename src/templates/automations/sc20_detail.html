@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load a11y_tags %}
 
 {% block title %}{{ module.code }} · SheepContabil{% endblock %}
 
@@ -132,7 +131,7 @@
         <label for="{{ field.id_for_label }}" class="form-label">
           {{ field.label }}{% if field.field.required %}<span class="text-carmim" aria-hidden="true"> *</span><span class="sr-only"> (obrigatório)</span>{% endif %}
         </label>
-        {{ field|a11y }}
+        {{ field }}
         {% if field.help_text %}<p id="{{ field.id_for_label }}_helptext" class="form-help">{{ field.help_text|safe }}</p>{% endif %}
         {% if field.errors %}<p class="field-error" role="alert">{{ field.errors.0 }}</p>{% endif %}
       </div>

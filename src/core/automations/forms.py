@@ -26,7 +26,25 @@ from core.automations.sc04.contracts import InvalidDocument, ValidatedDocument
 from core.automations.sc04.validation import validate_document
 
 
-class SC04UploadForm(forms.Form):
+class A11yFormMixin:
+    """Injeta propriedades de acessibilidade ARIA nos widgets (WCAG AA)."""
+    def get_context(self):
+        context = super().get_context()
+        for bound_field in context['form']:
+            attrs = bound_field.field.widget.attrs
+            described_by = []
+            if bound_field.help_text:
+                described_by.append(f"{bound_field.id_for_label}_helptext")
+            if bound_field.errors:
+                attrs['aria-invalid'] = 'true'
+                described_by.append(f"{bound_field.id_for_label}_errors")
+            if described_by:
+                existing = attrs.get('aria-describedby', '')
+                attrs['aria-describedby'] = (existing + ' ' + ' '.join(described_by)).strip()
+        return context
+
+
+class SC04UploadForm(A11yFormMixin, forms.Form):
     attachment = forms.FileField(
         label="Documento sintético",
         help_text="PDF, PNG, JPEG ou TXT UTF-8 com até 10 MiB.",
@@ -65,7 +83,7 @@ class SC04UploadForm(forms.Form):
         return attachment
 
 
-class SC04ReviewForm(forms.Form):
+class SC04ReviewForm(A11yFormMixin, forms.Form):
     document_type = forms.ChoiceField(
         label="Tipo documental confirmado",
         choices=[
@@ -117,7 +135,7 @@ class SC04ReviewForm(forms.Form):
         return cleaned
 
 
-class SC04QueueFilterForm(forms.Form):
+class SC04QueueFilterForm(A11yFormMixin, forms.Form):
     status = forms.ChoiceField(
         label="Estado",
         required=False,
@@ -141,7 +159,7 @@ class SC04QueueFilterForm(forms.Form):
     )
 
 
-class DigitalCertificateForm(forms.ModelForm):  # type: ignore[type-arg]
+class DigitalCertificateForm(A11yFormMixin, forms.ModelForm):  # type: ignore[type-arg]
     class Meta:
         model = DigitalCertificate
         fields = (
@@ -198,7 +216,7 @@ class DigitalCertificateForm(forms.ModelForm):  # type: ignore[type-arg]
         return cleaned_data
 
 
-class BriefingStartForm(forms.Form):
+class BriefingStartForm(A11yFormMixin, forms.Form):
     client_name = forms.CharField(
         label="Cliente sintético",
         max_length=180,
@@ -232,7 +250,7 @@ class BriefingStartForm(forms.Form):
         return document
 
 
-class SC05OperationForm(forms.Form):
+class SC05OperationForm(A11yFormMixin, forms.Form):
     client = forms.ModelChoiceField(
         label="Cliente sintético",
         queryset=SC05Client.objects.none(),
