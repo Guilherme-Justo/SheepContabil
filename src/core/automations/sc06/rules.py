@@ -246,15 +246,17 @@ def sanitize_answers(
         married_partner = sanitized.get("married_partner_name")
         partner_names = sanitized.get("partner_names")
         if (
-            married_partner
-            and partner_names
-            and isinstance(married_partner, str)
+            isinstance(married_partner, str)
             and isinstance(partner_names, str)
+            and married_partner.strip()
+            and partner_names.strip()
+            and not _is_partner_declared(married_partner, partner_names)
         ):
-            if not _is_partner_declared(married_partner, partner_names):
-                errors.setdefault("married_partner_name", []).append(
-                    f"O sócio casado informado ('{married_partner}') deve coincidir com um dos nomes declarados no quadro societário."
-                )
+            msg = (
+                f"O sócio casado informado ('{married_partner}') deve coincidir "
+                "com um dos nomes declarados no quadro societário."
+            )
+            errors.setdefault("married_partner_name", []).append(msg)
 
     if errors:
         raise ValidationError(errors)

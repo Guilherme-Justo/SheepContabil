@@ -17,6 +17,8 @@ from core.automations.models import (
     DocumentStatus,
     DocumentType,
     FiscalClient,
+    RunStatus,
+    RunTrigger,
     SC05Action,
     SC05Client,
     SC05ClientStatus,
@@ -293,3 +295,50 @@ class SC05OperationForm(A11yFormMixin, forms.Form):
         elif action == SC05Action.UNBLOCK and client.status != SC05ClientStatus.BLOCKED:
             self.add_error("action", "O cliente ainda está ativo.")
         return cleaned_data
+
+
+class DashboardRunFilterForm(A11yFormMixin, forms.Form):
+    _widget_class = (
+        "form-input text-xs py-1.5 px-2.5 rounded-lg border-grafite/25 "
+        "dark:border-white/15 dark:bg-[#091216] dark:text-white"
+    )
+
+    module = forms.ChoiceField(
+        label="Automação",
+        required=False,
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por automação",
+            }
+        ),
+    )
+    status = forms.ChoiceField(
+        label="Estado",
+        required=False,
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por estado",
+            }
+        ),
+    )
+    trigger = forms.ChoiceField(
+        label="Disparo",
+        required=False,
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por tipo de disparo",
+            }
+        ),
+    )
+
+    def __init__(self, *args: Any, modules: Any = None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        module_choices = [("", "Todas as automações")]
+        if modules is not None:
+            module_choices.extend((m.code, f"{m.code} · {m.name}") for m in modules)
+        self.fields["module"].choices = module_choices
+        self.fields["status"].choices = [("", "Todos os estados")] + list(RunStatus.choices)
+        self.fields["trigger"].choices = [("", "Todos os disparos")] + list(RunTrigger.choices)

@@ -39,16 +39,40 @@
   {% endfor %}
 </section>
 
-<section class="mt-10">
-  <div class="section-heading">
-    <div><p class="eyebrow">Rastreabilidade</p><h2>Execuções recentes</h2></div>
+<section class="mt-10" aria-labelledby="runs-heading">
+  <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div>
+      <p class="eyebrow">Rastreabilidade</p>
+      <h2 id="runs-heading">Execuções recentes</h2>
+    </div>
+
+    <form method="get" class="flex flex-wrap items-center gap-2" role="search" aria-label="Filtrar execuções">
+      <div class="min-w-36">{{ filter_form.module }}</div>
+      <div class="min-w-32">{{ filter_form.status }}</div>
+      <div class="min-w-32">{{ filter_form.trigger }}</div>
+      <button
+        type="submit"
+        class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
+      >
+        Filtrar
+      </button>
+      {% if has_active_filters %}
+        <a
+          href="{% url 'automations:dashboard' %}"
+          class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+        >
+          Limpar
+        </a>
+      {% endif %}
+    </form>
   </div>
+
   <div class="table-shell mt-5">
     <div class="overflow-x-auto">
       <table class="data-table">
         <thead><tr><th>Automação</th><th>Quando</th><th>Disparo</th><th>Estado</th><th class="text-right">Abrir</th></tr></thead>
         <tbody>
-          {% for run in recent_runs %}
+          {% for run in page_obj %}
           <tr>
             <td><span class="font-mono text-xs font-semibold text-petroleo dark:text-turquesa">{{ run.module.code }}</span><strong class="ml-3">{{ run.module.name }}</strong></td>
             <td class="font-mono text-xs">{{ run.created_at|date:"d/m/Y H:i" }}</td>
@@ -57,11 +81,74 @@
             <td class="text-right"><a href="{% url 'automations:run-detail' run.id %}" class="table-link">Detalhes</a></td>
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="py-10 text-center text-grafite">Nenhuma execução registrada neste perfil.</td></tr>
+          <tr>
+            <td colspan="5" class="py-10 text-center text-grafite">
+              {% if has_active_filters %}
+                Nenhuma execução encontrada com os filtros selecionados.
+              {% else %}
+                Nenhuma execução registrada neste perfil.
+              {% endif %}
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+
+    {% if paginator.num_pages > 1 %}
+    <nav class="flex flex-col items-center justify-between gap-3 border-t border-grafite/15 p-4 text-sm text-grafite sm:flex-row dark:border-white/10" aria-label="Navegação das execuções">
+      <p class="text-xs">
+        Mostrando <strong class="text-tinta dark:text-white">{{ page_obj.start_index }}</strong> a <strong class="text-tinta dark:text-white">{{ page_obj.end_index }}</strong> de <strong class="text-tinta dark:text-white">{{ paginator.count }}</strong> execuções
+        · Página <strong class="text-tinta dark:text-white">{{ page_obj.number }}</strong> de <strong class="text-tinta dark:text-white">{{ paginator.num_pages }}</strong>
+      </p>
+      <div class="flex items-center gap-1.5">
+        {% if page_obj.has_previous %}
+          <a
+            href="?page={{ page_obj.previous_page_number }}{{ query_params }}"
+            class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+            aria-label="Página anterior"
+          >
+            ← Anterior
+          </a>
+        {% else %}
+          <span class="inline-flex items-center rounded-lg border border-grafite/15 px-3 py-1.5 text-xs font-medium text-grafite/40 dark:border-white/5 dark:text-white/30 cursor-not-allowed">
+            ← Anterior
+          </span>
+        {% endif %}
+
+        <div class="flex items-center gap-1">
+          {% for p in paginator.page_range %}
+            {% if p == page_obj.number %}
+              <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-turquesa text-xs font-semibold text-white shadow-xs" aria-current="page">
+                {{ p }}
+              </span>
+            {% elif p > page_obj.number|add:"-3" and p < page_obj.number|add:"3" %}
+              <a
+                href="?page={{ p }}{{ query_params }}"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-grafite/25 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+              >
+                {{ p }}
+              </a>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        {% if page_obj.has_next %}
+          <a
+            href="?page={{ page_obj.next_page_number }}{{ query_params }}"
+            class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+            aria-label="Próxima página"
+          >
+            Próxima →
+          </a>
+        {% else %}
+          <span class="inline-flex items-center rounded-lg border border-grafite/15 px-3 py-1.5 text-xs font-medium text-grafite/40 dark:border-white/5 dark:text-white/30 cursor-not-allowed">
+            Próxima →
+          </span>
+        {% endif %}
+      </div>
+    </nav>
+    {% endif %}
   </div>
 </section>
 {% endblock %}

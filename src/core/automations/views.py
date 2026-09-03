@@ -24,6 +24,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from core.automations.forms import (
     BriefingStartForm,
+    DashboardRunFilterForm,
     DigitalCertificateForm,
     SC04QueueFilterForm,
     SC04ReviewForm,
@@ -86,24 +87,65 @@ from core.identity.models import User
 
 
 def _visible_modules(request: HttpRequest) -> AutomationModuleQuerySet:
-    return AutomationModule.objects.visible_to(request.user).select_related("area")
+    return AutomationModule.objects.visible_to(request.user).select_related("area").order_by("code")
 
 
 @login_required
 def dashboard(request: HttpRequest) -> HttpResponse:
-    modules = _visible_modules(request).annotate(
-        run_count=Count("runs"),
-        last_run_at=Max("runs__created_at"),
+    modules = (
+        _visible_modules(request)
+        .annotate(
+            run_count=Count("runs"),
+            last_run_at=Max("runs__created_at"),
+        )
+        .order_by("code")
     )
-    recent_runs = (
+
+    runs = (
         AutomationRun.objects.filter(module__in=modules)
         .select_related("module", "triggered_by")
-        .order_by("-created_at")[:6]
+        .order_by("-created_at")
     )
+
+    filter_form = DashboardRunFilterForm(
+        request.GET if request.GET else None,
+        modules=modules,
+    )
+    has_active_filters = False
+    if request.GET and filter_form.is_valid():
+        selected_module = filter_form.cleaned_data.get("module")
+        if selected_module:
+            runs = runs.filter(module__code=selected_module)
+            has_active_filters = True
+        selected_status = filter_form.cleaned_data.get("status")
+        if selected_status:
+            runs = runs.filter(status=selected_status)
+            has_active_filters = True
+        selected_trigger = filter_form.cleaned_data.get("trigger")
+        if selected_trigger:
+            runs = runs.filter(trigger=selected_trigger)
+            has_active_filters = True
+
+    paginator = Paginator(runs, per_page=8)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
+    query_dict = request.GET.copy()
+    query_dict.pop("page", None)
+    query_params = f"&{query_dict.urlencode()}" if query_dict else ""
+
     return render(
         request,
         "automations/dashboard.html",
-        {"modules": modules, "recent_runs": recent_runs},
+        {
+            "modules": modules,
+            "recent_runs": page_obj,
+            "page_obj": page_obj,
+            "paginator": paginator,
+            "filter_form": filter_form,
+            "has_active_filters": has_active_filters,
+            "query_params": query_params,
+        },
     )
 
 

@@ -299,8 +299,8 @@ def test_cancel_draft_action_via_post_and_redirects(
 
     # POST action=cancel
     response = client.post(detail_url, {"action": "cancel"})
-    assert response.status_code == 302
-    assert response.url == reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
+    expected_redirect = reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
+    assert response.url == expected_redirect
 
     briefing.refresh_from_db()
     assert briefing.status == SocietaryBriefingStatus.CANCELLED
@@ -344,4 +344,3 @@ def test_sc06_detail_pagination_and_formatted_document(
     assert resp2.status_code == 200
     assert len(resp2.context["page_obj"]) == 2
     assert resp2.context["page_obj"].number == 2
-

@@ -78,7 +78,7 @@ class AutomationModule(models.Model):
     objects = AutomationModuleQuerySet.as_manager()
 
     class Meta:
-        ordering = ("sort_order", "code")
+        ordering = ("code",)
         verbose_name = "módulo de automação"
         verbose_name_plural = "módulos de automação"
 

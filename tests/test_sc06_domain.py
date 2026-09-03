@@ -370,5 +370,3 @@ def test_cancel_briefing_lifecycle_and_document_formatting(
     # Cannot cancel already cancelled briefing:
     with pytest.raises(ValidationError):
         cancel_briefing(briefing.id, cancelled_by=administrator)
-
-
