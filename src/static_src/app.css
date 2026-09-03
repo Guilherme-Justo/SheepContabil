@@ -98,8 +98,31 @@
   .status-success { background: rgba(31,166,154,.12); color: #14766e; }
   .status-warning { background: rgba(232,163,61,.15); color: #8a5913; }
   .status-danger { background: rgba(196,69,61,.11); color: #a43731; }
-  .status-active { background: rgba(16,80,95,.1); color: #10505f; }
+  .status-active { background: rgba(16,80,95,.1); color: #10505f; border: 1px solid rgba(16,80,95,.18); }
   .status-neutral { background: #eef3f4; color: #5a7078; }
+
+  /* Indicador nativo de seletores de data/hora */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: .85;
+    transition: opacity .15s ease;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator:hover,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+
+  /* Previne o fundo branco forçado pelo navegador no autofill (Light Mode) */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+    -webkit-text-fill-color: #0b1a20 !important;
+    caret-color: #0b1a20 !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
   .info-card, .stat-card, .content-card { border: 1px solid rgba(90,112,120,.13); border-radius: 1.15rem; background: white; padding: 1.35rem; box-shadow: 0 12px 36px rgba(16,80,95,.04); }
   .info-card dt { color: #5a7078; }
   .info-card dd { margin-top: .2rem; font-weight: 600; color: #0b1a20; }
@@ -851,10 +874,11 @@
 
   /* Badges & Accents */
   .soft-badge, .status-neutral { background: rgba(255,255,255,.08); color: rgba(255,255,255,.75); border-color: rgba(255,255,255,.12); }
-  .status-success { background: rgba(31,166,154,.22); color: #79d8cf; }
-  .status-warning { background: rgba(232,163,61,.22); color: #f3ba63; }
-  .status-danger { background: rgba(196,69,61,.22); color: #ff8d85; }
-  .status-active { background: rgba(31,166,154,.18); color: #79d8cf; }
+  .status-success { background: rgba(31,166,154,.22); color: #79d8cf; border: 1px solid rgba(31,166,154,.3); }
+  .status-warning { background: rgba(232,163,61,.22); color: #f3ba63; border: 1px solid rgba(232,163,61,.3); }
+  .status-danger { background: rgba(196,69,61,.22); color: #ff8d85; border: 1px solid rgba(196,69,61,.3); }
+  .status-active { background: rgba(56,189,248,.16); color: #7dd3fc; border: 1px solid rgba(56,189,248,.28); }
+  .status-active i { box-shadow: 0 0 0 3px rgba(56,189,248,.25); }
   .environment-badge { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: rgba(255,255,255,.85); }
   .nature-ai { background: rgba(31,166,154,.22); color: #1fa69a; }
   .nature-rpa { background: rgba(232,163,61,.22); color: #e8a33d; }
@@ -917,5 +941,70 @@
     color: #79d8cf;
   }
 }
+
+/* ==========================================================================
+   MELHORIAS DE POLIMENTO VISUAL EM DARK MODE (LOTE 1)
+   ========================================================================== */
+
+/* Previne o fundo branco forçado pelo navegador no autofill (Dark Mode) */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #091216 inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #ffffff !important;
+  border-color: rgba(31, 166, 154, 0.4) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Seletor de data e calendário em Dark Mode */
+.dark input[type="date"],
+.dark input[type="datetime-local"] {
+  color-scheme: dark !important;
+}
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(58%) sepia(35%) saturate(836%) hue-rotate(125deg) brightness(96%) contrast(92%) !important;
+}
+
+/* Estilização perceptível de campos desabilitados em Dark Mode */
+.dark input:disabled,
+.dark select:disabled,
+.dark textarea:disabled,
+.dark fieldset[disabled] input,
+.dark fieldset[disabled] select,
+.dark fieldset[disabled] textarea,
+.dark .form-input:disabled {
+  background: rgba(255, 255, 255, 0.035) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+/* Erros de validação em Dark Mode */
+.dark .form-error {
+  border-left: 3px solid #ff8d85 !important;
+  background: rgba(196, 69, 61, 0.15) !important;
+  color: #ffe9e7 !important;
+}
+.dark .field-error {
+  color: #ff8d85 !important;
+}
+
+/* SC-06 Card de Evidência de Execução no Dark Mode */
+.dark .sc06-run-evidence {
+  background: linear-gradient(135deg, #091216, rgba(31, 166, 154, 0.08)) !important;
+  border-color: rgba(31, 166, 154, 0.25) !important;
+  box-shadow: none !important;
+}
+.dark .sc06-run-evidence h2 {
+  color: #ffffff !important;
+}
+.dark .sc06-run-evidence p:not(.eyebrow) {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
 
 
