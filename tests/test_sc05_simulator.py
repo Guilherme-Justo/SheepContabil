@@ -333,3 +333,36 @@ def test_portals_expose_stable_dom_contract(
     assert 'data-testid="tasks-client-aurora-demo-block-submit"' in tasks_html
     assert 'data-testid="tasks-client-aurora-demo-active-state"' in tasks_html
     assert "ACTIVE" in tasks_html
+
+
+def test_simulator_settings_declare_isolated_cookie_namespace() -> None:
+    import ast
+    from pathlib import Path
+
+    settings_file = (
+        Path(__file__).resolve().parent.parent / "src" / "config" / "settings" / "simulator.py"
+    )
+    tree = ast.parse(settings_file.read_text(encoding="utf-8"))
+    assignments = {
+        target.id: node.value.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        for target in node.targets
+        if isinstance(target, ast.Name) and isinstance(node.value, ast.Constant)
+    }
+    assert assignments.get("SESSION_COOKIE_NAME") == "sc05_sim_sessionid"
+    assert assignments.get("CSRF_COOKIE_NAME") == "sc05_sim_csrftoken"
+
+
+def test_portal_login_sets_isolated_session_cookie(settings) -> None:
+    settings.SC05_SIMULATOR_USERNAME = "robot"
+    settings.SC05_SIMULATOR_PASSWORD = "safe-synthetic-password"
+    settings.SESSION_COOKIE_NAME = "sc05_sim_sessionid"
+
+    client = Client()
+    response = client.post(
+        reverse("sc05_simulator:login"),
+        {"username": "robot", "password": "safe-synthetic-password"},
+    )
+    assert response.status_code == 302
+    assert "sc05_sim_sessionid" in response.cookies
