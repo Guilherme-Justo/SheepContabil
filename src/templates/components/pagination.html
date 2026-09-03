@@ -10,9 +10,9 @@
   <div class="flex items-center gap-1.5">
     {% if page_obj.has_previous %}
       <a
-        href="?page={{ page_obj.previous_page_number }}{{ query_params }}"
+        href="?{{ page_param|default:'page' }}={{ page_obj.previous_page_number }}{{ query_params }}"
         {% if target_id %}
-          hx-get="?page={{ page_obj.previous_page_number }}{{ query_params }}"
+          hx-get="?{{ page_param|default:'page' }}={{ page_obj.previous_page_number }}{{ query_params }}"
           hx-target="#{{ target_id }}"
           hx-select="#{{ target_id }}"
           hx-swap="outerHTML show:none"
@@ -37,9 +37,9 @@
           </span>
         {% elif p > page_obj.number|add:"-3" and p < page_obj.number|add:"3" %}
           <a
-            href="?page={{ p }}{{ query_params }}"
+            href="?{{ page_param|default:'page' }}={{ p }}{{ query_params }}"
             {% if target_id %}
-              hx-get="?page={{ p }}{{ query_params }}"
+              hx-get="?{{ page_param|default:'page' }}={{ p }}{{ query_params }}"
               hx-target="#{{ target_id }}"
               hx-select="#{{ target_id }}"
               hx-swap="outerHTML show:none"
@@ -55,9 +55,9 @@
 
     {% if page_obj.has_next %}
       <a
-        href="?page={{ page_obj.next_page_number }}{{ query_params }}"
+        href="?{{ page_param|default:'page' }}={{ page_obj.next_page_number }}{{ query_params }}"
         {% if target_id %}
-          hx-get="?page={{ page_obj.next_page_number }}{{ query_params }}"
+          hx-get="?{{ page_param|default:'page' }}={{ page_obj.next_page_number }}{{ query_params }}"
           hx-target="#{{ target_id }}"
           hx-select="#{{ target_id }}"
           hx-swap="outerHTML show:none"

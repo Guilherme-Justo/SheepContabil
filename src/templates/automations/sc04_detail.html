@@ -107,35 +107,53 @@
       <span class="soft-badge self-start lg:self-auto">{{ summary.duplicates_today|default:0 }} duplicado{{ summary.duplicates_today|default:0|pluralize }} hoje</span>
     </div>
 
-    <form action="{% url 'automations:module-detail' module.slug %}" method="get" class="sc04-filter-bar mt-5" aria-label="Filtrar fila documental">
-      <div class="sc04-filter-search">
+    <form
+      action="{% url 'automations:module-detail' module.slug %}"
+      method="get"
+      class="mt-5 flex flex-wrap items-center gap-2"
+      role="search"
+      aria-label="Filtrar fila documental"
+      hx-get="{% url 'automations:module-detail' module.slug %}"
+      hx-target="#sc04-queue-content"
+      hx-select="#sc04-queue-content"
+      hx-swap="outerHTML show:none"
+      hx-push-url="true"
+    >
+      <div class="min-w-44">
         <label for="{{ queue_filter_form.q.id_for_label }}" class="sr-only">{{ queue_filter_form.q.label }}</label>
         {{ queue_filter_form.q }}
       </div>
-      <div>
+      <div class="min-w-36">
         <label for="{{ queue_filter_form.status.id_for_label }}" class="sr-only">Estado</label>
         {{ queue_filter_form.status }}
       </div>
-      <div>
+      <div class="min-w-36">
         <label for="{{ queue_filter_form.source.id_for_label }}" class="sr-only">Origem</label>
         {{ queue_filter_form.source }}
       </div>
-      <div>
+      <div class="min-w-36">
         <label for="{{ queue_filter_form.outcome.id_for_label }}" class="sr-only">Resultado da ingestão</label>
         {{ queue_filter_form.outcome }}
       </div>
-      <div class="flex items-center gap-2">
-        <button type="submit" class="sc04-secondary-button">Aplicar filtros</button>
-        {% if has_active_filters %}
-          <a
-            href="{% url 'automations:module-detail' module.slug %}"
-            class="sc04-clear-filters-link"
-            title="Limpar todos os filtros da fila"
-          >
-            Limpar filtros
-          </a>
-        {% endif %}
-      </div>
+      <button
+        type="submit"
+        class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
+      >
+        Filtrar
+      </button>
+      {% if has_active_filters %}
+        <a
+          href="{% url 'automations:module-detail' module.slug %}"
+          class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+          hx-get="{% url 'automations:module-detail' module.slug %}"
+          hx-target="#sc04-queue-content"
+          hx-select="#sc04-queue-content"
+          hx-swap="outerHTML show:none"
+          hx-push-url="true"
+        >
+          Limpar
+        </a>
+      {% endif %}
     </form>
 
     {% include "automations/partials/sc04_queue.html" %}
@@ -143,27 +161,31 @@
 </section>
 
 <section class="mt-12" aria-labelledby="sc04-runs-title">
-  <div class="section-heading">
-    <p class="eyebrow">Rastreabilidade</p>
-    <h2 id="sc04-runs-title">Execuções do SC-04</h2>
-    <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Uploads, acionamentos manuais e triagens agendadas permanecem no mesmo histórico.</p>
-  </div>
-  <div class="table-shell mt-5 overflow-x-auto">
-    <table class="data-table">
-      <caption class="sr-only">Histórico de execuções da triagem de arquivos</caption>
-      <thead><tr><th scope="col">Data e hora</th><th scope="col">Origem</th><th scope="col">Responsável</th><th scope="col">Estado</th><th scope="col" class="text-right">Resultado</th></tr></thead>
-      <tbody>
-        {% for run in runs %}
-        <tr>
-          <td class="font-mono text-xs"><time datetime="{{ run.created_at|date:'c' }}">{{ run.created_at|date:"d/m/Y H:i" }}</time></td>
-          <td>{{ run.get_trigger_display }}</td>
-          <td>{% if run.triggered_by %}{{ run.triggered_by.label }}{% else %}Sistema{% endif %}</td>
-          <td><span class="status-badge status-{{ run.status_tone }}"><i></i>{{ run.get_status_display }}</span></td>
-          <td class="text-right"><a href="{% url 'automations:run-detail' run.id %}" class="table-link">Ver execução</a></td>
-        </tr>
-        {% empty %}<tr><td colspan="5" class="py-10 text-center text-grafite">Nenhuma triagem foi executada ainda.</td></tr>{% endfor %}
-      </tbody>
-    </table>
+  <div id="sc04-runs-region">
+    <div class="section-heading">
+      <p class="eyebrow">Rastreabilidade</p>
+      <h2 id="sc04-runs-title">Execuções do SC-04</h2>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Uploads, acionamentos manuais e triagens agendadas permanecem no mesmo histórico.</p>
+    </div>
+    <div class="table-shell mt-5 overflow-x-auto">
+      <table class="data-table">
+        <caption class="sr-only">Histórico de execuções da triagem de arquivos</caption>
+        <thead><tr><th scope="col">Data e hora</th><th scope="col">Origem</th><th scope="col">Responsável</th><th scope="col">Estado</th><th scope="col" class="text-right">Resultado</th></tr></thead>
+        <tbody>
+          {% for run in runs_page_obj %}
+          <tr>
+            <td class="font-mono text-xs"><time datetime="{{ run.created_at|date:'c' }}">{{ run.created_at|date:"d/m/Y H:i" }}</time></td>
+            <td>{{ run.get_trigger_display }}</td>
+            <td>{% if run.triggered_by %}{{ run.triggered_by.label }}{% else %}Sistema{% endif %}</td>
+            <td><span class="status-badge status-{{ run.status_tone }}"><i></i>{{ run.get_status_display }}</span></td>
+            <td class="text-right"><a href="{% url 'automations:run-detail' run.id %}" class="table-link">Ver execução</a></td>
+          </tr>
+          {% empty %}<tr><td colspan="5" class="py-10 text-center text-grafite">Nenhuma triagem foi executada ainda.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% include "components/pagination.html" with page_obj=runs_page_obj paginator=runs_paginator item_label="execuções" nav_label="Navegação das execuções do módulo" target_id="sc04-runs-region" page_param="runs_page" %}
   </div>
 </section>
 {% endblock %}

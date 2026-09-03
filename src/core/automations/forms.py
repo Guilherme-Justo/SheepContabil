@@ -139,26 +139,55 @@ class SC04ReviewForm(A11yFormMixin, forms.Form):
 
 
 class SC04QueueFilterForm(A11yFormMixin, forms.Form):
+    _widget_class = (
+        "form-input text-xs py-1.5 px-2.5 rounded-lg border-grafite/25 "
+        "dark:border-white/15 dark:bg-[#091216] dark:text-white"
+    )
+
+    q = forms.CharField(
+        label="Buscar",
+        required=False,
+        max_length=120,
+        widget=forms.TextInput(
+            attrs={
+                "class": _widget_class,
+                "placeholder": "Buscar arquivo ou cliente...",
+                "aria-label": "Buscar por arquivo ou cliente",
+            }
+        ),
+    )
     status = forms.ChoiceField(
         label="Estado",
         required=False,
         choices=[("", "Todos os estados"), *DocumentStatus.choices],
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por estado",
+            }
+        ),
     )
     source = forms.ChoiceField(
         label="Origem",
         required=False,
         choices=[("", "Todas as origens"), *DocumentSource.choices],
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por origem",
+            }
+        ),
     )
     outcome = forms.ChoiceField(
         label="Resultado",
         required=False,
         choices=[("", "Todos os resultados"), *DocumentRunOutcome.choices],
-    )
-    q = forms.CharField(
-        label="Buscar",
-        required=False,
-        max_length=120,
-        widget=forms.TextInput(attrs={"placeholder": "Arquivo ou cliente"}),
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por resultado",
+            }
+        ),
     )
 
 

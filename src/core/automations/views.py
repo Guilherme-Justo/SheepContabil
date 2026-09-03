@@ -484,6 +484,7 @@ def _sc04_dashboard_context(
     query_params = request.GET.copy()
     query_params.pop("page", None)
     filter_querystring = query_params.urlencode()
+    query_params_formatted = f"&{filter_querystring}" if filter_querystring else ""
     has_active_filters = bool(
         filter_form.is_valid()
         and (
@@ -497,6 +498,9 @@ def _sc04_dashboard_context(
     queue_refresh_url = reverse("automations:sc04-queue-fragment")
     if query:
         queue_refresh_url = f"{queue_refresh_url}?{query}"
+    runs_paginator = Paginator(module.runs.select_related("triggered_by").all(), per_page=6)
+    runs_page_number = request.GET.get("runs_page", 1)
+    runs_page_obj = runs_paginator.get_page(runs_page_number)
     return {
         "module": module,
         "upload_form": upload_form or SC04UploadForm(),
@@ -508,11 +512,14 @@ def _sc04_dashboard_context(
         "paginator": paginator,
         "is_paginated": page_obj.has_other_pages(),
         "filter_querystring": filter_querystring,
+        "query_params": query_params_formatted,
         "queue_refresh_url": queue_refresh_url,
         "has_active_queue": documents.filter(
             status__in=(DocumentStatus.QUEUED, DocumentStatus.PROCESSING)
         ).exists(),
-        "runs": module.runs.select_related("triggered_by")[:20],
+        "runs": runs_page_obj,
+        "runs_page_obj": runs_page_obj,
+        "runs_paginator": runs_paginator,
     }
 
 
