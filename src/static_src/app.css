@@ -1040,6 +1040,7 @@ label:has(input:disabled) {
 #sc06-cases-region.htmx-request,
 #sc04-queue-content.htmx-request,
 #sc04-runs-region.htmx-request,
+#sc05-operations-region.htmx-request,
 .htmx-swapping {
   opacity: 0.6;
   pointer-events: none;

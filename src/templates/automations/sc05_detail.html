@@ -82,28 +82,90 @@
 </section>
 
 <section class="mt-12" aria-labelledby="sc05-history-title">
-  <div class="section-heading">
-    <p class="eyebrow">Rastreabilidade</p>
-    <h2 id="sc05-history-title">Operações recentes</h2>
-    <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Cada operação conserva autor, duração, cenário e resultado por sistema.</p>
-  </div>
-  <div class="table-shell mt-5 overflow-x-auto">
-    <table class="data-table sc05-history-table">
-      <caption class="sr-only">Histórico de bloqueios e desbloqueios</caption>
-      <thead><tr><th scope="col">Data</th><th scope="col">Cliente</th><th scope="col">Ação</th><th scope="col">Responsável</th><th scope="col">Estado</th><th scope="col" class="text-right">Resultado</th></tr></thead>
-      <tbody>
-        {% for operation in operations %}
-        <tr>
-          <td class="font-mono text-xs">{{ operation.created_at|date:"d/m/Y H:i" }}</td>
-          <td><strong>{{ operation.client.name }}</strong></td>
-          <td>{{ operation.get_action_display }}</td>
-          <td>{% if operation.run.triggered_by %}{{ operation.run.triggered_by.label }}{% else %}Sistema{% endif %}</td>
-          <td><span class="status-badge status-{{ operation.run.status_tone }}"><i></i>{{ operation.run.get_status_display }}</span></td>
-          <td class="text-right"><a class="table-link" href="{% url 'automations:run-detail' operation.run_id %}">Ver sistemas</a></td>
-        </tr>
-        {% empty %}<tr><td colspan="6" class="py-10 text-center text-grafite">Nenhuma operação funcional registrada.</td></tr>{% endfor %}
-      </tbody>
-    </table>
+  <div id="sc05-operations-region">
+    <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <p class="eyebrow">Rastreabilidade</p>
+        <h2 id="sc05-history-title">Operações recentes</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Cada operação conserva autor, duração, cenário e resultado por sistema.</p>
+      </div>
+
+      <form
+        action="{% url 'automations:module-detail' module.slug %}"
+        method="get"
+        class="flex flex-wrap items-center gap-2"
+        role="search"
+        aria-label="Filtrar histórico de operações"
+        hx-get="{% url 'automations:module-detail' module.slug %}"
+        hx-target="#sc05-operations-region"
+        hx-select="#sc05-operations-region"
+        hx-swap="outerHTML show:none"
+        hx-push-url="true"
+      >
+        <div class="min-w-44">
+          <label for="{{ filter_form.q.id_for_label }}" class="sr-only">{{ filter_form.q.label }}</label>
+          {{ filter_form.q }}
+        </div>
+        <div class="min-w-36">
+          <label for="{{ filter_form.action.id_for_label }}" class="sr-only">Ação</label>
+          {{ filter_form.action }}
+        </div>
+        <div class="min-w-36">
+          <label for="{{ filter_form.status.id_for_label }}" class="sr-only">Estado</label>
+          {{ filter_form.status }}
+        </div>
+        <button
+          type="submit"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
+        >
+          Filtrar
+        </button>
+        {% if has_active_filters %}
+          <a
+            href="{% url 'automations:module-detail' module.slug %}"
+            class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+            hx-get="{% url 'automations:module-detail' module.slug %}"
+            hx-target="#sc05-operations-region"
+            hx-select="#sc05-operations-region"
+            hx-swap="outerHTML show:none"
+            hx-push-url="true"
+          >
+            Limpar
+          </a>
+        {% endif %}
+      </form>
+    </div>
+
+    <div class="table-shell mt-5 overflow-x-auto">
+      <table class="data-table sc05-history-table">
+        <caption class="sr-only">Histórico de bloqueios e desbloqueios</caption>
+        <thead><tr><th scope="col">Data</th><th scope="col">Cliente</th><th scope="col">Ação</th><th scope="col">Responsável</th><th scope="col">Estado</th><th scope="col" class="text-right">Resultado</th></tr></thead>
+        <tbody>
+          {% for operation in page_obj %}
+          <tr>
+            <td class="font-mono text-xs">{{ operation.created_at|date:"d/m/Y H:i" }}</td>
+            <td><strong>{{ operation.client.name }}</strong></td>
+            <td>{{ operation.get_action_display }}</td>
+            <td>{% if operation.run.triggered_by %}{{ operation.run.triggered_by.label }}{% else %}Sistema{% endif %}</td>
+            <td><span class="status-badge status-{{ operation.run.status_tone }}"><i></i>{{ operation.run.get_status_display }}</span></td>
+            <td class="text-right"><a class="table-link" href="{% url 'automations:run-detail' operation.run_id %}">Ver sistemas</a></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="py-10 text-center text-grafite">
+              {% if has_active_filters %}
+                Nenhuma operação localizada com os filtros selecionados.
+              {% else %}
+                Nenhuma operação funcional registrada.
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% include "components/pagination.html" with page_obj=page_obj paginator=paginator query_params=query_params item_label="operações" nav_label="Navegação das operações" target_id="sc05-operations-region" %}
   </div>
 </section>
 {% endblock %}

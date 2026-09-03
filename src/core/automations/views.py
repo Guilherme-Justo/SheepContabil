@@ -30,6 +30,7 @@ from core.automations.forms import (
     SC04QueueFilterForm,
     SC04ReviewForm,
     SC04UploadForm,
+    SC05OperationFilterForm,
     SC05OperationForm,
 )
 from core.automations.models import (
@@ -715,11 +716,45 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
                 return redirect("automations:run-detail", run_id=creation.run.id)
 
     clients = SC05Client.objects.all()
+    filter_form = SC05OperationFilterForm(request.GET if request.GET else None)
     operations = (
         SC05Operation.objects.select_related("client", "run", "run__triggered_by")
         .prefetch_related("steps")
-        .all()[:20]
+        .all()
     )
+    if filter_form.is_valid():
+        q_val = str(filter_form.cleaned_data.get("q") or "").strip()
+        action_val = str(filter_form.cleaned_data.get("action") or "")
+        status_val = str(filter_form.cleaned_data.get("status") or "")
+
+        if q_val:
+            clean_digits = re.sub(r"\D", "", q_val)
+            query_filter = Q(client__name__icontains=q_val)
+            if clean_digits:
+                query_filter |= Q(client__document__icontains=clean_digits)
+            operations = operations.filter(query_filter)
+        if action_val:
+            operations = operations.filter(action=action_val)
+        if status_val:
+            operations = operations.filter(run__status=status_val)
+
+    query_params = request.GET.copy()
+    query_params.pop("page", None)
+    filter_querystring = query_params.urlencode()
+    query_params_formatted = f"&{filter_querystring}" if filter_querystring else ""
+    has_active_filters = bool(
+        filter_form.is_valid()
+        and (
+            filter_form.cleaned_data.get("action")
+            or filter_form.cleaned_data.get("status")
+            or (filter_form.cleaned_data.get("q") or "").strip()
+        )
+    )
+
+    paginator = Paginator(operations.order_by("-created_at"), per_page=8)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
+
     summary = {
         "total": clients.count(),
         "active": clients.filter(status="active").count(),
@@ -732,8 +767,14 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         {
             "module": module,
             "form": form,
+            "filter_form": filter_form,
+            "has_active_filters": has_active_filters,
+            "query_params": query_params_formatted,
+            "filter_querystring": filter_querystring,
             "clients": clients,
-            "operations": operations,
+            "operations": page_obj,
+            "page_obj": page_obj,
+            "paginator": paginator,
             "summary": summary,
             "allow_failure_scenarios": allow_failure_scenarios,
         },

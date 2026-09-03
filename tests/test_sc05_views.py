@@ -362,3 +362,69 @@ def test_broker_failure_during_resume_keeps_partial_run_retryable(
     assert run.sc05_operation.resume_count == 1
     assert run.metadata["dispatch_error"] == "ConnectionError"
     assert run.metadata["sc05_resume_history"][0]["previous_error"] == "Falha parcial anterior."
+
+
+def test_sc05_operations_filters_and_pagination(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    technology_operator: User,
+) -> None:
+    client_a = SC05Client.objects.create(
+        external_reference="alpha-client",
+        name="Empresa Alpha Ltda",
+        document="12345678000199",
+    )
+    client_b = SC05Client.objects.create(
+        external_reference="beta-client",
+        name="Beta Servicos S.A.",
+        document="98765432000188",
+        status=SC05ClientStatus.BLOCKED,
+        task_restore_snapshot={"task-1": "usr-1"},
+    )
+
+    create_sc05_run(
+        module=modules["SC-05"],
+        client=client_a,
+        action=SC05Action.BLOCK,
+        scenario=SC05Scenario.HAPPY_PATH,
+        triggered_by=technology_operator,
+        request_key=uuid4(),
+    )
+    create_sc05_run(
+        module=modules["SC-05"],
+        client=client_b,
+        action=SC05Action.UNBLOCK,
+        scenario=SC05Scenario.HAPPY_PATH,
+        triggered_by=technology_operator,
+        request_key=uuid4(),
+    )
+
+    client.force_login(technology_operator)
+    url = _module_url(modules)
+
+    # 1. Sem filtros - ambas devem aparecer
+    response = client.get(url)
+    assert response.status_code == 200
+    content = response.content.decode("utf-8")
+    assert "Empresa Alpha Ltda" in content
+    assert "Beta Servicos S.A." in content
+    assert 'id="sc05-operations-region"' in content
+    assert "Limpar" not in content
+
+    # 2. Filtrar por busca de cliente "Alpha"
+    response_filtered = client.get(f"{url}?q=Alpha")
+    assert response_filtered.status_code == 200
+    content_filtered = response_filtered.content.decode("utf-8")
+    assert "Limpar" in content_filtered
+    ops_filtered = list(response_filtered.context["operations"])
+    assert len(ops_filtered) == 1
+    assert ops_filtered[0].client.name == "Empresa Alpha Ltda"
+
+    # 3. Filtrar por ação "unblock"
+    response_unblock = client.get(f"{url}?action={SC05Action.UNBLOCK}")
+    assert response_unblock.status_code == 200
+    content_unblock = response_unblock.content.decode("utf-8")
+    assert "Limpar" in content_unblock
+    ops_unblock = list(response_unblock.context["operations"])
+    assert len(ops_unblock) == 1
+    assert ops_unblock[0].client.name == "Beta Servicos S.A."
