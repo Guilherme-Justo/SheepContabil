@@ -630,12 +630,23 @@
   /* Containers, Topbar & Cards */
   .portal-topbar, .module-card, .info-card, .stat-card, .content-card, .table-shell, .date-card, .login-form-panel,
   .sc04-upload-card, .sc04-preview-card, .sc04-state-card, .sc04-decision-card, .sc04-review-card,
-  .sc04-summary-card, .sc05-summary-card, .sc06-summary-card, .sc20-summary-card,
-  .sc05-step-card, .sc06-case-card, .sc06-section-card, .sc06-progress-card, .sc06-form-actions,
+  .sc06-case-card, .sc06-section-card, .sc06-progress-card, .sc06-form-actions,
   .sc20-form-card, .sc04-confidence-grid > div {
     background: #0d1e25;
     border-color: rgba(255,255,255,.18);
     box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  }
+
+  /* Summary Cards, Step Cards & Action Panels (Clean dark mode without blurry dark halos) */
+  .sc04-summary-card, .sc05-summary-card, .sc06-summary-card, .sc20-summary-card,
+  .sc05-step-card {
+    background: #0d1e25;
+    border-color: rgba(255,255,255,.18);
+    box-shadow: none;
+  }
+
+  .sc04-action-panel, .sc05-action-panel, .sc20-action-panel {
+    box-shadow: none;
   }
 
   .module-card { background: #0d1e25; }
