@@ -137,6 +137,7 @@
   .primary-button:active,
   .sc04-execute-button:active,
   .sc04-secondary-button:active,
+  .sc04-clear-filters-link:active,
   .sc04-retry-button:active,
   .sc05-execute-button:active,
   .sc05-resume-button:active,
@@ -368,6 +369,16 @@
     color: #10505f; font-size: .71rem; font-weight: 600; transition: border-color .15s, background .15s, transform .15s;
   }
   .sc04-secondary-button:hover { border-color: #1fa69a; background: rgba(31,166,154,.04); transform: translateY(-1px); }
+  .sc04-clear-filters-link {
+    display: inline-flex; align-items: center; justify-content: center; white-space: nowrap;
+    border: 1px solid transparent; border-radius: .75rem; padding: .66rem .75rem;
+    color: #5a7078; font-size: .71rem; font-weight: 600; text-decoration: underline;
+    transition: color .15s, background .15s, transform .15s;
+  }
+  .sc04-clear-filters-link:hover {
+    color: #10505f;
+    background: rgba(16,80,95,.05);
+  }
   .sc04-retry-button { border-color: rgba(196,69,61,.28); background: rgba(196,69,61,.07); color: #a43731; }
   .sc04-retry-button:hover { border-color: rgba(196,69,61,.5); background: rgba(196,69,61,.13); }
   .sc04-execute-button:focus-visible, .sc04-secondary-button:focus-visible,
@@ -622,15 +633,15 @@
   .sc04-summary-card, .sc05-summary-card, .sc06-summary-card, .sc20-summary-card,
   .sc05-step-card, .sc06-case-card, .sc06-section-card, .sc06-progress-card, .sc06-form-actions,
   .sc20-form-card, .sc04-confidence-grid > div {
-    background: #0b1a20;
-    border-color: rgba(255,255,255,.1);
-    box-shadow: 0 8px 24px rgba(0,0,0,.3);
+    background: #0d1e25;
+    border-color: rgba(255,255,255,.18);
+    box-shadow: 0 10px 30px rgba(0,0,0,.45);
   }
 
-  .module-card { background: #0b1a20; }
+  .module-card { background: #0d1e25; }
   .module-card p { color: rgba(255,255,255,.75); }
   .module-card:hover { border-color: rgba(31,166,154,.5); box-shadow: 0 20px 52px rgba(0,0,0,.6); }
-  .module-code { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); color: #1fa69a; }
+  .module-code { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); color: #1fa69a; }
 
   /* Typography & Contrast */
   .page-subtitle, .metric-label, .date-card small, .info-card dt, .stat-card span,
@@ -723,7 +734,7 @@
   }
   .sc05-state-grid div, .sc04-file-metadata div, .sc04-preview-surface {
     background: rgba(255,255,255,.05);
-    border: 1px solid rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.15);
   }
 
   /* SC-20 Specifics */
@@ -770,6 +781,13 @@
     background: rgba(31,166,154,.2);
     border-color: #1fa69a;
   }
+  .sc04-clear-filters-link {
+    color: rgba(255,255,255,.7);
+  }
+  .sc04-clear-filters-link:hover {
+    color: white;
+    background: rgba(255,255,255,.08);
+  }
   .sc06-field-control label:has(input[type="checkbox"]), .sc06-field-control label:has(input[type="radio"]),
   .sc04-confirmation {
     color: rgba(255,255,255,.85);
@@ -784,6 +802,10 @@
 
   /* Badges & Accents */
   .soft-badge, .status-neutral { background: rgba(255,255,255,.08); color: rgba(255,255,255,.75); border-color: rgba(255,255,255,.12); }
+  .status-success { background: rgba(31,166,154,.22); color: #79d8cf; }
+  .status-warning { background: rgba(232,163,61,.22); color: #f3ba63; }
+  .status-danger { background: rgba(196,69,61,.22); color: #ff8d85; }
+  .status-active { background: rgba(31,166,154,.18); color: #79d8cf; }
   .environment-badge { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: rgba(255,255,255,.85); }
   .nature-ai { background: rgba(31,166,154,.22); color: #1fa69a; }
   .nature-rpa { background: rgba(232,163,61,.22); color: #e8a33d; }
@@ -792,9 +814,58 @@
   .notice { background: rgba(255,255,255,.05); color: rgba(255,255,255,.9); }
   .empty-state { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.1); }
   .status-dot { box-shadow: 0 0 0 4px rgba(31,166,154,.25); }
+
+  /* SC-04 Process Timeline: Cores Simbólicas e Estados no Modo Escuro */
   .sc04-timeline li { color: rgba(255,255,255,.6); }
-  .sc04-timeline li > span { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.15); color: white; }
+  .sc04-timeline li > span { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.18); color: rgba(255,255,255,.5); }
   .sc04-timeline strong { color: rgba(255,255,255,.85); }
+  .sc04-timeline .is-complete > span { border-color: #79d8cf; background: #1fa69a; color: #0b1a20; font-weight: 700; }
+  .sc04-timeline .is-complete strong { color: #79d8cf; }
+  .sc04-timeline .is-current > span { border-color: #79d8cf; background: rgba(31,166,154,.22); color: white; box-shadow: 0 0 0 4px rgba(31,166,154,.25); }
+  .sc04-timeline .is-current strong { color: white; }
+  .sc04-timeline .is-error > span { border-color: #ff8d85; background: rgba(196,69,61,.25); color: #ff8d85; }
+  .sc04-timeline .is-error strong { color: #ff8d85; }
+
+  /* SC-04 Card de Revisão Humana: Destaque Âmbar/Dourado Atmosférico */
+  .sc04-review-card {
+    border-color: rgba(232, 163, 61, 0.45);
+    background: radial-gradient(circle at 95% 5%, rgba(232, 163, 61, 0.15), transparent 45%),
+                linear-gradient(145deg, #0d1e25, rgba(232, 163, 61, 0.07));
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 1px rgba(232, 163, 61, 0.4);
+  }
+  .sc04-review-card .eyebrow,
+  .text-ambar {
+    color: #f3ba63;
+    font-weight: 700;
+  }
+
+  /* SC-04 Card de Decisão Preservada: Aura Turquesa e Contraste dos Valores */
+  .sc04-decision-card {
+    border-color: rgba(31, 166, 154, 0.4);
+    background: radial-gradient(circle at 95% 5%, rgba(31, 166, 154, 0.12), transparent 45%),
+                linear-gradient(145deg, #0d1e25, rgba(31, 166, 154, 0.06));
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 1px rgba(31, 166, 154, 0.3);
+  }
+  .sc04-decision-card dt {
+    color: rgba(255, 255, 255, 0.7);
+  }
+  .sc04-decision-card dd {
+    color: white;
+    font-weight: 600;
+  }
+  .sc04-decision-card dl div {
+    border-top-color: rgba(255, 255, 255, 0.12);
+  }
+
+  /* SC-04 Evidências Extraídas no Dark Mode */
+  .sc04-evidence {
+    background: rgba(31, 166, 154, 0.08);
+    border: 1px solid rgba(31, 166, 154, 0.2);
+    color: rgba(255, 255, 255, 0.85);
+  }
+  .sc04-evidence strong {
+    color: #79d8cf;
+  }
 }
 
 

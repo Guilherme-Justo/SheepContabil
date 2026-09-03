@@ -440,6 +440,15 @@ def _sc04_dashboard_context(
     query_params = request.GET.copy()
     query_params.pop("page", None)
     filter_querystring = query_params.urlencode()
+    has_active_filters = bool(
+        filter_form.is_valid()
+        and (
+            filter_form.cleaned_data.get("status")
+            or filter_form.cleaned_data.get("source")
+            or filter_form.cleaned_data.get("outcome")
+            or (filter_form.cleaned_data.get("q") or "").strip()
+        )
+    )
     query = request.GET.urlencode()
     queue_refresh_url = reverse("automations:sc04-queue-fragment")
     if query:
@@ -448,6 +457,7 @@ def _sc04_dashboard_context(
         "module": module,
         "upload_form": upload_form or SC04UploadForm(),
         "queue_filter_form": filter_form,
+        "has_active_filters": has_active_filters,
         "summary": summary,
         "queue_rows": queue_rows,
         "page_obj": page_obj,

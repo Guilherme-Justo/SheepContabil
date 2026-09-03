@@ -289,6 +289,23 @@ def test_classifier_uses_strict_non_persistent_structured_output() -> None:
     request_payload = json.loads(str(call["input"]))
     assert request_payload["exact_client_code"] == "aurora"
     assert request_payload["document_text"].startswith("NOTA FISCAL")
+    instructions = str(call["instructions"])
+    assert "REGRAS DE CLIENTE E DESAMBIGUAÇÃO" in instructions
+
+
+def test_classifier_instructions_include_accounting_disambiguation_rules() -> None:
+    responses = _FakeResponses(_provider_response(_valid_prediction_payload()))
+    classifier = OpenAIDocumentClassifier(client=Any, model="gpt-test")
+    classifier._client = _FakeOpenAI(responses)  # type: ignore[assignment]
+
+    classifier.classify(_classification_request())
+
+    call = responses.calls[0]
+    instructions = str(call["instructions"])
+    assert "REGRAS DE CLIENTE E DESAMBIGUAÇÃO:" in instructions
+    assert "Prestador" in instructions
+    assert "Tomador" in instructions
+    assert "marque is_ambiguous como false" in instructions
 
 
 def test_classifier_rejects_unknown_client_even_after_structured_output() -> None:
