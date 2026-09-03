@@ -72,6 +72,10 @@ def test_operator_cannot_open_a_module_outside_their_area(
     )
 
     assert denied.status_code == 404
+    denied_html = denied.content.decode()
+    assert "Página ou módulo não localizado" in denied_html
+    assert "Política de Acesso e Segregação de Funções (RBAC)" in denied_html
+    assert "Processos" in denied_html
     assert allowed.status_code == 200
 
 
