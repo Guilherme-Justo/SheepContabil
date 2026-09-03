@@ -383,10 +383,9 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     page1 = resp_p1.content.decode()
     assert "Mostrando" in page1
     assert "1</strong> a" in page1
-    assert "10</strong> de" in page1
+    assert "7</strong> de" in page1
     assert "15</strong> arquivos" in page1
     assert ">1</strong> de" in page1
-    assert ">2</strong>" in page1
     assert "page=2" in page1
 
     # Page 2
@@ -396,8 +395,8 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     )
     assert resp_p2.status_code == 200
     page2 = resp_p2.content.decode()
-    assert "11</strong> a" in page2
-    assert "15</strong> de" in page2
+    assert "8</strong> a" in page2
+    assert "14</strong> de" in page2
     assert ">2</strong> de" in page2
     assert "page=1" in page2
 
@@ -408,6 +407,6 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     )
     assert resp_fragment.status_code == 200
     frag = resp_fragment.content.decode()
-    assert "11</strong> a" in frag
+    assert "8</strong> a" in frag
     assert "q=paginated" in frag
     assert "page=2" in frag

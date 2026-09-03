@@ -124,18 +124,18 @@ def test_dashboard_run_filters_and_pagination(
             trigger=trigger_val,
         )
 
-    # 1. Unfiltered: 8 items per page, 2 pages total
+    # 1. Unfiltered: 7 items per page (DEFAULT_PAGE_SIZE), 2 pages total
     resp = client.get(reverse("automations:dashboard"))
     assert resp.status_code == 200
     assert resp.context["paginator"].num_pages == 2
-    assert len(resp.context["page_obj"]) == 8
+    assert len(resp.context["page_obj"]) == 7
     assert resp.context["has_active_filters"] is False
     assert "Navegação das execuções" in resp.content.decode()
 
     # Page 2
     resp_p2 = client.get(f"{reverse('automations:dashboard')}?page=2")
     assert resp_p2.status_code == 200
-    assert len(resp_p2.context["page_obj"]) == 2
+    assert len(resp_p2.context["page_obj"]) == 3
 
     # 2. Filter by module SC-06
     resp_sc06 = client.get(f"{reverse('automations:dashboard')}?module=SC-06")

@@ -9,6 +9,7 @@ from django.conf import settings
 from django.core.files.uploadedfile import UploadedFile
 
 from core.automations.models import (
+    CertificateStatus,
     CommunicationChannel,
     DigitalCertificate,
     DocumentClassificationAttempt,
@@ -246,6 +247,41 @@ class DigitalCertificateForm(A11yFormMixin, forms.ModelForm):  # type: ignore[ty
         if channel == CommunicationChannel.WHATSAPP and not phone:
             self.add_error("contact_phone", "Informe o telefone usado no aviso simulado.")
         return cleaned_data
+
+
+class SC20CertificateFilterForm(A11yFormMixin, forms.Form):
+    _widget_class = (
+        "form-input text-xs py-1.5 px-2.5 rounded-lg border-grafite/25 "
+        "dark:border-white/15 dark:bg-[#091216] dark:text-white"
+    )
+
+    q = forms.CharField(
+        label="Buscar",
+        required=False,
+        max_length=120,
+        widget=forms.TextInput(
+            attrs={
+                "class": _widget_class,
+                "placeholder": "Buscar cliente ou CPF/CNPJ...",
+                "aria-label": "Buscar por cliente ou documento",
+            }
+        ),
+    )
+    status = forms.ChoiceField(
+        label="Estado",
+        required=False,
+        choices=[
+            ("", "Todos os estados"),
+            ("expiring", "Vencendo em 60 dias"),
+            *CertificateStatus.choices,
+        ],
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por estado",
+            }
+        ),
+    )
 
 
 class BriefingStartForm(A11yFormMixin, forms.Form):

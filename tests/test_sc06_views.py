@@ -335,14 +335,14 @@ def test_sc06_detail_pagination_and_formatted_document(
     resp1 = client.get(module_url)
     assert resp1.status_code == 200
     assert resp1.context["paginator"].num_pages == 2
-    assert len(resp1.context["page_obj"]) == 6
+    assert len(resp1.context["page_obj"]) == 7
     assert resp1.context["page_obj"].number == 1
     assert "Navegação dos casos societários" in resp1.content.decode()
 
     # Page 2
     resp2 = client.get(f"{module_url}?page=2")
     assert resp2.status_code == 200
-    assert len(resp2.context["page_obj"]) == 2
+    assert len(resp2.context["page_obj"]) == 1
     assert resp2.context["page_obj"].number == 2
 
 

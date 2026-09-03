@@ -32,6 +32,7 @@ from core.automations.forms import (
     SC04UploadForm,
     SC05OperationFilterForm,
     SC05OperationForm,
+    SC20CertificateFilterForm,
 )
 from core.automations.models import (
     AutomationModule,
@@ -87,6 +88,8 @@ from core.automations.sc20.services import create_sc20_run
 from core.automations.tasks import run_sc04_task, run_sc05_task, run_sc20_task
 from core.identity.models import User
 
+DEFAULT_PAGE_SIZE = 7
+
 
 def _visible_modules(request: HttpRequest) -> AutomationModuleQuerySet:
     return AutomationModule.objects.visible_to(request.user).select_related("area").order_by("code")
@@ -128,7 +131,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             runs = runs.filter(trigger=selected_trigger)
             has_active_filters = True
 
-    paginator = Paginator(runs, per_page=8)
+    paginator = Paginator(runs, per_page=DEFAULT_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
 
@@ -445,7 +448,7 @@ def _sc04_dashboard_context(
 ) -> dict[str, Any]:
     filter_form = SC04QueueFilterForm(request.GET or None)
     queue = _sc04_queue_queryset(module, filter_form)
-    paginator = Paginator(queue, per_page=10)
+    paginator = Paginator(queue, per_page=DEFAULT_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
     queue_rows = []
@@ -499,7 +502,9 @@ def _sc04_dashboard_context(
     queue_refresh_url = reverse("automations:sc04-queue-fragment")
     if query:
         queue_refresh_url = f"{queue_refresh_url}?{query}"
-    runs_paginator = Paginator(module.runs.select_related("triggered_by").all(), per_page=6)
+    runs_paginator = Paginator(
+        module.runs.select_related("triggered_by").all(), per_page=DEFAULT_PAGE_SIZE
+    )
     runs_page_number = request.GET.get("runs_page", 1)
     runs_page_obj = runs_paginator.get_page(runs_page_number)
     return {
@@ -751,7 +756,7 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         )
     )
 
-    paginator = Paginator(operations.order_by("-created_at"), per_page=8)
+    paginator = Paginator(operations.order_by("-created_at"), per_page=DEFAULT_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
 
@@ -996,7 +1001,7 @@ def _sc06_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             filtered_briefings = filtered_briefings.filter(status=status)
             has_active_filters = True
 
-    paginator = Paginator(filtered_briefings, per_page=6)
+    paginator = Paginator(filtered_briefings, per_page=DEFAULT_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
 
@@ -1104,13 +1109,9 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
 
     today = timezone.localdate()
     window_end = today + timedelta(days=60)
-    certificates = DigitalCertificate.objects.all()
-    attempts = CommunicationAttempt.objects.select_related(
-        "communication__certificate",
-        "run",
-    )[:30]
+    all_certificates = DigitalCertificate.objects.all()
     summary = {
-        "total": certificates.count(),
+        "total": all_certificates.count(),
         "expiring": DigitalCertificate.objects.expiring_between(
             start_date=today,
             end_date=window_end,
@@ -1120,17 +1121,68 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             status=CommunicationStatus.FAILED
         ).count(),
     }
-    runs = module.runs.select_related("triggered_by").all()[:20]
+
+    filter_form = SC20CertificateFilterForm(request.GET if request.GET else None)
+    certificates = all_certificates
+    if filter_form.is_valid():
+        q_val = str(filter_form.cleaned_data.get("q") or "").strip()
+        status_val = str(filter_form.cleaned_data.get("status") or "")
+
+        if q_val:
+            clean_digits = re.sub(r"\D", "", q_val)
+            query_filter = Q(client_name__icontains=q_val)
+            if clean_digits:
+                query_filter |= Q(client_document__icontains=clean_digits)
+            certificates = certificates.filter(query_filter)
+        if status_val == "expiring":
+            certificates = certificates.expiring_between(start_date=today, end_date=window_end)
+        elif status_val:
+            certificates = certificates.filter(status=status_val)
+
+    query_params_dict = request.GET.copy()
+    query_params_dict.pop("page", None)
+    filter_querystring = query_params_dict.urlencode()
+    query_params_formatted = f"&{filter_querystring}" if filter_querystring else ""
+    has_active_filters = bool(
+        filter_form.is_valid()
+        and (
+            filter_form.cleaned_data.get("status")
+            or (filter_form.cleaned_data.get("q") or "").strip()
+        )
+    )
+
+    certificates_paginator = Paginator(certificates, per_page=DEFAULT_PAGE_SIZE)
+    certificates_page = certificates_paginator.get_page(request.GET.get("page", 1))
+
+    attempts_paginator = Paginator(
+        CommunicationAttempt.objects.select_related("communication__certificate", "run").all(),
+        per_page=DEFAULT_PAGE_SIZE,
+    )
+    attempts_page = attempts_paginator.get_page(request.GET.get("attempts_page", 1))
+
+    runs_paginator = Paginator(
+        module.runs.select_related("triggered_by").all(),
+        per_page=DEFAULT_PAGE_SIZE,
+    )
+    runs_page = runs_paginator.get_page(request.GET.get("runs_page", 1))
+
     return render(
         request,
         "automations/sc20_detail.html",
         {
             "module": module,
-            "certificates": certificates,
-            "attempts": attempts,
+            "filter_form": filter_form,
+            "has_active_filters": has_active_filters,
+            "query_params": query_params_formatted,
+            "filter_querystring": filter_querystring,
+            "certificates": certificates_page,
+            "certificates_paginator": certificates_paginator,
+            "attempts": attempts_page,
+            "attempts_paginator": attempts_paginator,
             "summary": summary,
             "form": form,
-            "runs": runs,
+            "runs": runs_page,
+            "runs_paginator": runs_paginator,
         },
     )
 

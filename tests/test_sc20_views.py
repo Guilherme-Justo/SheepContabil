@@ -177,3 +177,49 @@ def test_failed_attempt_can_be_retried_from_the_module_page(
     page = client.get(_module_url(modules)).content.decode()
     assert "Superado" in page
     assert "Tentar novamente" not in page
+
+
+def test_sc20_certificates_filters_and_pagination(
+    client: Client,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    for i in range(10):
+        DigitalCertificate.objects.create(
+            serial_number=f"CERT-PAGE-{i + 1:02d}",
+            client_name="Cliente Exclusivo" if i == 0 else f"Cliente Cert {i + 1:02d}",
+            client_document=f"900000000{i:02d}",
+            responsible_name=f"Responsavel {i + 1}",
+            contact_email=f"cert{i}@example.test",
+            preferred_channel=CommunicationChannel.EMAIL,
+            valid_until=timezone.localdate() + timedelta(days=20 if i < 5 else 120),
+            status=CertificateStatus.ACTIVE if i < 8 else CertificateStatus.REVOKED,
+        )
+
+    client.force_login(processes_operator)
+    url = _module_url(modules)
+
+    # 1. Sem filtros: 7 itens na página 1, 2 páginas no total
+    response = client.get(url)
+    assert response.status_code == 200
+    assert response.context["certificates_paginator"].num_pages == 2
+    assert len(response.context["certificates"]) == 7
+    assert 'id="sc20-certificates-region"' in response.content.decode()
+    assert "Limpar" not in response.content.decode()
+
+    # 2. Página 2: 3 itens restantes
+    response_p2 = client.get(f"{url}?page=2")
+    assert response_p2.status_code == 200
+    assert len(response_p2.context["certificates"]) == 3
+
+    # 3. Filtrar por busca textual de nome único
+    response_search = client.get(f"{url}?q=Exclusivo")
+    assert response_search.status_code == 200
+    assert len(response_search.context["certificates"]) == 1
+    assert "Limpar" in response_search.content.decode()
+
+    # 4. Filtrar por status vencendo em 60 dias
+    response_expiring = client.get(f"{url}?status=expiring")
+    assert response_expiring.status_code == 200
+    assert len(response_expiring.context["certificates"]) == 5
+    assert "Limpar" in response_expiring.content.decode()

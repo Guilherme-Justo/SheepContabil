@@ -1041,6 +1041,9 @@ label:has(input:disabled) {
 #sc04-queue-content.htmx-request,
 #sc04-runs-region.htmx-request,
 #sc05-operations-region.htmx-request,
+#sc20-certificates-region.htmx-request,
+#sc20-attempts-region.htmx-request,
+#sc20-runs-region.htmx-request,
 .htmx-swapping {
   opacity: 0.6;
   pointer-events: none;
