@@ -684,6 +684,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --color-nevoa: #091216;
 
   body { background: var(--color-nevoa); color: rgba(255,255,255,.9); }
@@ -950,11 +951,21 @@
 .dark input:-webkit-autofill,
 .dark input:-webkit-autofill:hover,
 .dark input:-webkit-autofill:focus,
-.dark input:-webkit-autofill:active {
+.dark input:-webkit-autofill:active,
+.dark input:autofill,
+.dark input:autofill:hover,
+.dark input:autofill:focus,
+.dark input:autofill:active,
+.dark textarea:-webkit-autofill,
+.dark textarea:autofill,
+.dark select:-webkit-autofill,
+.dark select:autofill {
   -webkit-box-shadow: 0 0 0 1000px #091216 inset !important;
+  box-shadow: 0 0 0 1000px #091216 inset !important;
   -webkit-text-fill-color: #ffffff !important;
   caret-color: #ffffff !important;
   border-color: rgba(31, 166, 154, 0.4) !important;
+  color-scheme: dark !important;
   transition: background-color 5000s ease-in-out 0s;
 }
 
