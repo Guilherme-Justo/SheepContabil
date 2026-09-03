@@ -1035,5 +1035,14 @@ label:has(input:disabled) {
   color: rgba(255, 255, 255, 0.75) !important;
 }
 
+/* Transição reativa HTMX suave para paginação e filtros */
+#dashboard-runs-region.htmx-request,
+#sc06-cases-region.htmx-request,
+.htmx-swapping {
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity .15s ease;
+}
+
 
 

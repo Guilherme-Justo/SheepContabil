@@ -1,4 +1,5 @@
 import hashlib
+import re
 from datetime import timedelta
 from io import BytesIO
 from typing import Any, cast
@@ -70,7 +71,7 @@ from core.automations.sc04.validation import extension_for_media_type
 from core.automations.sc05.artifacts import build_screenshot_storage
 from core.automations.sc05.contracts import ArtifactStorageError
 from core.automations.sc05.services import create_sc05_run_result, resume_sc05_run
-from core.automations.sc06.forms import BriefingAnswersForm
+from core.automations.sc06.forms import BriefingAnswersForm, SC06CasesFilterForm
 from core.automations.sc06.pdf import build_briefing_pdf
 from core.automations.sc06.rules import build_frontend_config
 from core.automations.sc06.services import (
@@ -930,9 +931,31 @@ def _sc06_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         completed=Count("id", filter=Q(status=SocietaryBriefingStatus.COMPLETED)),
         cancelled=Count("id", filter=Q(status=SocietaryBriefingStatus.CANCELLED)),
     )
-    paginator = Paginator(briefings, per_page=6)
+    filter_form = SC06CasesFilterForm(request.GET if request.GET else None)
+    has_active_filters = False
+    filtered_briefings = briefings
+    if request.GET and filter_form.is_valid():
+        q = filter_form.cleaned_data.get("q")
+        if q:
+            clean_digits = re.sub(r"\D", "", q)
+            query_q = Q(client_name__icontains=q)
+            if clean_digits:
+                query_q |= Q(client_document__icontains=clean_digits)
+            filtered_briefings = filtered_briefings.filter(query_q)
+            has_active_filters = True
+        status = filter_form.cleaned_data.get("status")
+        if status:
+            filtered_briefings = filtered_briefings.filter(status=status)
+            has_active_filters = True
+
+    paginator = Paginator(filtered_briefings, per_page=6)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
+
+    query_dict = request.GET.copy()
+    query_dict.pop("page", None)
+    query_params = f"&{query_dict.urlencode()}" if query_dict else ""
+
     try:
         active_template = get_latest_published_version()
     except PublishedTemplateUnavailable:
@@ -948,6 +971,9 @@ def _sc06_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "paginator": paginator,
             "summary": summary,
             "active_template": active_template,
+            "filter_form": filter_form,
+            "has_active_filters": has_active_filters,
+            "query_params": query_params,
         },
     )
 

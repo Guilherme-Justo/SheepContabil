@@ -5,6 +5,7 @@ from typing import Any
 
 from django import forms
 
+from core.automations.models import SocietaryBriefingStatus
 from core.automations.sc06.rules import get_active_questions
 
 
@@ -174,3 +175,38 @@ def _serialise_answer(value: Any) -> Any:
     if isinstance(value, date):
         return value.isoformat()
     return value
+
+
+class SC06CasesFilterForm(A11yFormMixin, forms.Form):
+    _widget_class = (
+        "form-input text-xs py-1.5 px-2.5 rounded-lg border-grafite/25 "
+        "dark:border-white/15 dark:bg-[#091216] dark:text-white"
+    )
+
+    q = forms.CharField(
+        label="Buscar",
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": _widget_class,
+                "placeholder": "Buscar cliente ou documento...",
+                "aria-label": "Buscar cliente ou documento",
+            }
+        ),
+    )
+    status = forms.ChoiceField(
+        label="Estado",
+        required=False,
+        choices=[
+            ("", "Todos os estados"),
+            (SocietaryBriefingStatus.DRAFT, "Em elaboração"),
+            (SocietaryBriefingStatus.COMPLETED, "Concluído"),
+            (SocietaryBriefingStatus.CANCELLED, "Cancelado"),
+        ],
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por estado",
+            }
+        ),
+    )

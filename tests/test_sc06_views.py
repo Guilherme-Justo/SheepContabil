@@ -20,7 +20,7 @@ from core.automations.models import (
     SocietaryBriefing,
     SocietaryBriefingStatus,
 )
-from core.automations.sc06.services import complete_briefing, create_briefing
+from core.automations.sc06.services import cancel_briefing, complete_briefing, create_briefing
 from core.identity.models import User
 
 pytestmark = pytest.mark.django_db
@@ -344,3 +344,62 @@ def test_sc06_detail_pagination_and_formatted_document(
     assert resp2.status_code == 200
     assert len(resp2.context["page_obj"]) == 2
     assert resp2.context["page_obj"].number == 2
+
+
+def test_sc06_cases_filters_and_htmx_pagination(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    societary_operator: User,
+    administrator: User,
+) -> None:
+    _publish_template(administrator)
+    b1 = create_briefing(
+        client_name="Alfa Consultoria",
+        client_document="11122233344",
+        created_by=societary_operator,
+    )
+    b2 = create_briefing(
+        client_name="Beta Contabilidade",
+        client_document="55566677788",
+        created_by=societary_operator,
+    )
+    b3 = create_briefing(
+        client_name="Gama Tech",
+        client_document="99988877766",
+        created_by=societary_operator,
+    )
+    cancel_briefing(b3.id, cancelled_by=societary_operator)
+
+    module_url = reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
+    client.force_login(societary_operator)
+
+    # 1. Busca por nome parcial
+    resp_q_name = client.get(f"{module_url}?q=Alfa")
+    assert resp_q_name.status_code == 200
+    assert len(resp_q_name.context["page_obj"]) == 1
+    assert resp_q_name.context["page_obj"][0].id == b1.id
+    assert resp_q_name.context["has_active_filters"] is True
+
+    resp_q_beta = client.get(f"{module_url}?q=Beta")
+    assert resp_q_beta.status_code == 200
+    assert len(resp_q_beta.context["page_obj"]) == 1
+    assert resp_q_beta.context["page_obj"][0].id == b2.id
+
+    # 2. Busca por documento formatado ou dígitos
+    resp_q_doc = client.get(f"{module_url}?q=999.888")
+    assert resp_q_doc.status_code == 200
+    assert len(resp_q_doc.context["page_obj"]) == 1
+    assert resp_q_doc.context["page_obj"][0].id == b3.id
+
+    # 3. Filtro por status cancelado
+    resp_cancelled = client.get(f"{module_url}?status={SocietaryBriefingStatus.CANCELLED}")
+    assert resp_cancelled.status_code == 200
+    assert len(resp_cancelled.context["page_obj"]) == 1
+    assert resp_cancelled.context["page_obj"][0].status == SocietaryBriefingStatus.CANCELLED
+
+    # 4. Atributos HTMX presentes no HTML da página
+    html = resp_cancelled.content.decode()
+    assert 'hx-target="#sc06-cases-region"' in html
+    assert 'hx-swap="outerHTML show:none"' in html
+    assert 'hx-push-url="true"' in html
+    assert "Limpar" in html
