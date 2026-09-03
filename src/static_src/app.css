@@ -982,6 +982,28 @@
   color: rgba(255, 255, 255, 0.55) !important;
   cursor: not-allowed !important;
   box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+/* Estilização perceptível e coerente de campos desabilitados em Light Mode */
+html:not(.dark) input:disabled,
+html:not(.dark) select:disabled,
+html:not(.dark) textarea:disabled,
+html:not(.dark) fieldset[disabled] input,
+html:not(.dark) fieldset[disabled] select,
+html:not(.dark) fieldset[disabled] textarea,
+html:not(.dark) .form-input:disabled {
+  background: rgba(238, 243, 244, 0.85) !important;
+  border-color: rgba(90, 112, 120, 0.22) !important;
+  color: #5a7078 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+}
+
+fieldset[disabled] label,
+label:has(input:disabled) {
+  cursor: not-allowed !important;
 }
 
 /* Erros de validação em Dark Mode */
