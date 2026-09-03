@@ -113,16 +113,6 @@
     opacity: 1;
   }
 
-  /* Previne o fundo branco forçado pelo navegador no autofill (Light Mode) */
-  input:-webkit-autofill,
-  input:-webkit-autofill:hover,
-  input:-webkit-autofill:focus,
-  input:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
-    -webkit-text-fill-color: #0b1a20 !important;
-    caret-color: #0b1a20 !important;
-    transition: background-color 5000s ease-in-out 0s;
-  }
   .info-card, .stat-card, .content-card { border: 1px solid rgba(90,112,120,.13); border-radius: 1.15rem; background: white; padding: 1.35rem; box-shadow: 0 12px 36px rgba(16,80,95,.04); }
   .info-card dt { color: #5a7078; }
   .info-card dd { margin-top: .2rem; font-weight: 600; color: #0b1a20; }
@@ -963,10 +953,10 @@
   -webkit-box-shadow: 0 0 0 1000px #091216 inset !important;
   box-shadow: 0 0 0 1000px #091216 inset !important;
   -webkit-text-fill-color: #ffffff !important;
+  color: #ffffff !important;
   caret-color: #ffffff !important;
   border-color: rgba(31, 166, 154, 0.4) !important;
   color-scheme: dark !important;
-  transition: background-color 5000s ease-in-out 0s;
 }
 
 /* Seletor de data e calendário em Dark Mode */
