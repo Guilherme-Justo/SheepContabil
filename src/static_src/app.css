@@ -132,6 +132,25 @@
     opacity: 0.95;
   }
 
+  button,
+  [role="button"],
+  .primary-button,
+  .sc04-execute-button,
+  .sc04-secondary-button,
+  .sc04-retry-button,
+  .sc05-execute-button,
+  .sc05-resume-button,
+  .sc05-retry-button,
+  .sc06-start-button,
+  .sc06-save-button,
+  .sc06-pdf-button,
+  .sc20-execute-button,
+  .sc20-retry-button,
+  .sidebar-signout,
+  .theme-toggle {
+    cursor: pointer;
+  }
+
   .primary-button { border: 0; border-radius: .8rem; background: #10505f; padding: .82rem 1rem; color: white; font-weight: 600; box-shadow: 0 12px 26px rgba(16,80,95,.17); transition: background .15s, transform .15s, box-shadow .15s; }
   .primary-button:hover { background: #1fa69a; transform: translateY(-1px); }
   .primary-button:active,
@@ -150,9 +169,20 @@
   .sidebar-signout:active,
   .sc06-case-primary-link:active,
   .theme-toggle:active {
-    transform: scale(0.97) translateY(1px);
-    box-shadow: 0 2px 8px rgba(16,80,95,.2);
+    transform: scale(0.97) translateY(1px) !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,.2) !important;
   }
+  .primary-button:active {
+    background: #0d424e !important;
+  }
+  .sc04-execute-button:active,
+  .sc05-execute-button:active,
+  .sc05-resume-button:active,
+  .sc06-start-button:active,
+  .sc20-execute-button:active {
+    background: #cbf3ee !important;
+  }
+
   .form-error { border-left: 3px solid #c4453d; border-radius: .55rem; background: rgba(196,69,61,.08); padding: .75rem .85rem; color: #91312c; font-size: .75rem; line-height: 1.5; }
   .field-error { margin-top: .4rem; font-size: .7rem; color: #c4453d; }
   .notice { border-left: 3px solid #1fa69a; border-radius: .65rem; background: white; padding: .8rem 1rem; font-size: .78rem; }
@@ -175,7 +205,9 @@
     display: flex; align-items: center; justify-content: space-between; gap: 1rem; border: 0;
     border-radius: .8rem; background: white; padding: .82rem 1rem; color: #10505f;
     font-size: .78rem; font-weight: 600; transition: background .15s, transform .15s, box-shadow .15s;
+    cursor: pointer;
   }
+
   .sc20-execute-button:hover { background: #e8ffff; transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,.14); }
   .sc20-execute-button:focus-visible, .sc20-retry-button:focus-visible, .primary-button:focus-visible {
     outline: 3px solid rgba(31,166,154,.35); outline-offset: 3px;
@@ -248,7 +280,9 @@
     display: flex; align-items: center; justify-content: space-between; gap: 1rem; border: 0; border-radius: .8rem;
     background: white; padding: .82rem 1rem; color: #10505f; font-size: .76rem; font-weight: 600;
     transition: background .15s, transform .15s, box-shadow .15s;
+    cursor: pointer;
   }
+
   .sc05-execute-button:hover, .sc05-resume-button:hover { background: #e8ffff; transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,.14); }
   .sc05-execute-button:focus-visible, .sc05-resume-button:focus-visible { outline: 3px solid rgba(31,166,154,.35); outline-offset: 3px; }
   .sc05-summary-card {
@@ -300,7 +334,9 @@
     display: flex; align-items: center; justify-content: space-between; gap: 1rem; border: 0;
     border-radius: .8rem; background: white; padding: .82rem 1rem; color: #10505f;
     font-size: .78rem; font-weight: 600; transition: background .15s, transform .15s, box-shadow .15s;
+    cursor: pointer;
   }
+
   .sc04-execute-button:hover { background: #e8ffff; transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,.14); }
   .sc04-summary-card {
     display: flex; min-height: 8rem; align-items: center; gap: 1rem; border: 1px solid rgba(90,112,120,.13);
@@ -447,7 +483,9 @@
     display: flex; align-items: center; justify-content: space-between; gap: 1rem; border: 0;
     border-radius: .8rem; background: white; padding: .82rem 1rem; color: #10505f;
     font-size: .78rem; font-weight: 600; transition: background .15s, transform .15s, box-shadow .15s;
+    cursor: pointer;
   }
+
   .sc06-start-button:hover { background: #e8ffff; transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,.14); }
   .sc06-start-button:focus-visible, .sc06-save-button:focus-visible, .sc06-pdf-button:focus-visible,
   .sc06-case-primary-link:focus-visible, .sc06-case-secondary-link:focus-visible {
