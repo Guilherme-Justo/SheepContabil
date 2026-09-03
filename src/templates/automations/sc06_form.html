@@ -60,10 +60,19 @@
 
     {% if briefing.status == "completed" %}<fieldset disabled aria-label="Respostas consolidadas">{% endif %}
 
-    {% if form.non_field_errors %}
+    {% if form.errors %}
       <div class="form-error mb-6" role="alert">
-        <strong>Revise o briefing antes de continuar.</strong>
-        <p class="mt-1">{{ form.non_field_errors.0 }}</p>
+        <div class="flex items-start gap-3">
+          <span class="text-base leading-none" aria-hidden="true">⚠️</span>
+          <div>
+            <strong>Revise o briefing antes de continuar.</strong>
+            {% if form.non_field_errors %}
+              <p class="mt-1">{{ form.non_field_errors.0 }}</p>
+            {% else %}
+              <p class="mt-1">O formulário possui campos com preenchimento obrigatório ou pendências que precisam ser corrigidos antes da conclusão.</p>
+            {% endif %}
+          </div>
+        </div>
       </div>
     {% endif %}
 

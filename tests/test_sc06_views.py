@@ -185,6 +185,7 @@ def test_server_blocks_completion_when_conditional_requirements_are_missing(
     briefing.run.refresh_from_db()
     html = response.content.decode()
     assert response.status_code == 200
+    assert "Revise o briefing antes de continuar." in html
     assert html.count("Este campo é obrigatório") >= 4
     assert briefing.status == SocietaryBriefingStatus.DRAFT
     assert briefing.run.status == RunStatus.RUNNING

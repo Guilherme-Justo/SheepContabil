@@ -162,6 +162,10 @@ class AutomationRun(models.Model):
     def duration_label(self) -> str:
         duration = self.duration
         if duration is None:
+            if self.status == RunStatus.RUNNING or (self.started_at and not self.finished_at):
+                return "Em andamento"
+            if self.status in {RunStatus.QUEUED, RunStatus.PENDING}:
+                return "Aguardando início"
             return "—"
         total_seconds = max(0, int(duration.total_seconds()))
         minutes, seconds = divmod(total_seconds, 60)

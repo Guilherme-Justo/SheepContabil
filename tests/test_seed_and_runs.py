@@ -138,6 +138,17 @@ def test_run_exposes_duration_and_safe_status_tone(
     assert run.status_tone == "danger"
     assert str(run).startswith("SC-04 · Falhou")
 
+    active_run = AutomationRun.objects.create(
+        module=modules["SC-04"],
+        trigger=RunTrigger.MANUAL,
+        status=RunStatus.RUNNING,
+        triggered_by=administrator,
+        started_at=started,
+        finished_at=None,
+    )
+    assert active_run.duration is None
+    assert active_run.duration_label == "Em andamento"
+
 
 def test_run_detail_obeys_the_same_area_policy(
     client: Client,

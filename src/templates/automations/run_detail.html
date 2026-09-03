@@ -38,10 +38,16 @@
     <h2 class="mt-3 font-display text-xl font-semibold">Resumo operacional</h2>
     <p class="mt-4 text-sm leading-7 text-grafite">{{ run.summary|default:"Nenhum resumo produzido até o momento." }}</p>
   </article>
-  <article class="content-card {% if run.error_message %}border-carmim/30{% endif %}">
-    <p class="eyebrow {% if run.error_message %}text-carmim{% endif %}">Tratamento de falha</p>
-    <h2 class="mt-3 font-display text-xl font-semibold">Mensagem compreensível</h2>
-    <p class="mt-4 text-sm leading-7 text-grafite">{{ run.error_message|default:"Nenhuma falha registrada nesta execução." }}</p>
+  <article class="content-card {% if run.error_message %}border-carmim/30 bg-carmim/5 dark:bg-carmim/10{% endif %}">
+    {% if run.error_message %}
+      <p class="eyebrow text-carmim">Tratamento de falha</p>
+      <h2 class="mt-3 font-display text-xl font-semibold text-carmim">Diagnóstico e orientação</h2>
+      <p class="mt-4 text-sm leading-7 text-grafite">{{ run.error_message }}</p>
+    {% else %}
+      <p class="eyebrow text-turquesa">Integridade operacional</p>
+      <h2 class="mt-3 font-display text-xl font-semibold">Diagnóstico da execução</h2>
+      <p class="mt-4 text-sm leading-7 text-grafite">Nenhuma falha registrada nesta execução. A rotina operou com total estabilidade.</p>
+    {% endif %}
   </article>
 </section>
 
