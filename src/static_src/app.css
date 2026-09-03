@@ -137,6 +137,7 @@
   .primary-button:active,
   .sc04-execute-button:active,
   .sc04-secondary-button:active,
+  .sc04-clear-filters-link:active,
   .sc04-retry-button:active,
   .sc05-execute-button:active,
   .sc05-resume-button:active,
@@ -368,6 +369,16 @@
     color: #10505f; font-size: .71rem; font-weight: 600; transition: border-color .15s, background .15s, transform .15s;
   }
   .sc04-secondary-button:hover { border-color: #1fa69a; background: rgba(31,166,154,.04); transform: translateY(-1px); }
+  .sc04-clear-filters-link {
+    display: inline-flex; align-items: center; justify-content: center; white-space: nowrap;
+    border: 1px solid transparent; border-radius: .75rem; padding: .66rem .75rem;
+    color: #5a7078; font-size: .71rem; font-weight: 600; text-decoration: underline;
+    transition: color .15s, background .15s, transform .15s;
+  }
+  .sc04-clear-filters-link:hover {
+    color: #10505f;
+    background: rgba(16,80,95,.05);
+  }
   .sc04-retry-button { border-color: rgba(196,69,61,.28); background: rgba(196,69,61,.07); color: #a43731; }
   .sc04-retry-button:hover { border-color: rgba(196,69,61,.5); background: rgba(196,69,61,.13); }
   .sc04-execute-button:focus-visible, .sc04-secondary-button:focus-visible,
@@ -769,6 +780,13 @@
   .sc04-secondary-button:hover {
     background: rgba(31,166,154,.2);
     border-color: #1fa69a;
+  }
+  .sc04-clear-filters-link {
+    color: rgba(255,255,255,.7);
+  }
+  .sc04-clear-filters-link:hover {
+    color: white;
+    background: rgba(255,255,255,.08);
   }
   .sc06-field-control label:has(input[type="checkbox"]), .sc06-field-control label:has(input[type="radio"]),
   .sc04-confirmation {

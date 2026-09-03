@@ -14,7 +14,7 @@
     A atualização automática está temporariamente indisponível. Os dados exibidos foram preservados; atualize a página para tentar novamente.
   </div>
 
-  <div class="table-shell overflow-x-auto">
+  <div class="table-shell overflow-x-auto min-h-[26rem]">
     <table class="data-table sc04-queue-table">
       <caption class="sr-only">Fila de documentos recebidos pela triagem fiscal</caption>
       <thead>
@@ -68,7 +68,14 @@
           <td class="text-right"><a href="{% url 'automations:sc04-document-detail' row.document.id %}" class="table-link">Detalhes</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="8" class="py-12 text-center text-grafite">Nenhum arquivo corresponde aos filtros atuais.</td></tr>
+        <tr>
+          <td colspan="8" class="py-12 text-center text-grafite dark:text-white/60">
+            Nenhum arquivo corresponde aos filtros atuais.
+            {% if has_active_filters %}
+              <a href="{% url 'automations:module-detail' module.slug %}" class="table-link font-semibold underline ml-2">Limpar filtros</a>
+            {% endif %}
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
@@ -86,7 +93,7 @@
           href="?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ page_obj.previous_page_number }}"
           hx-get="{% url 'automations:sc04-queue-fragment' %}?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ page_obj.previous_page_number }}"
           hx-target="#sc04-queue-content"
-          hx-swap="outerHTML"
+          hx-swap="outerHTML show:#sc04-queue-content:top"
           hx-push-url="?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ page_obj.previous_page_number }}"
           class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
           aria-label="Página anterior"
@@ -110,7 +117,7 @@
               href="?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ p }}"
               hx-get="{% url 'automations:sc04-queue-fragment' %}?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ p }}"
               hx-target="#sc04-queue-content"
-              hx-swap="outerHTML"
+              hx-swap="outerHTML show:#sc04-queue-content:top"
               hx-push-url="?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ p }}"
               class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-grafite/25 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
             >
@@ -125,7 +132,7 @@
           href="?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ page_obj.next_page_number }}"
           hx-get="{% url 'automations:sc04-queue-fragment' %}?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ page_obj.next_page_number }}"
           hx-target="#sc04-queue-content"
-          hx-swap="outerHTML"
+          hx-swap="outerHTML show:#sc04-queue-content:top"
           hx-push-url="?{% if filter_querystring %}{{ filter_querystring }}&{% endif %}page={{ page_obj.next_page_number }}"
           class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
           aria-label="Próxima página"
