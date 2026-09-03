@@ -10,3 +10,7 @@ SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 SECURE_HSTS_SECONDS = 0
+
+# Isolated cookie namespace prevents local session/CSRF collisions with the main app on localhost
+SESSION_COOKIE_NAME = "sc05_sim_sessionid"
+CSRF_COOKIE_NAME = "sc05_sim_csrftoken"
