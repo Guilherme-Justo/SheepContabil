@@ -277,3 +277,71 @@ def test_draft_pdf_and_repeat_completion_fail_safely(
 
     assert repeated.status_code == 400
     assert AutomationRun.objects.count() == 1
+
+
+def test_cancel_draft_action_via_post_and_redirects(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    societary_operator: User,
+    administrator: User,
+) -> None:
+    _publish_template(administrator)
+    briefing = create_briefing(
+        client_name="Caso Para Cancelar",
+        client_document="12345678901",
+        created_by=societary_operator,
+    )
+    detail_url = reverse(
+        "automations:sc06-briefing-detail",
+        kwargs={"briefing_id": briefing.id},
+    )
+    client.force_login(societary_operator)
+
+    # POST action=cancel
+    response = client.post(detail_url, {"action": "cancel"})
+    assert response.status_code == 302
+    assert response.url == reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
+
+    briefing.refresh_from_db()
+    assert briefing.status == SocietaryBriefingStatus.CANCELLED
+    assert briefing.run.status == RunStatus.CANCELLED
+
+    # Reading detail page shows cancelled banner and fieldset disabled
+    detail_page = client.get(detail_url)
+    assert detail_page.status_code == 200
+    content = detail_page.content.decode()
+    assert "Briefing cancelado e arquivado" in content
+    assert "<fieldset disabled" in content
+
+
+def test_sc06_detail_pagination_and_formatted_document(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    societary_operator: User,
+    administrator: User,
+) -> None:
+    _publish_template(administrator)
+    for i in range(8):
+        create_briefing(
+            client_name=f"Cliente {i + 1:02d}",
+            client_document=f"{i:011d}",
+            created_by=societary_operator,
+        )
+
+    module_url = reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
+    client.force_login(societary_operator)
+
+    # Page 1
+    resp1 = client.get(module_url)
+    assert resp1.status_code == 200
+    assert resp1.context["paginator"].num_pages == 2
+    assert len(resp1.context["page_obj"]) == 6
+    assert resp1.context["page_obj"].number == 1
+    assert "Navegação dos casos societários" in resp1.content.decode()
+
+    # Page 2
+    resp2 = client.get(f"{module_url}?page=2")
+    assert resp2.status_code == 200
+    assert len(resp2.context["page_obj"]) == 2
+    assert resp2.context["page_obj"].number == 2
+

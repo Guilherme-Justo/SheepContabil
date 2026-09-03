@@ -66,6 +66,11 @@ document.addEventListener("DOMContentLoaded", () => {
 window.sc06BriefingForm = (config) => ({
   config,
   answers: { ...(config.initialAnswers || config.answers || {}) },
+  initialSnapshot: "",
+  isSubmitting: false,
+  showUnsavedModal: false,
+  showCancelModal: false,
+  pendingNavigationUrl: "",
 
   init() {
     this.$nextTick(() => {
@@ -73,6 +78,14 @@ window.sc06BriefingForm = (config) => ({
       this.$root.querySelectorAll('[data-mask="document"], [data-sc06-answer="current_cnpj"]').forEach((field) => {
         if (field.value) field.value = formatDocument(field.value);
       });
+      this.initialSnapshot = JSON.stringify(this.answers);
+    });
+
+    window.addEventListener("beforeunload", (e) => {
+      if (this.isDirty && !this.isSubmitting) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
     });
   },
 
@@ -202,5 +215,51 @@ window.sc06BriefingForm = (config) => ({
       })
       .filter((item) => item.length > 0);
     return [...new Set(items)];
+  },
+
+  get isDirty() {
+    if (!this.initialSnapshot) return false;
+    return JSON.stringify(this.answers) !== this.initialSnapshot;
+  },
+
+  promptLeave(url) {
+    if (!this.isDirty) {
+      window.location.href = url;
+      return;
+    }
+    this.pendingNavigationUrl = url;
+    this.showUnsavedModal = true;
+  },
+
+  saveAndLeave() {
+    this.isSubmitting = true;
+    const form = this.$root.querySelector("form");
+    if (!form) {
+      window.location.href = this.pendingNavigationUrl;
+      return;
+    }
+    let nextInput = form.querySelector('input[name="next"]');
+    if (!nextInput) {
+      nextInput = document.createElement("input");
+      nextInput.type = "hidden";
+      nextInput.name = "next";
+      form.appendChild(nextInput);
+    }
+    nextInput.value = this.pendingNavigationUrl;
+
+    let actionInput = form.querySelector('input[name="action"][type="hidden"]');
+    if (!actionInput) {
+      actionInput = document.createElement("input");
+      actionInput.type = "hidden";
+      actionInput.name = "action";
+      form.appendChild(actionInput);
+    }
+    actionInput.value = "save";
+    form.submit();
+  },
+
+  discardAndLeave() {
+    this.isSubmitting = true;
+    window.location.href = this.pendingNavigationUrl;
   },
 });

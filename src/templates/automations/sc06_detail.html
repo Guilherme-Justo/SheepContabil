@@ -52,18 +52,22 @@
   </aside>
 </section>
 
-<section class="mt-8 grid gap-4 sm:grid-cols-3" aria-label="Resumo dos briefings">
+<section class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Resumo dos briefings">
   <article class="sc06-summary-card">
     <span class="sc06-summary-icon" aria-hidden="true">≡</span>
     <div><p>Total de casos</p><strong>{{ summary.total|default:0 }}</strong><small>briefings registrados</small></div>
   </article>
   <article class="sc06-summary-card sc06-summary-warning">
     <span class="sc06-summary-icon" aria-hidden="true">◷</span>
-    <div><p>Em elaboração</p><strong>{{ summary.draft|default:0 }}</strong><small>rascunhos que podem ser retomados</small></div>
+    <div><p>Em elaboração</p><strong>{{ summary.draft|default:0 }}</strong><small>rascunhos pendentes</small></div>
   </article>
   <article class="sc06-summary-card sc06-summary-success">
     <span class="sc06-summary-icon" aria-hidden="true">✓</span>
     <div><p>Concluídos</p><strong>{{ summary.completed|default:0 }}</strong><small>documentos consolidados</small></div>
+  </article>
+  <article class="sc06-summary-card">
+    <span class="sc06-summary-icon text-grafite/70" aria-hidden="true">✕</span>
+    <div><p>Cancelados</p><strong>{{ summary.cancelled|default:0 }}</strong><small>casos descontinuados</small></div>
   </article>
 </section>
 
@@ -94,7 +98,7 @@
         <span class="sc06-case-monogram" aria-hidden="true">{{ briefing.client_name|first|upper }}</span>
         <div class="min-w-0">
           <h3>{{ briefing.client_name }}</h3>
-          <p class="font-mono">{{ briefing.client_document }}</p>
+          <p class="font-mono">{{ briefing.formatted_client_document }}</p>
         </div>
       </div>
 
@@ -121,5 +125,60 @@
     </div>
     {% endfor %}
   </div>
+
+  {% if paginator.num_pages > 1 %}
+  <nav class="mt-6 flex flex-col items-center justify-between gap-3 border-t border-grafite/15 pt-4 text-sm text-grafite sm:flex-row dark:border-white/10" aria-label="Navegação dos casos societários">
+    <p class="text-xs">
+      Mostrando <strong class="text-tinta dark:text-white">{{ page_obj.start_index }}</strong> a <strong class="text-tinta dark:text-white">{{ page_obj.end_index }}</strong> de <strong class="text-tinta dark:text-white">{{ paginator.count }}</strong> casos
+      · Página <strong class="text-tinta dark:text-white">{{ page_obj.number }}</strong> de <strong class="text-tinta dark:text-white">{{ paginator.num_pages }}</strong>
+    </p>
+    <div class="flex items-center gap-1.5">
+      {% if page_obj.has_previous %}
+        <a
+          href="?page={{ page_obj.previous_page_number }}"
+          class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+          aria-label="Página anterior"
+        >
+          ← Anterior
+        </a>
+      {% else %}
+        <span class="inline-flex items-center rounded-lg border border-grafite/15 px-3 py-1.5 text-xs font-medium text-grafite/40 dark:border-white/5 dark:text-white/30 cursor-not-allowed">
+          ← Anterior
+        </span>
+      {% endif %}
+
+      <div class="flex items-center gap-1">
+        {% for p in paginator.page_range %}
+          {% if p == page_obj.number %}
+            <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-turquesa text-xs font-semibold text-white shadow-xs" aria-current="page">
+              {{ p }}
+            </span>
+          {% elif p > page_obj.number|add:"-3" and p < page_obj.number|add:"3" %}
+            <a
+              href="?page={{ p }}"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-grafite/25 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+            >
+              {{ p }}
+            </a>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      {% if page_obj.has_next %}
+        <a
+          href="?page={{ page_obj.next_page_number }}"
+          class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+          aria-label="Próxima página"
+        >
+          Próxima →
+        </a>
+      {% else %}
+        <span class="inline-flex items-center rounded-lg border border-grafite/15 px-3 py-1.5 text-xs font-medium text-grafite/40 dark:border-white/5 dark:text-white/30 cursor-not-allowed">
+          Próxima →
+        </span>
+      {% endif %}
+    </div>
+  </nav>
+  {% endif %}
 </section>
 {% endblock %}

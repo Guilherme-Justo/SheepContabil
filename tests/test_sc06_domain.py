@@ -29,6 +29,7 @@ from core.automations.sc06.rules import (
     validate_template_schema,
 )
 from core.automations.sc06.services import (
+    cancel_briefing,
     complete_briefing,
     create_briefing,
     get_latest_published_version,
@@ -338,4 +339,36 @@ def test_married_partner_must_belong_to_declared_partners(
     answers["married_partner_name"] = "Clarice Lispector"
     sanitized = sanitize_answers(SC06_SCHEMA_V1, answers, require_complete=True)
     assert sanitized["married_partner_name"] == "Clarice Lispector"
+
+
+def test_cancel_briefing_lifecycle_and_document_formatting(
+    modules: dict[str, AutomationModule],
+    administrator: User,
+) -> None:
+    _published_version(administrator)
+    briefing = create_briefing(
+        client_name="Cliente Para Cancelamento",
+        client_document="12345678901",
+        created_by=administrator,
+    )
+    assert briefing.status == SocietaryBriefingStatus.DRAFT
+    assert briefing.formatted_client_document == "123.456.789-01"
+
+    cnpj_briefing = create_briefing(
+        client_name="Empresa CNPJ",
+        client_document="12345678000199",
+        created_by=administrator,
+    )
+    assert cnpj_briefing.formatted_client_document == "12.345.678/0001-99"
+
+    cancelled = cancel_briefing(briefing.id, cancelled_by=administrator)
+    assert cancelled.status == SocietaryBriefingStatus.CANCELLED
+    assert cancelled.run.status == RunStatus.CANCELLED
+    assert cancelled.run.finished_at is not None
+    assert "cancelado" in cancelled.run.summary.lower()
+
+    # Cannot cancel already cancelled briefing:
+    with pytest.raises(ValidationError):
+        cancel_briefing(briefing.id, cancelled_by=administrator)
+
 

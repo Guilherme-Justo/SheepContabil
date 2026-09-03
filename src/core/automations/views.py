@@ -74,6 +74,7 @@ from core.automations.sc06.pdf import build_briefing_pdf
 from core.automations.sc06.rules import build_frontend_config
 from core.automations.sc06.services import (
     PublishedTemplateUnavailable,
+    cancel_briefing,
     complete_briefing,
     create_briefing,
     get_latest_published_version,
@@ -794,8 +795,12 @@ def sc06_briefing_detail(request: HttpRequest, briefing_id: str) -> HttpResponse
         if briefing.status != SocietaryBriefingStatus.DRAFT:
             return HttpResponseBadRequest("Este briefing já foi concluído e não aceita alterações.")
         action = request.POST.get("action", "")
-        if action not in {"save", "complete"}:
+        if action not in {"save", "complete", "cancel"}:
             return HttpResponseBadRequest("Ação inválida.")
+        if action == "cancel":
+            cancel_briefing(briefing.id, cancelled_by=cast(User, request.user))
+            messages.info(request, "Briefing societário cancelado e arquivado.")
+            return redirect("automations:module-detail", slug=briefing.run.module.slug)
         submitted_answers = {
             field_name: request.POST.get(field_name, "") for field_name in form.fields
         }
@@ -817,6 +822,9 @@ def sc06_briefing_detail(request: HttpRequest, briefing_id: str) -> HttpResponse
             except ValidationError as exc:
                 _apply_validation_error(form, exc)
             else:
+                next_url = request.POST.get("next")
+                if action == "save" and next_url and next_url.startswith("/"):
+                    return redirect(next_url)
                 return redirect(
                     "automations:sc06-briefing-detail",
                     briefing_id=briefing.id,
@@ -878,7 +886,11 @@ def _sc06_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         total=Count("id"),
         draft=Count("id", filter=Q(status=SocietaryBriefingStatus.DRAFT)),
         completed=Count("id", filter=Q(status=SocietaryBriefingStatus.COMPLETED)),
+        cancelled=Count("id", filter=Q(status=SocietaryBriefingStatus.CANCELLED)),
     )
+    paginator = Paginator(briefings, per_page=6)
+    page_number = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page_number)
     try:
         active_template = get_latest_published_version()
     except PublishedTemplateUnavailable:
@@ -889,7 +901,9 @@ def _sc06_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         {
             "module": module,
             "start_form": start_form,
-            "briefings": briefings,
+            "briefings": page_obj,
+            "page_obj": page_obj,
+            "paginator": paginator,
             "summary": summary,
             "active_template": active_template,
         },
