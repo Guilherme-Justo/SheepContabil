@@ -113,6 +113,20 @@ def _question_field(question: dict[str, Any]) -> forms.Field:
         "autocomplete": "off",
     }
     placeholder = question.get("placeholder")
+    if question["id"] == "current_cnpj":
+        attrs["data-mask"] = "document"
+        if not placeholder:
+            placeholder = "00.000.000/0000-00"
+
+    if question["id"] == "partner_names":
+        if not placeholder:
+            placeholder = "Exemplo:\nJoão da Silva - 123.456.789-00\nMaria Santos - 987.654.321-11"
+        if not common["help_text"]:
+            common["help_text"] = (
+                "Informe os sócios envolvidos (um por linha ou separados por vírgula). "
+                "Eles serão vinculados à seleção de sócio casado e aos atos societários."
+            )
+
     if placeholder:
         attrs["placeholder"] = placeholder
 

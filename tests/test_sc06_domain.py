@@ -313,3 +313,29 @@ def test_incomplete_completion_preserves_draft_and_running_execution(
     briefing.run.refresh_from_db()
     assert briefing.status == SocietaryBriefingStatus.DRAFT
     assert briefing.run.status == RunStatus.RUNNING
+
+
+def test_married_partner_must_belong_to_declared_partners(
+    administrator: User,
+) -> None:
+    _published_version(administrator)
+    answers = {
+        **_complete_sp_opening_answers(),
+        "partner_names": "Carlos Drumond de Andrade\nClarice Lispector",
+        "has_married_partner": True,
+        "married_partner_name": "Estranho Nao Cadastrado",
+        "marriage_regime": "partial_community",
+    }
+    with pytest.raises(ValidationError) as captured:
+        sanitize_answers(SC06_SCHEMA_V1, answers, require_complete=True)
+
+    assert "married_partner_name" in captured.value.error_dict
+    assert "deve coincidir com um dos nomes declarados" in str(
+        captured.value.error_dict["married_partner_name"][0]
+    )
+
+    # With declared partner name:
+    answers["married_partner_name"] = "Clarice Lispector"
+    sanitized = sanitize_answers(SC06_SCHEMA_V1, answers, require_complete=True)
+    assert sanitized["married_partner_name"] == "Clarice Lispector"
+

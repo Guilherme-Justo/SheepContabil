@@ -242,9 +242,42 @@ def sanitize_answers(
             except ValidationError as exc:
                 errors[question_id] = list(exc.messages)
 
+    if require_complete and sanitized.get("has_married_partner") is True:
+        married_partner = sanitized.get("married_partner_name")
+        partner_names = sanitized.get("partner_names")
+        if (
+            married_partner
+            and partner_names
+            and isinstance(married_partner, str)
+            and isinstance(partner_names, str)
+        ):
+            if not _is_partner_declared(married_partner, partner_names):
+                errors.setdefault("married_partner_name", []).append(
+                    f"O sócio casado informado ('{married_partner}') deve coincidir com um dos nomes declarados no quadro societário."
+                )
+
     if errors:
         raise ValidationError(errors)
     return sanitized
+
+
+def _is_partner_declared(married_partner: str, partner_names: str) -> bool:
+    if not married_partner or not partner_names:
+        return True
+    married_norm = married_partner.strip().lower()
+    partners_norm = partner_names.strip().lower()
+    if married_norm in partners_norm:
+        return True
+    items = [item.strip() for item in re.split(r"[\n,;]+", partners_norm) if item.strip()]
+    for item in items:
+        clean_item = re.sub(r"\s*-\s*\d{2,3}.*$", "", item).strip()
+        if married_norm == clean_item or married_norm in clean_item or clean_item in married_norm:
+            return True
+        m_words = set(re.findall(r"\w+", married_norm))
+        i_words = set(re.findall(r"\w+", clean_item))
+        if m_words and m_words.issubset(i_words):
+            return True
+    return False
 
 
 def format_answer(question: Mapping[str, object], value: object) -> str:

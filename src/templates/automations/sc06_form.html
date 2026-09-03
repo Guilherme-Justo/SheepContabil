@@ -85,7 +85,7 @@
         x-cloak
       >
         <header class="sc06-section-header">
-          <span class="sc06-section-number" aria-hidden="true">{{ forloop.counter|stringformat:"02d" }}</span>
+          <span class="sc06-section-number" aria-hidden="true" x-text="getSectionIndex('{{ section.id|escapejs }}')">{{ forloop.counter|stringformat:"02d" }}</span>
           <div>
             <h2>{{ section.title }}</h2>
             {% if section.description %}<p>{{ section.description }}</p>{% endif %}
@@ -105,7 +105,48 @@
               {{ question.label }}
               {% if question.required %}<span class="text-carmim" aria-hidden="true"> *</span><span class="sr-only"> (obrigatório)</span>{% endif %}
             </label>
-            <div class="sc06-field-control">{{ question.bound_field }}</div>
+            {% if question.id == "married_partner_name" %}
+              <div class="space-y-2">
+                <template x-if="parsedPartnerList.length > 0">
+                  <div>
+                    <label for="sc06_partner_selector" class="text-xs font-medium text-turquesa block mb-1">
+                      💡 Selecione da lista de sócios cadastrados:
+                    </label>
+                    <select
+                      id="sc06_partner_selector"
+                      class="form-control"
+                      @change="
+                        if ($event.target.value) {
+                          answers['married_partner_name'] = $event.target.value;
+                          $refs.marriedInput.value = $event.target.value;
+                        }
+                      "
+                    >
+                      <option value="">Selecione o sócio casado...</option>
+                      <template x-for="p in parsedPartnerList" :key="p">
+                        <option :value="p" :selected="answers['married_partner_name'] === p" x-text="p"></option>
+                      </template>
+                    </select>
+                  </div>
+                </template>
+                <div class="sc06-field-control">
+                  <input
+                    type="text"
+                    name="{{ question.id }}"
+                    id="{{ question.bound_field.id_for_label }}"
+                    class="form-control"
+                    x-ref="marriedInput"
+                    :value="answers['{{ question.id }}'] || ''"
+                    @input="answers['{{ question.id }}'] = $event.target.value"
+                    data-sc06-answer="{{ question.id }}"
+                    placeholder="Nome do sócio casado"
+                    autocomplete="off"
+                  >
+                </div>
+              </div>
+            {% else %}
+              <div class="sc06-field-control">{{ question.bound_field }}</div>
+            {% endif %}
             {% if question.help_text %}<p id="{{ question.bound_field.id_for_label }}_helptext" class="form-help">{{ question.help_text }}</p>{% endif %}
             {% if question.bound_field.errors %}<p class="field-error" role="alert">{{ question.bound_field.errors.0 }}</p>{% endif %}
           </div>

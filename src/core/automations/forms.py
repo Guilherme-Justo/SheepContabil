@@ -231,12 +231,13 @@ class BriefingStartForm(A11yFormMixin, forms.Form):
     client_document = forms.CharField(
         label="CPF ou CNPJ sintético",
         max_length=18,
-        help_text="Informe 11 ou 14 dígitos fictícios.",
+        help_text="Informe 11 dígitos (CPF) ou 14 dígitos (CNPJ).",
         widget=forms.TextInput(
             attrs={
                 "autocomplete": "off",
                 "inputmode": "numeric",
-                "placeholder": "00.000.000/0000-00",
+                "data-mask": "document",
+                "placeholder": "000.000.000-00 ou 00.000.000/0000-00",
             }
         ),
     )
