@@ -666,7 +666,7 @@
   body { background: var(--color-nevoa); color: rgba(255,255,255,.9); }
   
   /* Containers, Topbar & Cards */
-  .portal-topbar, .module-card, .info-card, .stat-card, .content-card, .table-shell, .date-card, .login-form-panel,
+  .portal-topbar, .module-card, .info-card, .stat-card, .content-card, .table-shell, .date-card,
   .sc04-upload-card, .sc04-preview-card, .sc04-state-card, .sc04-decision-card, .sc04-review-card,
   .sc06-case-card, .sc06-section-card, .sc06-progress-card, .sc06-form-actions,
   .sc20-form-card, .sc04-confidence-grid > div {
@@ -675,15 +675,15 @@
     box-shadow: 0 10px 30px rgba(0,0,0,.45);
   }
 
-  /* Summary Cards, Step Cards & Action Panels (Clean dark mode without blurry dark halos) */
+  /* Summary Cards, Step Cards, Login & Action Panels (Clean dark mode without blurry dark halos) */
   .sc04-summary-card, .sc05-summary-card, .sc06-summary-card, .sc20-summary-card,
-  .sc05-step-card {
+  .sc05-step-card, .login-form-panel {
     background: #0d1e25;
     border-color: rgba(255,255,255,.18);
     box-shadow: none;
   }
 
-  .sc04-action-panel, .sc05-action-panel, .sc20-action-panel {
+  .sc04-action-panel, .sc05-action-panel, .sc20-action-panel, .primary-button {
     box-shadow: none;
   }
 
@@ -693,12 +693,15 @@
   .module-code { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); color: #1fa69a; }
 
   /* Typography & Contrast */
+  .text-tinta { color: white !important; }
+  .text-grafite { color: rgba(255,255,255,.75) !important; }
+
   .page-subtitle, .metric-label, .date-card small, .info-card dt, .stat-card span,
   .data-table th, .data-table td, .breadcrumbs, .form-help,
   .sc04-summary-card p, .sc05-summary-card p, .sc06-summary-card p, .sc20-summary-card p,
   .sc04-summary-card small, .sc05-summary-card small, .sc06-summary-card small, .sc20-summary-card small,
   .sc06-case-identity p, .sc06-case-meta p, .sc05-step-card header p, .sc05-state-grid dt, .sc04-file-metadata dt,
-  .sc04-state-description, .sc06-section-header p, .sc06-section-empty {
+  .sc04-state-description, .sc06-section-header p, .sc06-section-empty, .login-form-panel p {
     color: rgba(255,255,255,.7);
   }
 
@@ -706,11 +709,13 @@
   .breadcrumbs strong, .data-table td strong, .section-heading h2, .form-label,
   .sc04-summary-card strong, .sc05-summary-card strong, .sc06-summary-card strong, .sc20-summary-card strong,
   .sc06-case-identity h3, .sc05-step-card h3, .sc05-state-grid dd, .sc04-file-metadata dd,
-  .sc06-section-header h2, .sc06-progress-value {
+  .sc06-section-header h2, .sc06-progress-value, .login-form-panel h2 {
     color: white;
   }
 
   .eyebrow { color: rgba(255,255,255,.7); }
+  .login-form-panel .eyebrow { color: #1fa69a; }
+
 
   /* Summary Icons & Status */
   .sc04-summary-icon, .sc05-summary-icon, .sc06-summary-icon, .sc20-summary-icon {
