@@ -44,35 +44,45 @@
   }
   .sidebar-label { color: rgba(255,255,255,.72); }
   .sidebar-link {
-    display: grid; grid-template-columns: 2.8rem 1fr; align-items: center; gap: .5rem;
-    border-radius: .8rem; padding: .72rem .75rem; color: rgba(255,255,255,.72);
+    display: flex; align-items: center; gap: .6rem;
+    border-radius: .8rem; padding: .65rem .6rem; color: rgba(255,255,255,.72);
     font-size: .78rem; font-weight: 500; transition: background .16s, color .16s;
+    min-width: 0;
   }
   .sidebar-link:hover { background: rgba(255,255,255,.07); color: white; }
+  .sidebar-link-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2.65rem; height: 1.7rem; flex-shrink: 0;
+    font-family: var(--font-mono); font-size: .72rem; font-weight: 600;
+    color: var(--color-turquesa); border-radius: .5rem;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+  }
   .portal-sidebar {
-    transition: padding .2s ease, background-color .15s ease;
+    transition: padding .25s cubic-bezier(0.4, 0, 0.2, 1), background-color .15s ease;
   }
   .portal-sidebar.is-collapsed {
     padding-inline: .55rem !important;
   }
   .portal-sidebar.is-collapsed .sidebar-link {
+    justify-content: center !important;
+    padding: .55rem .25rem !important;
+  }
+  .portal-sidebar.is-collapsed .sidebar-signout {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+    padding: 0 !important;
     display: flex !important;
     justify-content: center !important;
     align-items: center !important;
-    padding: .65rem .25rem !important;
-    width: 100% !important;
-  }
-  .portal-sidebar.is-collapsed .sidebar-link span:first-child {
-    font-size: .72rem !important;
-    font-weight: 600 !important;
-    letter-spacing: -.02em;
-    text-align: center !important;
+    border-radius: .6rem !important;
+    margin-inline: auto !important;
   }
   .sidebar-signout {
     width: 100%; border: 1px solid rgba(255,255,255,.15); border-radius: .75rem;
     padding: .65rem .8rem; text-align: left; font-size: .78rem; color: rgba(255,255,255,.7);
+    transition: border-color .16s, color .16s, background-color .16s;
   }
-  .sidebar-signout:hover { border-color: rgba(255,255,255,.3); color: white; }
+  .sidebar-signout:hover { border-color: rgba(255,255,255,.3); color: white; background: rgba(255,255,255,.06); }
   .portal-topbar {
     position: sticky; top: 0; z-index: 30;
     display: flex; min-height: 5.3rem; align-items: center; justify-content: space-between; gap: 1.5rem;
@@ -98,7 +108,7 @@
   .nature-badge, .soft-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: .38rem .58rem; font-family: "Archivo", sans-serif; font-size: .58rem; font-weight: 700; letter-spacing: .08em; }
   .nature-ai { background: rgba(31,166,154,.12); color: #10505f; }
   .nature-rpa { background: rgba(232,163,61,.16); color: #875615; }
-  .nature-control { background: rgba(16,80,95,.1); color: #10505f; }
+  .nature-control { background: rgba(16,80,95,.08); color: #10505f; border: 1px solid rgba(16,80,95,.18); }
   .soft-badge { border: 1px solid rgba(90,112,120,.16); background: white; color: #5a7078; }
   .metric-value { font-family: "Archivo", sans-serif; font-size: 1.75rem; font-weight: 600; line-height: 1; }
   .metric-label { margin-top: .35rem; color: #5a7078; font-size: .68rem; }
@@ -689,6 +699,42 @@
   .portal-sidebar::-webkit-scrollbar { width: 6px; }
   .portal-sidebar::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,.15); border-radius: 999px; }
   .portal-sidebar::-webkit-scrollbar-track { background: transparent; }
+
+  /* Anti-FOUC: Renderização estática instantânea no primeiro paint quando o sidebar estiver recolhido */
+  html.sidebar-is-collapsed .portal-layout {
+    grid-template-columns: 4.75rem 1fr !important;
+  }
+  html.sidebar-is-collapsed .portal-sidebar {
+    padding-inline: .55rem !important;
+  }
+  html.sidebar-is-collapsed .portal-sidebar .brand-logo-full {
+    display: none !important;
+  }
+  html.sidebar-is-collapsed .portal-sidebar .brand-logo-icon {
+    display: block !important;
+  }
+  html.sidebar-is-collapsed .portal-sidebar .sidebar-label-container {
+    display: none !important;
+  }
+  html.sidebar-is-collapsed .portal-sidebar .sidebar-link span:last-child {
+    display: none !important;
+  }
+  html.sidebar-is-collapsed .portal-sidebar .sidebar-user-details {
+    display: none !important;
+  }
+  html.sidebar-is-collapsed .portal-sidebar .sidebar-user-avatar {
+    display: flex !important;
+  }
+  html.sidebar-is-collapsed .portal-sidebar .sidebar-signout {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    margin-inline: auto !important;
+  }
+  html.sidebar-is-collapsed .portal-sidebar .sidebar-signout span {
+    display: none !important;
+  }
   .login-layout { grid-template-columns: minmax(0,1.15fr) minmax(28rem,.85fr); }
   .login-brand-panel { display: block; }
   .login-form-panel { padding: 3rem; }
@@ -784,6 +830,23 @@
   .sc04-summary-danger .sc04-summary-icon, .sc05-summary-danger .sc05-summary-icon, .sc20-summary-danger .sc20-summary-icon {
     background: rgba(196,69,61,.2);
     color: #ff8d85;
+  }
+
+  /* Semantic top border colors on summary cards in dark mode */
+  .sc04-summary-card, .sc05-summary-card, .sc06-summary-card, .sc20-summary-card {
+    border-top: 3px solid #5ec0b7 !important;
+  }
+  .sc04-summary-active, .sc05-summary-active, .sc06-summary-active {
+    border-top-color: #38bdf8 !important;
+  }
+  .sc04-summary-warning, .sc05-summary-warning, .sc06-summary-warning, .sc20-summary-warning {
+    border-top-color: #e8a33d !important;
+  }
+  .sc04-summary-success, .sc05-summary-success, .sc06-summary-success, .sc20-summary-success {
+    border-top-color: #1fa69a !important;
+  }
+  .sc04-summary-danger, .sc05-summary-danger, .sc06-summary-danger, .sc20-summary-danger {
+    border-top-color: #c4453d !important;
   }
 
   /* Guidance Banners */
@@ -913,9 +976,9 @@
   .status-danger { background: rgba(196,69,61,.22); color: #ff8d85; border: 1px solid rgba(196,69,61,.3); }
   .status-active { background: rgba(56,189,248,.16); color: #7dd3fc; border: 1px solid rgba(56,189,248,.28); }
   .status-active i { box-shadow: 0 0 0 3px rgba(56,189,248,.25); }
-  .environment-badge { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: rgba(255,255,255,.85); }
-  .nature-ai { background: rgba(31,166,154,.22); color: #1fa69a; }
-  .nature-rpa { background: rgba(232,163,61,.22); color: #e8a33d; }
+  .nature-ai { background: rgba(31,166,154,.22); color: #79d8cf; border: 1px solid rgba(31,166,154,.3); }
+  .nature-rpa { background: rgba(232,163,61,.22); color: #f3ba63; border: 1px solid rgba(232,163,61,.3); }
+  .nature-control { background: rgba(56,189,248,.16); color: #7dd3fc; border: 1px solid rgba(56,189,248,.28); }
   .card-arrow { background: rgba(255,255,255,.1); color: white; }
   .module-card:hover .card-arrow { background: #1fa69a; color: white; }
   .notice { background: rgba(255,255,255,.05); color: rgba(255,255,255,.9); }
