@@ -228,7 +228,23 @@
   }
 
   .form-error { border-left: 3px solid #c4453d; border-radius: .55rem; background: rgba(196,69,61,.08); padding: .75rem .85rem; color: #91312c; font-size: .75rem; line-height: 1.5; }
-  .field-error { margin-top: .4rem; font-size: .7rem; color: #c4453d; }
+  .field-error {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: .4rem;
+    font-size: .72rem;
+    font-weight: 600;
+    color: #c4453d;
+    line-height: 1.4;
+  }
+  .field-error::before {
+    content: "⚠";
+    display: inline-block;
+    font-size: 0.8rem;
+    line-height: 1;
+    color: #c4453d;
+  }
   .notice { border-left: 3px solid #1fa69a; border-radius: .65rem; background: white; padding: .8rem 1rem; font-size: .78rem; }
   .notice-success { border-left-color: #1fa69a; }
   .notice-info { border-left-color: #10505f; }
@@ -583,9 +599,57 @@
   .sc06-dark-field input:focus, .sc06-dark-field select:focus {
     border-color: rgba(121,216,207,.85); background: rgba(255,255,255,.13); box-shadow: 0 0 0 4px rgba(31,166,154,.2);
   }
+  .sc06-dark-field input[aria-invalid="true"],
+  .sc06-dark-field select[aria-invalid="true"] {
+    border-color: #ff6b63 !important;
+    background: rgba(255, 107, 99, 0.12) !important;
+    box-shadow: 0 0 0 1px rgba(255, 107, 99, 0.45) !important;
+  }
+  .sc06-dark-field input[aria-invalid="true"]:focus,
+  .sc06-dark-field select[aria-invalid="true"]:focus {
+    border-color: #ff8d85 !important;
+    box-shadow: 0 0 0 4px rgba(255, 107, 99, 0.3) !important;
+  }
   .sc06-dark-help { margin-top: .35rem; color: rgba(255,255,255,.72); font-size: .62rem; line-height: 1.45; }
-  .sc06-dark-field-error { margin-top: .4rem; color: #ffb9b5; font-size: .67rem; line-height: 1.45; }
-  .sc06-dark-form-error { border-left: 3px solid #ff8d85; border-radius: .55rem; background: rgba(196,69,61,.2); padding: .7rem .8rem; color: #ffe9e7; font-size: .72rem; line-height: 1.5; }
+  .sc06-dark-field-error {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.45rem;
+    padding: 0.22rem 0.55rem;
+    border-radius: 0.45rem;
+    background: rgba(255, 107, 99, 0.14);
+    border: 1px solid rgba(255, 107, 99, 0.35);
+    color: #ff6b63;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .sc06-dark-field-error::before {
+    content: "⚠";
+    display: inline-block;
+    font-size: 0.85rem;
+    line-height: 1;
+    color: #ff5247;
+  }
+  .sc06-dark-form-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    border-left: 3px solid #ff6b63;
+    border-radius: .55rem;
+    background: rgba(196, 69, 61, 0.25);
+    padding: .7rem .85rem;
+    color: #ffe9e7;
+    font-size: .74rem;
+    line-height: 1.5;
+  }
+  .sc06-dark-form-error::before {
+    content: "⚠️";
+    display: inline-block;
+    font-size: 0.9rem;
+    line-height: 1.2;
+  }
   .sc06-start-button {
     display: flex; align-items: center; justify-content: space-between; gap: 1rem; border: 0;
     border-radius: .8rem; background: white; padding: .82rem 1rem; color: #10505f;
@@ -1212,7 +1276,36 @@ label:has(input:disabled) {
   color: #ffe9e7 !important;
 }
 .dark .field-error {
-  color: #ff8d85 !important;
+  color: #ff6b63 !important;
+}
+.dark .field-error::before {
+  color: #ff5247 !important;
+}
+
+/* Realce acessível para inputs com erro de validação (WCAG AA) */
+input[aria-invalid="true"]:not(.sc06-dark-field input),
+select[aria-invalid="true"]:not(.sc06-dark-field select),
+textarea[aria-invalid="true"] {
+  border-color: #c4453d !important;
+  background-color: rgba(196, 69, 61, 0.04) !important;
+}
+input[aria-invalid="true"]:not(.sc06-dark-field input):focus,
+select[aria-invalid="true"]:not(.sc06-dark-field select):focus,
+textarea[aria-invalid="true"]:focus {
+  border-color: #c4453d !important;
+  box-shadow: 0 0 0 3px rgba(196, 69, 61, 0.22) !important;
+}
+.dark input[aria-invalid="true"]:not(.sc06-dark-field input),
+.dark select[aria-invalid="true"]:not(.sc06-dark-field select),
+.dark textarea[aria-invalid="true"] {
+  border-color: #ff6b63 !important;
+  background-color: rgba(255, 107, 99, 0.08) !important;
+}
+.dark input[aria-invalid="true"]:not(.sc06-dark-field input):focus,
+.dark select[aria-invalid="true"]:not(.sc06-dark-field select):focus,
+.dark textarea[aria-invalid="true"]:focus {
+  border-color: #ff8d85 !important;
+  box-shadow: 0 0 0 3px rgba(255, 107, 99, 0.28) !important;
 }
 
 /* SC-06 Card de Evidência de Execução no Dark Mode */

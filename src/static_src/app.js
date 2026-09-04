@@ -55,6 +55,35 @@ document.addEventListener("input", (e) => {
       }
     }
   }
+
+  if (target.getAttribute("aria-invalid") === "true") {
+    if (target.value && target.value.trim().length > 0) {
+      target.removeAttribute("aria-invalid");
+      const describedBy = target.getAttribute("aria-describedby");
+      if (describedBy) {
+        describedBy.split(/\s+/).forEach((id) => {
+          const errEl = document.getElementById(id);
+          if (
+            errEl &&
+            (errEl.classList.contains("field-error") ||
+              errEl.classList.contains("sc06-dark-field-error"))
+          ) {
+            errEl.style.display = "none";
+          }
+        });
+      }
+      const fieldContainer =
+        target.closest(".sc06-dark-field")?.parentElement ||
+        target.closest(".sc06-field-control")?.parentElement ||
+        target.closest("div");
+      if (fieldContainer) {
+        const siblingError = fieldContainer.querySelector(
+          ".field-error, .sc06-dark-field-error"
+        );
+        if (siblingError) siblingError.style.display = "none";
+      }
+    }
+  }
 });
 
 document.addEventListener("DOMContentLoaded", () => {
