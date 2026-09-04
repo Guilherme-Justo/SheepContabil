@@ -285,4 +285,3 @@ def test_sc20_certificates_sorting_and_whitelist_security(
     resp_invalid = client.get(f"{url}?sort=invalid_column")
     assert resp_invalid.status_code == 200
     assert resp_invalid.context["current_sort"] == ""
-

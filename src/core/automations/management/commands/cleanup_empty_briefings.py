@@ -23,10 +23,9 @@ class Command(BaseCommand):
 
     def handle(self, *args: object, **options: object) -> None:
         dry_run = bool(options.get("dry_run"))
-        drafts = (
-            SocietaryBriefing.objects.filter(status=SocietaryBriefingStatus.DRAFT)
-            .select_related("run")
-        )
+        drafts = SocietaryBriefing.objects.filter(
+            status=SocietaryBriefingStatus.DRAFT
+        ).select_related("run")
         empty_count = 0
 
         for briefing in drafts:

@@ -209,4 +209,3 @@ def test_dashboard_runs_sorting_and_whitelist_security(
     resp_invalid = client.get(f"{url}?sort=malicious_field")
     assert resp_invalid.status_code == 200
     assert resp_invalid.context["current_sort"] == ""
-

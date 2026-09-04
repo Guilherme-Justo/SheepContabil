@@ -169,10 +169,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         .order_by("code")
     )
 
-    runs = (
-        AutomationRun.objects.filter(module__in=modules)
-        .select_related("module", "triggered_by")
-    )
+    runs = AutomationRun.objects.filter(module__in=modules).select_related("module", "triggered_by")
 
     filter_form = DashboardRunFilterForm(
         request.GET if request.GET else None,
@@ -521,8 +518,8 @@ def _sc04_dashboard_context(
     upload_form: SC04UploadForm | None = None,
 ) -> dict[str, Any]:
     filter_form = SC04QueueFilterForm(request.GET or None)
-    current_sort, query_params_formatted, sort_query_params = (
-        _extract_sort_and_query_params(request)
+    current_sort, query_params_formatted, sort_query_params = _extract_sort_and_query_params(
+        request
     )
     queue, valid_sort = _sc04_queue_queryset(module, filter_form, sort_param=current_sort)
     paginator = Paginator(queue, per_page=DEFAULT_PAGE_SIZE)
@@ -690,12 +687,14 @@ def _sc04_queue_queryset(
         ).values_list("id", flat=True)
         queue = queue.filter(intake__document_id__in=matching_doc_ids)
     if query:
-        matching_doc_ids = FiscalDocument.objects.filter(
-            intakes__run__module=module
-        ).filter(
-            Q(intakes__original_filename__icontains=query)
-            | Q(matched_client__name__icontains=query)
-        ).values_list("id", flat=True)
+        matching_doc_ids = (
+            FiscalDocument.objects.filter(intakes__run__module=module)
+            .filter(
+                Q(intakes__original_filename__icontains=query)
+                | Q(matched_client__name__icontains=query)
+            )
+            .values_list("id", flat=True)
+        )
         queue = queue.filter(intake__document_id__in=matching_doc_ids)
     return _apply_sorting(
         queue,
@@ -943,8 +942,8 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         "action": "action",
         "status": "run__status",
     }
-    current_sort, query_params_formatted, sort_query_params = (
-        _extract_sort_and_query_params(request)
+    current_sort, query_params_formatted, sort_query_params = _extract_sort_and_query_params(
+        request
     )
     operations, valid_sort = _apply_sorting(
         operations,
@@ -1482,8 +1481,8 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         "expires_on": "valid_until",
         "status": "status",
     }
-    current_sort, query_params_formatted, sort_query_params = (
-        _extract_sort_and_query_params(request)
+    current_sort, query_params_formatted, sort_query_params = _extract_sort_and_query_params(
+        request
     )
     certificates, valid_sort = _apply_sorting(
         certificates,

@@ -462,9 +462,7 @@ def test_cancel_empty_draft_discards_completely(
 
     # Cancelar rascunho sem respostas faz descarte limpo (hard delete)
     response = client.post(detail_url, {"action": "cancel"})
-    expected_redirect = reverse(
-        "automations:module-detail", kwargs={"slug": modules["SC-06"].slug}
-    )
+    expected_redirect = reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
     assert response.url == expected_redirect
 
     assert not SocietaryBriefing.objects.filter(id=briefing.id).exists()
@@ -489,9 +487,7 @@ def test_abandon_new_briefing_leaves_no_database_residue(
             "client_document": "12345678000190",
         },
     )
-    expected_redirect = reverse(
-        "automations:module-detail", kwargs={"slug": modules["SC-06"].slug}
-    )
+    expected_redirect = reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
     assert cancel_response.url == expected_redirect
     assert SocietaryBriefing.objects.count() == 0
     assert AutomationRun.objects.count() == 0
@@ -520,20 +516,13 @@ def test_cleanup_empty_briefings_command(
     # Teste --dry-run
     out_dry = StringIO()
     call_command("cleanup_empty_briefings", "--dry-run", stdout=out_dry)
-    assert (
-        "[DRY-RUN] Total de 1 rascunho(s) vazio(s) elegível(is)."
-        in out_dry.getvalue()
-    )
+    assert "[DRY-RUN] Total de 1 rascunho(s) vazio(s) elegível(is)." in out_dry.getvalue()
     assert SocietaryBriefing.objects.filter(id=empty_briefing.id).exists()
 
     # Execução real
     out_real = StringIO()
     call_command("cleanup_empty_briefings", stdout=out_real)
-    assert (
-        "Total de 1 rascunho(s) vazio(s) descartado(s) com sucesso."
-        in out_real.getvalue()
-    )
+    assert "Total de 1 rascunho(s) vazio(s) descartado(s) com sucesso." in out_real.getvalue()
     assert not SocietaryBriefing.objects.filter(id=empty_briefing.id).exists()
     assert not AutomationRun.objects.filter(id=empty_briefing.run_id).exists()
     assert SocietaryBriefing.objects.filter(id=filled_briefing.id).exists()
-

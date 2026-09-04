@@ -613,4 +613,3 @@ def test_sc05_clients_table_sorting_filtering_pagination_and_isolation(
     assert '<input type="hidden" name="sort" value="created_at">' in html_comb
     assert '<input type="hidden" name="clients_q" value="Alfa">' in html_comb
     assert '<input type="hidden" name="clients_sort" value="name">' in html_comb
-
