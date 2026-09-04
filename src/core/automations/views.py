@@ -1,5 +1,6 @@
 import hashlib
 import re
+from collections import defaultdict
 from datetime import timedelta
 from io import BytesIO
 from typing import Any, cast
@@ -43,6 +44,7 @@ from core.automations.models import (
     CommunicationStatus,
     DigitalCertificate,
     DocumentDecision,
+    DocumentIntake,
     DocumentReview,
     DocumentReviewStatus,
     DocumentRouting,
@@ -519,12 +521,44 @@ def _sc04_dashboard_context(
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
     queue_rows = []
+    document_ids = [item.intake.document_id for item in page_obj.object_list]
+    intakes_by_doc: dict[UUID, list[DocumentIntake]] = defaultdict(list)
+    if document_ids:
+        intakes = (
+            DocumentIntake.objects.filter(document_id__in=document_ids)
+            .select_related("run")
+            .prefetch_related("run_items")
+            .order_by("received_at")
+        )
+        for intake in intakes:
+            intakes_by_doc[intake.document_id].append(intake)
+
     for item in page_obj.object_list:
         document = item.intake.document
+        history = intakes_by_doc.get(document.id) or [item.intake]
+        total_occurrences = len(history)
+        is_multi_intake = total_occurrences > 1
+        latest_intake = history[-1] if history else item.intake
+        first_intake = history[0] if history else item.intake
+        display_filename = latest_intake.original_filename or item.intake.original_filename
+        display_source = (
+            latest_intake.get_source_display()
+            if latest_intake
+            else item.intake.get_source_display()
+        )
+        display_received_at = latest_intake.received_at if latest_intake else item.created_at
         queue_rows.append(
             {
                 "item": item,
                 "document": document,
+                "latest_intake": latest_intake,
+                "first_intake": first_intake,
+                "intakes_history": history,
+                "total_occurrences": total_occurrences,
+                "is_multi_intake": is_multi_intake,
+                "display_filename": display_filename,
+                "display_source": display_source,
+                "display_received_at": display_received_at,
                 "type_confidence_percent": int(document.type_confidence * 100),
                 "client_confidence_percent": int(document.client_confidence * 100),
             }
@@ -611,7 +645,10 @@ def _sc04_queue_queryset(
     filter_form: SC04QueueFilterForm,
     sort_param: str = "",
 ) -> tuple[Any, str]:
-    queue = DocumentRunItem.objects.filter(run__module=module).select_related(
+    queue = DocumentRunItem.objects.filter(
+        run__module=module,
+        intake__is_duplicate=False,
+    ).select_related(
         "run",
         "intake",
         "intake__document",
@@ -631,14 +668,27 @@ def _sc04_queue_queryset(
     if status:
         queue = queue.filter(intake__document__status=status)
     if source:
-        queue = queue.filter(intake__source=source)
-    if outcome:
-        queue = queue.filter(outcome=outcome)
+        matching_doc_ids = FiscalDocument.objects.filter(
+            intakes__run__module=module,
+            intakes__source=source,
+        ).values_list("id", flat=True)
+        queue = queue.filter(intake__document_id__in=matching_doc_ids)
+    if outcome == DocumentRunOutcome.NEW:
+        queue = queue.filter(outcome=DocumentRunOutcome.NEW)
+    elif outcome:
+        matching_doc_ids = FiscalDocument.objects.filter(
+            intakes__run__module=module,
+            intakes__run_items__outcome=outcome,
+        ).values_list("id", flat=True)
+        queue = queue.filter(intake__document_id__in=matching_doc_ids)
     if query:
-        queue = queue.filter(
-            Q(intake__original_filename__icontains=query)
-            | Q(intake__document__matched_client__name__icontains=query)
-        )
+        matching_doc_ids = FiscalDocument.objects.filter(
+            intakes__run__module=module
+        ).filter(
+            Q(intakes__original_filename__icontains=query)
+            | Q(matched_client__name__icontains=query)
+        ).values_list("id", flat=True)
+        queue = queue.filter(intake__document_id__in=matching_doc_ids)
     return _apply_sorting(
         queue,
         sort_param,

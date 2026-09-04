@@ -15,7 +15,7 @@
   </div>
 
   <div class="table-shell overflow-x-auto">
-    <table class="data-table sc04-queue-table">
+    <table class="data-table sc04-queue-table" x-data="{ openRows: {} }">
       <caption class="sr-only">Fila de documentos recebidos pela triagem fiscal</caption>
       <thead>
         <tr>
@@ -31,14 +31,66 @@
       </thead>
       <tbody>
         {% for row in queue_rows %}
-        <tr>
+        <tr
+          class="transition-colors hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+          :class="openRows['{{ row.document.id }}'] ? 'bg-turquesa/5 dark:bg-turquesa/10' : ''"
+        >
           <td>
-            <strong class="block max-w-56 truncate" title="{{ row.item.intake.original_filename }}">{{ row.item.intake.original_filename }}</strong>
-            <span class="mt-1 block font-mono text-[.62rem]">{{ row.document.id }}</span>
+            <div class="flex items-start gap-2">
+              {% if row.is_multi_intake %}
+                <button
+                  type="button"
+                  @click="openRows['{{ row.document.id }}'] = !openRows['{{ row.document.id }}']"
+                  class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-grafite/60 transition hover:bg-turquesa/15 hover:text-turquesa focus:outline-none focus-visible:ring-1 focus-visible:ring-turquesa dark:text-white/60 dark:hover:text-turquesa cursor-pointer"
+                  :title="openRows['{{ row.document.id }}'] ? 'Recolher histórico de envios' : 'Expandir {{ row.total_occurrences }} envios deste arquivo'"
+                  :aria-expanded="openRows['{{ row.document.id }}'] ? 'true' : 'false'"
+                  aria-label="Alternar histórico de envios do arquivo {{ row.display_filename }}"
+                >
+                  <svg
+                    class="h-3.5 w-3.5 transition-transform duration-200"
+                    :class="openRows['{{ row.document.id }}'] ? 'rotate-90 text-turquesa' : ''"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              {% endif %}
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <strong class="block max-w-56 truncate text-tinta dark:text-white" title="{{ row.display_filename }}">{{ row.display_filename }}</strong>
+                  {% if row.is_multi_intake %}
+                    <button
+                      type="button"
+                      @click="openRows['{{ row.document.id }}'] = !openRows['{{ row.document.id }}']"
+                      class="inline-flex items-center gap-1 rounded-full bg-turquesa/15 px-2 py-0.5 text-[0.65rem] font-bold text-petroleo dark:bg-turquesa/20 dark:text-turquesa hover:bg-turquesa/25 transition cursor-pointer"
+                      title="Clique para ver os {{ row.total_occurrences }} envios deste documento"
+                    >
+                      <span>{{ row.total_occurrences }} envios</span>
+                      <svg
+                        class="h-2.5 w-2.5 transition-transform duration-200"
+                        :class="openRows['{{ row.document.id }}'] ? 'rotate-180' : ''"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  {% endif %}
+                </div>
+                <span class="mt-1 block font-mono text-[.62rem] text-grafite/60 dark:text-white/40">{{ row.document.id }}</span>
+              </div>
+            </div>
           </td>
-          <td>{{ row.item.intake.get_source_display }}</td>
+          <td>{{ row.display_source }}</td>
           <td>
-            {% if row.item.outcome == "new" %}
+            {% if row.is_multi_intake %}
+              <span class="status-badge status-active" title="{{ row.total_occurrences }} envios registrados"><i></i>Múltiplos envios ({{ row.total_occurrences }})</span>
+            {% elif row.item.outcome == "new" %}
               <span class="status-badge status-active"><i></i>{{ row.item.get_outcome_display }}</span>
             {% else %}
               <span class="status-badge status-neutral"><i></i>{{ row.item.get_outcome_display }}</span>
@@ -46,27 +98,113 @@
           </td>
           <td>
             {% if row.document.classified_type != "unknown" %}
-              <strong class="block">{{ row.document.get_classified_type_display }}</strong>
-              <span class="mt-1 block text-xs">{{ row.type_confidence_percent }}% de confiança</span>
+              <strong class="block text-tinta dark:text-white">{{ row.document.get_classified_type_display }}</strong>
+              <span class="mt-1 block text-xs text-grafite/70 dark:text-white/60">{{ row.type_confidence_percent }}% de confiança</span>
             {% else %}
-              <span>Ainda não identificada</span>
+              <span class="text-grafite/60 dark:text-white/50">Ainda não identificada</span>
             {% endif %}
           </td>
           <td>
             {% if row.document.matched_client %}
-              <strong class="block">{{ row.document.matched_client.name }}</strong>
-              <span class="mt-1 block text-xs">{{ row.client_confidence_percent }}% de confiança</span>
+              <strong class="block text-tinta dark:text-white">{{ row.document.matched_client.name }}</strong>
+              <span class="mt-1 block text-xs text-grafite/70 dark:text-white/60">{{ row.client_confidence_percent }}% de confiança</span>
             {% else %}
-              <span>Não identificado</span>
+              <span class="text-grafite/60 dark:text-white/50">Não identificado</span>
             {% endif %}
           </td>
           <td>
             <span class="status-badge status-{{ row.document.status_tone }}"><i></i>{{ row.document.get_status_display }}</span>
-            {% if row.item.outcome != "new" %}<span class="mt-2 block text-xs">Estado do original canônico</span>{% endif %}
           </td>
-          <td class="font-mono text-xs"><time datetime="{{ row.item.created_at|date:'c' }}">{{ row.item.created_at|date:"d/m/Y H:i" }}</time></td>
+          <td class="font-mono text-xs text-grafite dark:text-white/80"><time datetime="{{ row.display_received_at|date:'c' }}">{{ row.display_received_at|date:"d/m/Y H:i" }}</time></td>
           <td class="text-right"><a href="{% url 'automations:sc04-document-detail' row.document.id %}" class="table-link">Detalhes</a></td>
         </tr>
+
+        {% if row.is_multi_intake %}
+        <tr
+          x-show="openRows['{{ row.document.id }}']"
+          x-cloak
+          class="sc04-thread-subrow bg-[#f8fafc] dark:bg-[#071317] border-y border-turquesa/20 dark:border-turquesa/30"
+        >
+          <td colspan="8" class="!p-0 border-t-0">
+            <div class="px-6 py-4 border-l-4 border-turquesa">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                  <svg class="h-4 w-4 text-turquesa shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span class="text-xs font-bold uppercase tracking-wider text-petroleo dark:text-turquesa">
+                    Histórico cronológico de envios ({{ row.total_occurrences }} ocorrências registradas)
+                  </span>
+                </div>
+                <span class="text-[0.7rem] font-mono text-grafite/60 dark:text-white/40">
+                  SHA-256: {{ row.document.sha256|slice:":16" }}...
+                </span>
+              </div>
+
+              <div class="rounded-lg border border-grafite/15 dark:border-white/10 overflow-hidden bg-white dark:bg-[#091216]">
+                <table class="w-full text-xs text-left">
+                  <thead class="bg-grafite/5 dark:bg-white/5 text-[0.68rem] font-semibold uppercase tracking-wider text-grafite/70 dark:text-white/60 border-b border-grafite/10 dark:border-white/10">
+                    <tr>
+                      <th scope="col" class="py-2 px-3">Via / Ocorrência</th>
+                      <th scope="col" class="py-2 px-3">Data e Hora</th>
+                      <th scope="col" class="py-2 px-3">Origem</th>
+                      <th scope="col" class="py-2 px-3">Arquivo Enviado</th>
+                      <th scope="col" class="py-2 px-3">Resultado da Ingestão</th>
+                      <th scope="col" class="py-2 px-3">Execução</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-grafite/10 dark:divide-white/5">
+                    {% for intake in row.intakes_history %}
+                    <tr class="hover:bg-grafite/[0.03] dark:hover:bg-white/[0.02]">
+                      <td class="py-2.5 px-3">
+                        {% if forloop.first %}
+                          <span class="inline-flex items-center gap-1.5 font-semibold text-petroleo dark:text-turquesa">
+                            <span class="h-2 w-2 rounded-full bg-turquesa"></span>
+                            1ª via (Original)
+                          </span>
+                        {% else %}
+                          <span class="inline-flex items-center gap-1.5 text-grafite/70 dark:text-white/70 pl-3.5">
+                            <span class="h-1.5 w-1.5 rounded-full bg-grafite/40 dark:bg-white/40"></span>
+                            {{ forloop.counter }}ª via (Reenvio)
+                          </span>
+                        {% endif %}
+                      </td>
+                      <td class="py-2.5 px-3 font-mono text-[0.72rem] text-grafite dark:text-white/80">
+                        <time datetime="{{ intake.received_at|date:'c' }}">{{ intake.received_at|date:"d/m/Y H:i" }}</time>
+                      </td>
+                      <td class="py-2.5 px-3 text-grafite dark:text-white/80">
+                        {{ intake.get_source_display }}
+                      </td>
+                      <td class="py-2.5 px-3">
+                        <span class="font-mono text-xs text-tinta dark:text-white" title="{{ intake.original_filename }}">
+                          {{ intake.original_filename }}
+                        </span>
+                      </td>
+                      <td class="py-2.5 px-3">
+                        {% if forloop.first %}
+                          <span class="status-badge status-active py-0.5 px-2 text-[0.68rem]">
+                            <i></i>Processado (Original)
+                          </span>
+                        {% else %}
+                          <span class="status-badge status-neutral py-0.5 px-2 text-[0.68rem]">
+                            <i></i>Dispensado (Conteúdo idêntico)
+                          </span>
+                        {% endif %}
+                      </td>
+                      <td class="py-2.5 px-3">
+                        <a href="{% url 'automations:run-detail' intake.run.id %}" class="table-link text-xs">
+                          #{{ intake.run.id|slice:":8" }}
+                        </a>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
         {% empty %}
         <tr>
           <td colspan="8" class="py-12 text-center text-grafite dark:text-white/60">

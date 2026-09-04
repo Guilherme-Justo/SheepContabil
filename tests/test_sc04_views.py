@@ -553,3 +553,92 @@ def test_sc04_queue_sorting_and_whitelist_security(
     assert resp_malicious.status_code == 200
     assert resp_malicious.context["current_sort"] == ""
 
+
+def test_sc04_queue_threading_and_accordion_for_resubmissions(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    fiscal_operator: User,
+) -> None:
+    sc04 = modules["SC-04"]
+    client.force_login(fiscal_operator)
+
+    # 1. Create document with 1 initial intake (original)
+    run, doc, item1, _ = _document_case(sc04, suffix="threaded-doc")
+    doc.status = DocumentStatus.AWAITING_REVIEW
+    doc.save(update_fields=["status"])
+    item1.intake.original_filename = "balancete_oficial.pdf"
+    item1.intake.save(update_fields=["original_filename"])
+
+    # 2. Add 2nd intake (resubmission / duplicate via simulated inbox)
+    intake2 = DocumentIntake.objects.create(
+        document=doc,
+        run=run,
+        source=DocumentSource.SIMULATED_INBOX,
+        source_reference="inbox:msg:002",
+        original_filename="balancete_reenvio_v2.pdf",
+        status="duplicate",
+        is_duplicate=True,
+    )
+    DocumentRunItem.objects.create(
+        run=run,
+        intake=intake2,
+        outcome=DocumentRunOutcome.DUPLICATE_HASH,
+    )
+
+    # 3. Add 3rd intake (resubmission / duplicate via manual upload)
+    intake3 = DocumentIntake.objects.create(
+        document=doc,
+        run=run,
+        source=DocumentSource.MANUAL,
+        source_reference="manual:upload:003",
+        original_filename="balancete_final_v3.pdf",
+        status="duplicate",
+        is_duplicate=True,
+    )
+    DocumentRunItem.objects.create(
+        run=run,
+        intake=intake3,
+        outcome=DocumentRunOutcome.DUPLICATE_HASH,
+    )
+
+    url = reverse("automations:module-detail", kwargs={"slug": sc04.slug})
+    response = client.get(url)
+    assert response.status_code == 200
+    html = response.content.decode()
+
+    # 4. Verify Single Row Threading:
+    # Exactly ONE main row for the document (UUID present once in table)
+    assert f">{doc.id}</span>" in html
+    assert "3 envios" in html
+    assert "Múltiplos envios (3)" in html
+
+    # 5. Confusing canonical jargon MUST NOT be present
+    assert "Estado do original canônico" not in html
+    assert "canônico" not in html.lower()
+
+    # 6. Status of the document is correctly displayed
+    assert "Aguardando revisão" in html
+
+    # 7. Accordion sub-row timeline contains all 3 occurrences
+    assert "Histórico cronológico de envios (3 ocorrências registradas)" in html
+    assert "1ª via (Original)" in html
+    assert "2ª via (Reenvio)" in html
+    assert "3ª via (Reenvio)" in html
+    assert "balancete_oficial.pdf" in html
+    assert "balancete_reenvio_v2.pdf" in html
+    assert "balancete_final_v3.pdf" in html
+    assert "Processado (Original)" in html
+    assert "Dispensado (Conteúdo idêntico)" in html
+
+    # 8. Queue Fragment returns the same threaded structure
+    frag_url = reverse("automations:sc04-queue-fragment")
+    frag_resp = client.get(frag_url)
+    assert frag_resp.status_code == 200
+    frag_html = frag_resp.content.decode()
+    assert "3 envios" in frag_html
+    assert "Múltiplos envios (3)" in frag_html
+    assert "Estado do original canônico" not in frag_html
+    assert "1ª via (Original)" in frag_html
+    assert "3ª via (Reenvio)" in frag_html
+
+
