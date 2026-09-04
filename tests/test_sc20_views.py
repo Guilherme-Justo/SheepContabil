@@ -281,10 +281,168 @@ def test_sc20_certificates_sorting_and_whitelist_security(
     assert pos_zeta != -1 and pos_alpha != -1
     assert pos_zeta < pos_alpha
 
-    # 4. Whitelist fallback: campo inválido não quebra a página
+    # 4. Sort por contato (responsible_name) ASC e DESC
+    resp_contact_asc = client.get(f"{url}?sort=contact")
+    assert resp_contact_asc.status_code == 200
+    html_c_asc = resp_contact_asc.content.decode()
+    assert 'aria-sort="ascending"' in html_c_asc
+    pos_c_alpha = html_c_asc.find("Responsavel Alpha")
+    pos_c_zeta = html_c_asc.find("Responsavel Zeta")
+    assert pos_c_alpha != -1 and pos_c_zeta != -1
+    assert pos_c_alpha < pos_c_zeta
+
+    resp_contact_desc = client.get(f"{url}?sort=-contact")
+    assert resp_contact_desc.status_code == 200
+    html_c_desc = resp_contact_desc.content.decode()
+    assert 'aria-sort="descending"' in html_c_desc
+    pos_c_alpha = html_c_desc.find("Responsavel Alpha")
+    pos_c_zeta = html_c_desc.find("Responsavel Zeta")
+    assert pos_c_zeta != -1 and pos_c_alpha != -1
+    assert pos_c_zeta < pos_c_alpha
+
+    # 5. Whitelist fallback: campo inválido não quebra a página
     resp_invalid = client.get(f"{url}?sort=invalid_column")
     assert resp_invalid.status_code == 200
     assert resp_invalid.context["current_sort"] == ""
+
+
+def test_sc20_attempts_sorting_and_isolation(
+    client: Client,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    client.force_login(processes_operator)
+    url = _module_url(modules)
+    cert = _certificate()
+    run = AutomationRun.objects.create(
+        module=modules["SC-20"],
+        trigger="manual",
+        status=RunStatus.SUCCEEDED,
+        triggered_by=processes_operator,
+    )
+    comm = CertificateCommunication.objects.create(
+        certificate=cert,
+        certificate_valid_until=cert.valid_until,
+        channel=CommunicationChannel.EMAIL,
+        policy_key="p1",
+        recipient="alpha@example.test",
+        status=CommunicationStatus.SENT,
+        first_run=run,
+        latest_run=run,
+    )
+    CommunicationAttempt.objects.create(
+        communication=comm,
+        run=run,
+        sequence=1,
+        status=CommunicationStatus.SENT,
+        recipient="alpha@example.test",
+    )
+
+    comm2 = CertificateCommunication.objects.create(
+        certificate=cert,
+        certificate_valid_until=cert.valid_until,
+        channel=CommunicationChannel.WHATSAPP,
+        policy_key="p2",
+        recipient="zeta@example.test",
+        status=CommunicationStatus.FAILED,
+        first_run=run,
+        latest_run=run,
+    )
+    CommunicationAttempt.objects.create(
+        communication=comm2,
+        run=run,
+        sequence=1,
+        status=CommunicationStatus.FAILED,
+        recipient="zeta@example.test",
+    )
+
+    # 1. Sem sort de avisos: neutro
+    resp_default = client.get(url)
+    assert resp_default.status_code == 200
+    html_def = resp_default.content.decode()
+    assert 'hx-target="#sc20-attempts-region"' in html_def
+    assert "attempts_sort=recipient" in html_def
+
+    # 2. Sort por recipient ASC
+    resp_rec_asc = client.get(f"{url}?attempts_sort=recipient")
+    assert resp_rec_asc.status_code == 200
+    html_rec_asc = resp_rec_asc.content.decode()
+    pos_alpha = html_rec_asc.find("alpha@example.test")
+    pos_zeta = html_rec_asc.find("zeta@example.test")
+    assert pos_alpha != -1 and pos_zeta != -1
+    assert pos_alpha < pos_zeta
+    # Isolamento: não deve afetar a tabela principal
+    assert resp_rec_asc.context["current_sort"] == ""
+    assert resp_rec_asc.context["attempts_current_sort"] == "recipient"
+
+    # 3. Sort por recipient DESC
+    resp_rec_desc = client.get(f"{url}?attempts_sort=-recipient")
+    assert resp_rec_desc.status_code == 200
+    html_rec_desc = resp_rec_desc.content.decode()
+    pos_alpha = html_rec_desc.find("alpha@example.test")
+    pos_zeta = html_rec_desc.find("zeta@example.test")
+    assert pos_zeta < pos_alpha
+    assert resp_rec_desc.context["attempts_current_sort"] == "-recipient"
+
+    # 4. Fallback de whitelist
+    resp_inv = client.get(f"{url}?attempts_sort=malicious_col")
+    assert resp_inv.status_code == 200
+    assert resp_inv.context["attempts_current_sort"] == ""
+
+
+def test_sc20_runs_sorting_and_isolation(
+    client: Client,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    client.force_login(processes_operator)
+    url = _module_url(modules)
+
+    AutomationRun.objects.create(
+        module=modules["SC-20"],
+        trigger="manual",
+        status=RunStatus.SUCCEEDED,
+        triggered_by=processes_operator,
+    )
+    AutomationRun.objects.create(
+        module=modules["SC-20"],
+        trigger="scheduled",
+        status=RunStatus.FAILED,
+        triggered_by=processes_operator,
+    )
+
+    # 1. Sem sort de runs: neutro
+    resp_default = client.get(url)
+    assert resp_default.status_code == 200
+    html_def = resp_default.content.decode()
+    assert 'hx-target="#sc20-runs-region"' in html_def
+    assert "runs_sort=trigger" in html_def
+
+    # 2. Sort por trigger ASC (manual antes de scheduled)
+    resp_trig_asc = client.get(f"{url}?runs_sort=trigger")
+    assert resp_trig_asc.status_code == 200
+    html_trig_asc = resp_trig_asc.content.decode()
+    pos_man = html_trig_asc.find("Manual")
+    pos_sch = html_trig_asc.find("Agendado")
+    assert pos_man != -1 and pos_sch != -1
+    assert pos_man < pos_sch
+    assert resp_trig_asc.context["runs_current_sort"] == "trigger"
+    assert resp_trig_asc.context["current_sort"] == ""
+    assert resp_trig_asc.context["attempts_current_sort"] == ""
+
+    # 3. Sort por trigger DESC (scheduled antes de manual)
+    resp_trig_desc = client.get(f"{url}?runs_sort=-trigger")
+    assert resp_trig_desc.status_code == 200
+    html_trig_desc = resp_trig_desc.content.decode()
+    pos_man = html_trig_desc.find("Manual")
+    pos_sch = html_trig_desc.find("Agendado")
+    assert pos_sch < pos_man
+    assert resp_trig_desc.context["runs_current_sort"] == "-trigger"
+
+    # 4. Fallback de whitelist
+    resp_inv = client.get(f"{url}?runs_sort=invalid_col")
+    assert resp_inv.status_code == 200
+    assert resp_inv.context["runs_current_sort"] == ""
 
 
 def test_sc20_filter_toolbar_alignment_structure(

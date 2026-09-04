@@ -125,7 +125,7 @@
             {% include "components/sortable_th.html" with field="expires_on" label="Validade" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
             <th scope="col">Prazo</th>
             {% include "components/sortable_th.html" with field="status" label="Estado" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
-            <th scope="col">Contato</th>
+            {% include "components/sortable_th.html" with field="contact" label="Contato" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
           </tr>
         </thead>
         <tbody>
@@ -218,10 +218,10 @@
         <caption class="sr-only">Histórico de tentativas de comunicação sobre certificados</caption>
         <thead>
           <tr>
-            <th scope="col">Destinatário</th>
-            <th scope="col">Canal</th>
-            <th scope="col">Resultado</th>
-            <th scope="col">Data e hora</th>
+            {% include "components/sortable_th.html" with field="recipient" label="Destinatário" current_sort=attempts_current_sort sort_query_params=attempts_sort_query_params sort_param="attempts_sort" target_id="sc20-attempts-region" %}
+            {% include "components/sortable_th.html" with field="channel" label="Canal" current_sort=attempts_current_sort sort_query_params=attempts_sort_query_params sort_param="attempts_sort" target_id="sc20-attempts-region" %}
+            {% include "components/sortable_th.html" with field="status" label="Resultado" current_sort=attempts_current_sort sort_query_params=attempts_sort_query_params sort_param="attempts_sort" target_id="sc20-attempts-region" %}
+            {% include "components/sortable_th.html" with field="created_at" label="Data e hora" current_sort=attempts_current_sort sort_query_params=attempts_sort_query_params sort_param="attempts_sort" target_id="sc20-attempts-region" %}
             <th scope="col" class="text-right">Ação</th>
           </tr>
         </thead>
@@ -260,7 +260,7 @@
       </table>
     </div>
 
-    {% include "components/pagination.html" with page_obj=attempts paginator=attempts_paginator item_label="avisos" nav_label="Navegação dos avisos" target_id="sc20-attempts-region" page_param="attempts_page" %}
+    {% include "components/pagination.html" with page_obj=attempts paginator=attempts_paginator item_label="avisos" nav_label="Navegação dos avisos" target_id="sc20-attempts-region" page_param="attempts_page" query_params=attempts_query_params %}
   </div>
 </section>
 
@@ -274,7 +274,15 @@
     <div class="table-shell mt-5 overflow-x-auto">
       <table class="data-table">
         <caption class="sr-only">Histórico de execuções da verificação de certificados</caption>
-        <thead><tr><th scope="col">Data e hora</th><th scope="col">Origem</th><th scope="col">Duração</th><th scope="col">Estado</th><th scope="col" class="text-right">Resultado</th></tr></thead>
+        <thead>
+          <tr>
+            {% include "components/sortable_th.html" with field="created_at" label="Data e hora" current_sort=runs_current_sort sort_query_params=runs_sort_query_params sort_param="runs_sort" target_id="sc20-runs-region" %}
+            {% include "components/sortable_th.html" with field="trigger" label="Origem" current_sort=runs_current_sort sort_query_params=runs_sort_query_params sort_param="runs_sort" target_id="sc20-runs-region" %}
+            <th scope="col">Duração</th>
+            {% include "components/sortable_th.html" with field="status" label="Estado" current_sort=runs_current_sort sort_query_params=runs_sort_query_params sort_param="runs_sort" target_id="sc20-runs-region" %}
+            <th scope="col" class="text-right">Resultado</th>
+          </tr>
+        </thead>
         <tbody>
           {% for run in runs %}
           <tr>
@@ -289,7 +297,7 @@
       </table>
     </div>
 
-    {% include "components/pagination.html" with page_obj=runs paginator=runs_paginator item_label="execuções" nav_label="Navegação das execuções do módulo" target_id="sc20-runs-region" page_param="runs_page" %}
+    {% include "components/pagination.html" with page_obj=runs paginator=runs_paginator item_label="execuções" nav_label="Navegação das execuções do módulo" target_id="sc20-runs-region" page_param="runs_page" query_params=runs_query_params %}
   </div>
 </section>
 {% endblock %}
