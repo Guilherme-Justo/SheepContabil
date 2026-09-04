@@ -1038,6 +1038,7 @@ label:has(input:disabled) {
 /* Transição reativa HTMX suave para paginação e filtros */
 #dashboard-runs-region.htmx-request,
 #sc06-cases-region.htmx-request,
+#sc04-queue-region.htmx-request,
 #sc04-queue-content.htmx-request,
 #sc04-runs-region.htmx-request,
 #sc05-operations-region.htmx-request,

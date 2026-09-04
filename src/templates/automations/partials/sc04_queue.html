@@ -14,7 +14,7 @@
     A atualização automática está temporariamente indisponível. Os dados exibidos foram preservados; atualize a página para tentar novamente.
   </div>
 
-  <div class="table-shell overflow-x-auto min-h-[26rem]">
+  <div class="table-shell overflow-x-auto">
     <table class="data-table sc04-queue-table">
       <caption class="sr-only">Fila de documentos recebidos pela triagem fiscal</caption>
       <thead>
@@ -70,9 +70,10 @@
         {% empty %}
         <tr>
           <td colspan="8" class="py-12 text-center text-grafite dark:text-white/60">
-            Nenhum arquivo corresponde aos filtros atuais.
             {% if has_active_filters %}
-              <a href="{% url 'automations:module-detail' module.slug %}" class="table-link font-semibold underline ml-2">Limpar filtros</a>
+              Nenhum arquivo localizado com os filtros selecionados.
+            {% else %}
+              Nenhum arquivo recebido na fila operacional.
             {% endif %}
           </td>
         </tr>
@@ -81,6 +82,6 @@
     </table>
   </div>
 
-  {% include "components/pagination.html" with page_obj=page_obj paginator=paginator query_params=query_params item_label="arquivos" nav_label="Navegação da fila de arquivos" target_id="sc04-queue-content" %}
+  {% include "components/pagination.html" with page_obj=page_obj paginator=paginator query_params=query_params item_label="arquivos" nav_label="Navegação da fila de arquivos" target_id="sc04-queue-region" %}
 </div>
 

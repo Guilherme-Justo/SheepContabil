@@ -410,3 +410,37 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     assert "8</strong> a" in frag
     assert "q=paginated" in frag
     assert "page=2" in frag
+
+
+def test_sc04_filter_button_and_compact_empty_table(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    fiscal_operator: User,
+) -> None:
+    sc04 = modules["SC-04"]
+    client.force_login(fiscal_operator)
+
+    # Clean queue without filters
+    url = reverse("automations:module-detail", kwargs={"slug": sc04.slug})
+    resp_clean = client.get(url)
+    assert resp_clean.status_code == 200
+    page_clean = resp_clean.content.decode()
+    assert 'id="sc04-queue-region"' in page_clean
+    assert 'hx-target="#sc04-queue-region"' in page_clean
+    assert "min-h-[26rem]" not in page_clean
+    assert "Limpar" not in page_clean
+    assert "Nenhum arquivo recebido na fila operacional." in page_clean
+
+    # Create a document
+    _document_case(sc04, suffix="sample-doc")
+
+    # Filter with non-matching query
+    resp_filtered = client.get(url, {"q": "termo-inexistente"})
+    assert resp_filtered.status_code == 200
+    page_filtered = resp_filtered.content.decode()
+    assert 'id="sc04-queue-region"' in page_filtered
+    assert "Limpar" in page_filtered
+    assert 'hx-target="#sc04-queue-region"' in page_filtered
+    assert 'hx-select="#sc04-queue-region"' in page_filtered
+    assert "Nenhum arquivo localizado com os filtros selecionados." in page_filtered
+    assert "Limpar filtros" not in page_filtered
