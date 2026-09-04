@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from io import BytesIO
+from io import BytesIO, StringIO
+from urllib.parse import urlencode
 
 import pytest
+from django.core.management import call_command
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
@@ -20,7 +22,12 @@ from core.automations.models import (
     SocietaryBriefing,
     SocietaryBriefingStatus,
 )
-from core.automations.sc06.services import cancel_briefing, complete_briefing, create_briefing
+from core.automations.sc06.services import (
+    cancel_briefing,
+    complete_briefing,
+    create_briefing,
+    save_briefing_draft,
+)
 from core.identity.models import User
 
 pytestmark = pytest.mark.django_db
@@ -102,9 +109,38 @@ def test_start_creates_draft_and_traceable_running_execution(
         },
     )
 
-    briefing = SocietaryBriefing.objects.select_related("run").get()
+    expected_query = urlencode(
+        {
+            "client_name": "Empresa Formulário",
+            "client_document": "12345678000190",
+        }
+    )
+    expected_new_url = f"{reverse('automations:sc06-briefing-new')}?{expected_query}"
     assert response.status_code == 302
-    assert response.url == reverse(
+    assert response.url == expected_new_url
+    assert SocietaryBriefing.objects.count() == 0
+    assert AutomationRun.objects.count() == 0
+
+    workspace_response = client.get(expected_new_url)
+    assert workspace_response.status_code == 200
+    content = workspace_response.content.decode()
+    assert "Empresa Formulário" in content
+    assert "Novo atendimento" in content
+    assert SocietaryBriefing.objects.count() == 0
+
+    save_response = client.post(
+        expected_new_url,
+        {
+            "action": "save",
+            "client_name": "Empresa Formulário",
+            "client_document": "12345678000190",
+            "process_type": "opening",
+        },
+    )
+
+    briefing = SocietaryBriefing.objects.select_related("run").get()
+    assert save_response.status_code == 302
+    assert save_response.url == reverse(
         "automations:sc06-briefing-detail",
         kwargs={"briefing_id": briefing.id},
     )
@@ -291,13 +327,14 @@ def test_cancel_draft_action_via_post_and_redirects(
         client_document="12345678901",
         created_by=societary_operator,
     )
+    save_briefing_draft(briefing.id, {"process_type": "opening"})
     detail_url = reverse(
         "automations:sc06-briefing-detail",
         kwargs={"briefing_id": briefing.id},
     )
     client.force_login(societary_operator)
 
-    # POST action=cancel
+    # POST action=cancel em rascunho com conteúdo: cancela e arquiva
     response = client.post(detail_url, {"action": "cancel"})
     expected_redirect = reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
     assert response.url == expected_redirect
@@ -400,6 +437,92 @@ def test_sc06_cases_filters_and_htmx_pagination(
     # 4. Atributos HTMX presentes no HTML da página
     html = resp_cancelled.content.decode()
     assert 'hx-target="#sc06-cases-region"' in html
-    assert 'hx-swap="outerHTML show:none"' in html
+    assert 'hx-swap="outerHTML show:#sc06-cases-region:top"' in html
     assert 'hx-push-url="true"' in html
     assert "Limpar" in html
+
+
+def test_cancel_empty_draft_discards_completely(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    societary_operator: User,
+    administrator: User,
+) -> None:
+    _publish_template(administrator)
+    briefing = create_briefing(
+        client_name="Rascunho Vazio Para Descarte",
+        client_document="12345678901",
+        created_by=societary_operator,
+    )
+    detail_url = reverse(
+        "automations:sc06-briefing-detail",
+        kwargs={"briefing_id": briefing.id},
+    )
+    client.force_login(societary_operator)
+
+    # Cancelar rascunho sem respostas faz descarte limpo (hard delete)
+    response = client.post(detail_url, {"action": "cancel"})
+    expected_redirect = reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
+    assert response.url == expected_redirect
+
+    assert not SocietaryBriefing.objects.filter(id=briefing.id).exists()
+    assert not AutomationRun.objects.filter(id=briefing.run_id).exists()
+
+
+def test_abandon_new_briefing_leaves_no_database_residue(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    societary_operator: User,
+    administrator: User,
+) -> None:
+    _publish_template(administrator)
+    client.force_login(societary_operator)
+
+    new_url = reverse("automations:sc06-briefing-new")
+    cancel_response = client.post(
+        new_url,
+        {
+            "action": "cancel",
+            "client_name": "Descarte Imediato",
+            "client_document": "12345678000190",
+        },
+    )
+    expected_redirect = reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
+    assert cancel_response.url == expected_redirect
+    assert SocietaryBriefing.objects.count() == 0
+    assert AutomationRun.objects.count() == 0
+
+
+def test_cleanup_empty_briefings_command(
+    administrator: User,
+    societary_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    _publish_template(administrator)
+    # 1. Briefing vazio
+    empty_briefing = create_briefing(
+        client_name="Vazio Legado",
+        client_document="12345678901",
+        created_by=societary_operator,
+    )
+    # 2. Briefing com conteúdo
+    filled_briefing = create_briefing(
+        client_name="Preenchido",
+        client_document="98765432100",
+        created_by=societary_operator,
+    )
+    save_briefing_draft(filled_briefing.id, {"process_type": "opening"})
+
+    # Teste --dry-run
+    out_dry = StringIO()
+    call_command("cleanup_empty_briefings", "--dry-run", stdout=out_dry)
+    assert "[DRY-RUN] Total de 1 rascunho(s) vazio(s) elegível(is)." in out_dry.getvalue()
+    assert SocietaryBriefing.objects.filter(id=empty_briefing.id).exists()
+
+    # Execução real
+    out_real = StringIO()
+    call_command("cleanup_empty_briefings", stdout=out_real)
+    assert "Total de 1 rascunho(s) vazio(s) descartado(s) com sucesso." in out_real.getvalue()
+    assert not SocietaryBriefing.objects.filter(id=empty_briefing.id).exists()
+    assert not AutomationRun.objects.filter(id=empty_briefing.run_id).exists()
+    assert SocietaryBriefing.objects.filter(id=filled_briefing.id).exists()

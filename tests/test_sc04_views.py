@@ -387,6 +387,9 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     assert "15</strong> arquivos" in page1
     assert ">1</strong> de" in page1
     assert "page=2" in page1
+    assert 'aria-label="Primeira página"' not in page1  # disabled span on page 1
+    assert 'aria-label="Última página"' in page1  # active link to page 3
+    assert "page=3" in page1
 
     # Page 2
     resp_p2 = client.get(
@@ -399,8 +402,31 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     assert "14</strong> de" in page2
     assert ">2</strong> de" in page2
     assert "page=1" in page2
+    assert 'aria-label="Primeira página"' in page2  # active link to page 1
+    assert 'aria-label="Última página"' in page2  # active link to page 3
 
-    # Queue fragment with filter + page
+    # Page 3 (last page of queue)
+    resp_p3 = client.get(
+        reverse("automations:module-detail", kwargs={"slug": sc04.slug}),
+        {"page": "3"},
+    )
+    assert resp_p3.status_code == 200
+    page3 = resp_p3.content.decode()
+    assert "15</strong> a" in page3
+    assert 'aria-label="Primeira página"' in page3  # active link to page 1
+
+    # Queue fragment on last page (Page 3) - isolated from other paginators
+    resp_frag_p3 = client.get(
+        reverse("automations:sc04-queue-fragment"),
+        {"page": "3"},
+    )
+    assert resp_frag_p3.status_code == 200
+    frag_p3 = resp_frag_p3.content.decode()
+    assert "15</strong> a" in frag_p3
+    assert 'aria-label="Primeira página"' in frag_p3  # active link to page 1
+    assert 'aria-label="Última página"' not in frag_p3  # disabled span on last page
+
+    # Queue fragment with filter + page 2
     resp_fragment = client.get(
         reverse("automations:sc04-queue-fragment"),
         {"q": "paginated", "page": "2"},
@@ -410,3 +436,238 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     assert "8</strong> a" in frag
     assert "q=paginated" in frag
     assert "page=2" in frag
+    assert 'aria-label="Primeira página"' in frag
+    assert 'aria-label="Última página"' in frag
+    assert "show:#sc04-queue-region:top" in frag
+
+
+def test_sc04_filter_button_and_compact_empty_table(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    fiscal_operator: User,
+) -> None:
+    sc04 = modules["SC-04"]
+    client.force_login(fiscal_operator)
+
+    # Clean queue without filters
+    url = reverse("automations:module-detail", kwargs={"slug": sc04.slug})
+    resp_clean = client.get(url)
+    assert resp_clean.status_code == 200
+    page_clean = resp_clean.content.decode()
+    assert 'id="sc04-queue-region"' in page_clean
+    assert 'hx-target="#sc04-queue-region"' in page_clean
+    assert "min-h-[26rem]" not in page_clean
+    assert "Limpar" not in page_clean
+    assert "Nenhum arquivo recebido na fila operacional." in page_clean
+
+    # Create a document
+    _document_case(sc04, suffix="sample-doc")
+
+    # Filter with non-matching query
+    resp_filtered = client.get(url, {"q": "termo-inexistente"})
+    assert resp_filtered.status_code == 200
+    page_filtered = resp_filtered.content.decode()
+    assert 'id="sc04-queue-region"' in page_filtered
+    assert "Limpar" in page_filtered
+    assert 'hx-target="#sc04-queue-region"' in page_filtered
+    assert 'hx-select="#sc04-queue-region"' in page_filtered
+    assert "Nenhum arquivo localizado com os filtros selecionados." in page_filtered
+    assert "Limpar filtros" not in page_filtered
+
+
+def test_sc04_queue_sorting_and_whitelist_security(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    fiscal_operator: User,
+) -> None:
+    sc04 = modules["SC-04"]
+    client.force_login(fiscal_operator)
+
+    client_a = FiscalClient.objects.create(
+        code="CLI-ALPHA",
+        route_prefix="alpha",
+        name="Alpha Consultoria",
+        document_number="11111111000101",
+    )
+    client_b = FiscalClient.objects.create(
+        code="CLI-BETA",
+        route_prefix="beta",
+        name="Beta Logistica",
+        document_number="22222222000102",
+    )
+
+    _, doc_a, item_a, _ = _document_case(sc04, suffix="doc-zebra")
+    doc_a.matched_client = client_a
+    doc_a.save(update_fields=["matched_client"])
+    item_a.intake.original_filename = "zebra_invoice.xml"
+    item_a.intake.save(update_fields=["original_filename"])
+
+    _, doc_b, item_b, _ = _document_case(sc04, suffix="doc-alpha")
+    doc_b.matched_client = client_b
+    doc_b.save(update_fields=["matched_client"])
+    item_b.intake.original_filename = "alpha_nfse.xml"
+    item_b.intake.save(update_fields=["original_filename"])
+
+    url = reverse("automations:module-detail", kwargs={"slug": sc04.slug})
+
+    # 1. Sem sort: natural, cabeçalhos neutros com aria-sort="none"
+    resp_nat = client.get(url)
+    assert resp_nat.status_code == 200
+    html_nat = resp_nat.content.decode()
+    assert 'aria-sort="none"' in html_nat
+    assert 'hx-target="#sc04-queue-region"' in html_nat
+
+    # 2. Sort ascendente por arquivo: alpha_nfse antes de zebra_invoice
+    resp_file_asc = client.get(f"{url}?sort=file")
+    assert resp_file_asc.status_code == 200
+    html_file_asc = resp_file_asc.content.decode()
+    assert 'aria-sort="ascending"' in html_file_asc
+    assert "sort=-file" in html_file_asc
+    pos_alpha = html_file_asc.find("alpha_nfse.xml")
+    pos_zebra = html_file_asc.find("zebra_invoice.xml")
+    assert pos_alpha != -1 and pos_zebra != -1
+    assert pos_alpha < pos_zebra
+
+    # 3. Sort descendente por arquivo: zebra_invoice antes de alpha_nfse
+    resp_file_desc = client.get(f"{url}?sort=-file")
+    assert resp_file_desc.status_code == 200
+    html_file_desc = resp_file_desc.content.decode()
+    assert 'aria-sort="descending"' in html_file_desc
+    pos_alpha = html_file_desc.find("alpha_nfse.xml")
+    pos_zebra = html_file_desc.find("zebra_invoice.xml")
+    assert pos_alpha != -1 and pos_zebra != -1
+    assert pos_zebra < pos_alpha
+
+    # 4. Sort por cliente ascendente: Alpha antes de Beta
+    resp_client_asc = client.get(f"{url}?sort=client")
+    assert resp_client_asc.status_code == 200
+    html_client_asc = resp_client_asc.content.decode()
+    assert 'aria-sort="ascending"' in html_client_asc
+    pos_a = html_client_asc.find("Alpha Consultoria")
+    pos_b = html_client_asc.find("Beta Logistica")
+    assert pos_a != -1 and pos_b != -1
+    assert pos_a < pos_b
+
+    # 5. Whitelist / Proteção contra SQL injection: campo arbitrário cai no padrão
+    resp_malicious = client.get(f"{url}?sort=__injection_attempt")
+    assert resp_malicious.status_code == 200
+    assert resp_malicious.context["current_sort"] == ""
+
+
+def test_sc04_queue_threading_and_accordion_for_resubmissions(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    fiscal_operator: User,
+) -> None:
+    sc04 = modules["SC-04"]
+    client.force_login(fiscal_operator)
+
+    # 1. Create document with 1 initial intake (original)
+    run, doc, item1, _ = _document_case(sc04, suffix="threaded-doc")
+    doc.status = DocumentStatus.AWAITING_REVIEW
+    doc.save(update_fields=["status"])
+    item1.intake.original_filename = "balancete_oficial.pdf"
+    item1.intake.save(update_fields=["original_filename"])
+
+    # 2. Add 2nd intake (resubmission / duplicate via simulated inbox)
+    intake2 = DocumentIntake.objects.create(
+        document=doc,
+        run=run,
+        source=DocumentSource.SIMULATED_INBOX,
+        source_reference="inbox:msg:002",
+        original_filename="balancete_reenvio_v2.pdf",
+        status="duplicate",
+        is_duplicate=True,
+    )
+    DocumentRunItem.objects.create(
+        run=run,
+        intake=intake2,
+        outcome=DocumentRunOutcome.DUPLICATE_HASH,
+    )
+
+    # 3. Add 3rd intake (resubmission / duplicate via manual upload)
+    intake3 = DocumentIntake.objects.create(
+        document=doc,
+        run=run,
+        source=DocumentSource.MANUAL,
+        source_reference="manual:upload:003",
+        original_filename="balancete_final_v3.pdf",
+        status="duplicate",
+        is_duplicate=True,
+    )
+    DocumentRunItem.objects.create(
+        run=run,
+        intake=intake3,
+        outcome=DocumentRunOutcome.DUPLICATE_HASH,
+    )
+
+    url = reverse("automations:module-detail", kwargs={"slug": sc04.slug})
+    response = client.get(url)
+    assert response.status_code == 200
+    html = response.content.decode()
+
+    # 4. Verify Single Row Threading:
+    # Exactly ONE main row for the document (UUID present once in table)
+    assert f">{doc.id}</span>" in html
+    assert "3 envios" in html
+    assert "Múltiplos envios (3)" in html
+
+    # 5. Confusing canonical jargon MUST NOT be present
+    assert "Estado do original canônico" not in html
+    assert "canônico" not in html.lower()
+
+    # 6. Status of the document is correctly displayed
+    assert "Aguardando revisão" in html
+
+    # 7. Accordion sub-row timeline contains all 3 occurrences
+    assert "Histórico cronológico de envios (3 ocorrências registradas)" in html
+    assert "1ª via (Original)" in html
+    assert "2ª via (Reenvio)" in html
+    assert "3ª via (Reenvio)" in html
+    assert "balancete_oficial.pdf" in html
+    assert "balancete_reenvio_v2.pdf" in html
+    assert "balancete_final_v3.pdf" in html
+    assert "Processado (Original)" in html
+    assert "Dispensado (Conteúdo idêntico)" in html
+
+    # 8. Queue Fragment returns the same threaded structure
+    frag_url = reverse("automations:sc04-queue-fragment")
+    frag_resp = client.get(frag_url)
+    assert frag_resp.status_code == 200
+    frag_html = frag_resp.content.decode()
+    assert "3 envios" in frag_html
+    assert "Múltiplos envios (3)" in frag_html
+    assert "Estado do original canônico" not in frag_html
+    assert "1ª via (Original)" in frag_html
+    assert "3ª via (Reenvio)" in frag_html
+
+
+def test_sc04_upload_form_validation_accessible_and_novalidate(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    fiscal_operator: User,
+) -> None:
+    sc04 = modules["SC-04"]
+    client.force_login(fiscal_operator)
+
+    # 1. GET page: ensure <form ... novalidate> is present on upload form
+    detail_url = reverse("automations:module-detail", kwargs={"slug": sc04.slug})
+    get_resp = client.get(detail_url)
+    assert get_resp.status_code == 200
+    get_html = get_resp.content.decode()
+    upload_url = reverse("automations:sc04-upload")
+    assert f'action="{upload_url}#sc04-upload-title"' in get_html
+    assert "novalidate" in get_html
+
+    # 2. POST without file or confirmation: returns 400 Bad Request
+    post_resp = client.post(upload_url, data={})
+    assert post_resp.status_code == 400
+    post_html = post_resp.content.decode()
+
+    # 3. Check accessible errors rendered simultaneously
+    assert 'id="id_attachment_errors"' in post_html
+    assert 'class="field-error"' in post_html
+    assert "Este campo é obrigatório." in post_html
+    assert 'id="id_confirm_synthetic_errors"' in post_html
+    assert 'role="alert"' in post_html
+    assert 'aria-invalid="true"' in post_html

@@ -40,7 +40,7 @@
         </label>
         <div class="sc06-dark-field">{{ field }}</div>
         {% if field.help_text %}<p class="sc06-dark-help">{{ field.help_text|safe }}</p>{% endif %}
-        {% if field.errors %}<p class="sc06-dark-field-error" role="alert">{{ field.errors.0 }}</p>{% endif %}
+        {% if field.errors %}<p class="sc06-dark-field-error" id="{{ field.id_for_label }}_errors" role="alert">{{ field.errors.0 }}</p>{% endif %}
       </div>
       {% endfor %}
 
@@ -80,7 +80,7 @@
 </div>
 
 <section class="mt-10" aria-labelledby="sc06-cases-title">
-  <div id="sc06-cases-region">
+  <div id="sc06-cases-region" class="scroll-mt-24">
     <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <p class="eyebrow">Rastreabilidade societária</p>
@@ -96,7 +96,7 @@
         hx-get="{% url 'automations:module-detail' module.slug %}"
         hx-target="#sc06-cases-region"
         hx-select="#sc06-cases-region"
-        hx-swap="outerHTML show:none"
+        hx-swap="outerHTML show:#sc06-cases-region:top"
         hx-push-url="true"
       >
         <div class="min-w-44">{{ filter_form.q }}</div>
@@ -114,7 +114,7 @@
             hx-get="{% url 'automations:module-detail' module.slug %}"
             hx-target="#sc06-cases-region"
             hx-select="#sc06-cases-region"
-            hx-swap="outerHTML show:none"
+            hx-swap="outerHTML show:#sc06-cases-region:top"
             hx-push-url="true"
           >
             Limpar

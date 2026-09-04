@@ -55,7 +55,71 @@ document.addEventListener("input", (e) => {
       }
     }
   }
+
+  clearFieldValidationError(target);
 });
+
+function clearFieldValidationError(target) {
+  if (!target || !target.matches || target.getAttribute("aria-invalid") !== "true") return;
+
+  let isValid = false;
+  if (target.type === "checkbox" || target.type === "radio") {
+    isValid = target.checked;
+  } else if (target.type === "file") {
+    isValid = Boolean(target.files && target.files.length > 0);
+  } else if (target.tagName === "SELECT") {
+    isValid = target.value !== "";
+  } else {
+    isValid = Boolean(target.value && target.value.trim().length > 0);
+  }
+
+  if (isValid) {
+    target.removeAttribute("aria-invalid");
+    const describedBy = target.getAttribute("aria-describedby");
+    if (describedBy) {
+      describedBy.split(/\s+/).forEach((id) => {
+        const errEl = document.getElementById(id);
+        if (
+          errEl &&
+          (errEl.classList.contains("field-error") ||
+            errEl.classList.contains("sc06-dark-field-error") ||
+            errEl.classList.contains("sc05-dark-field-error") ||
+            errEl.getAttribute("role") === "alert")
+        ) {
+          errEl.style.display = "none";
+        }
+      });
+    }
+    const fieldContainer =
+      target.closest(".sc04-file-control")?.parentElement ||
+      target.closest(".sc04-confirmation")?.parentElement ||
+      target.closest(".sc06-dark-field")?.parentElement ||
+      target.closest(".sc06-field-control")?.parentElement ||
+      target.closest(".sc05-dark-field")?.parentElement ||
+      target.closest("div");
+    if (fieldContainer) {
+      const siblingErrors = fieldContainer.querySelectorAll(
+        ".field-error, .sc06-dark-field-error, .sc05-dark-field-error, [role='alert']"
+      );
+      siblingErrors.forEach((el) => {
+        if (
+          !el.classList.contains("form-error") &&
+          !el.classList.contains("sc06-dark-form-error") &&
+          !el.classList.contains("sc05-dark-error")
+        ) {
+          el.style.display = "none";
+        }
+      });
+    }
+  }
+}
+
+document.addEventListener("change", (e) => {
+  if (e.target) {
+    clearFieldValidationError(e.target);
+  }
+});
+
 
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll('[data-mask="document"], [data-sc06-answer="current_cnpj"], input[name="client_document"]').forEach((field) => {

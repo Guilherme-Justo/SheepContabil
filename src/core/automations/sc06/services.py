@@ -173,6 +173,26 @@ def cancel_briefing(
     return briefing
 
 
+def is_briefing_empty(briefing: SocietaryBriefing) -> bool:
+    """Retorna True se o briefing não possui nenhuma resposta preenchida."""
+    if not briefing.answers:
+        return True
+    return all(v is None or v == "" or v == [] for v in briefing.answers.values())
+
+
+@transaction.atomic
+def discard_empty_briefing(briefing_id: UUID | str) -> bool:
+    """Remove o briefing e sua execução caso seja um rascunho sem respostas preenchidas."""
+    briefing = _locked_briefing(briefing_id)
+    _require_draft(briefing)
+    if is_briefing_empty(briefing):
+        run = briefing.run
+        briefing.delete()
+        run.delete()
+        return True
+    return False
+
+
 def _locked_briefing(briefing_id: UUID | str) -> SocietaryBriefing:
     return (
         SocietaryBriefing.objects.select_for_update()

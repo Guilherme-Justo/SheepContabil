@@ -319,6 +319,37 @@ class BriefingStartForm(A11yFormMixin, forms.Form):
         return document
 
 
+class SC05ClientFilterForm(A11yFormMixin, forms.Form):
+    _widget_class = (
+        "form-input text-xs py-1.5 px-2.5 rounded-lg border-grafite/25 "
+        "dark:border-white/15 dark:bg-[#091216] dark:text-white"
+    )
+
+    clients_q = forms.CharField(
+        label="Buscar",
+        required=False,
+        max_length=120,
+        widget=forms.TextInput(
+            attrs={
+                "class": _widget_class,
+                "placeholder": "Buscar cliente ou CNPJ...",
+                "aria-label": "Buscar por cliente ou CNPJ",
+            }
+        ),
+    )
+    clients_status = forms.ChoiceField(
+        label="Estado",
+        required=False,
+        choices=[("", "Todos os estados"), *SC05ClientStatus.choices],
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por estado do cliente",
+            }
+        ),
+    )
+
+
 class SC05OperationFilterForm(A11yFormMixin, forms.Form):
     _widget_class = (
         "form-input text-xs py-1.5 px-2.5 rounded-lg border-grafite/25 "

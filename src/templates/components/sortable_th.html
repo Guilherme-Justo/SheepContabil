@@ -1,0 +1,69 @@
+{% with active_sort=current_sort desc_prefix="-"|add:field s_param=sort_param|default:"sort" %}
+  {% if active_sort == field %}
+    <th scope="col" aria-sort="ascending" class="{% if align %}{{ align }}{% else %}text-left{% endif %} {{ extra_class }}">
+      <a
+        href="?{{ s_param }}={{ desc_prefix }}{{ sort_query_params }}"
+        {% if target_id %}
+          hx-get="?{{ s_param }}={{ desc_prefix }}{{ sort_query_params }}"
+          hx-target="#{{ target_id }}"
+          hx-select="#{{ target_id }}"
+          hx-swap="outerHTML show:#{{ target_id }}:top"
+          hx-push-url="true"
+        {% endif %}
+        class="group inline-flex items-center gap-1.5 font-bold text-petroleo transition hover:text-turquesa focus:outline-none focus-visible:underline dark:text-white {% if align == 'text-right' %}justify-end{% elif align == 'text-center' %}justify-center{% endif %}"
+        title="Ordenar por {{ label }} de forma decrescente"
+      >
+        <span>{{ label }}</span>
+        <span class="inline-flex items-center text-turquesa" aria-hidden="true">
+          <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+          </svg>
+        </span>
+      </a>
+    </th>
+  {% elif active_sort == desc_prefix %}
+    <th scope="col" aria-sort="descending" class="{% if align %}{{ align }}{% else %}text-left{% endif %} {{ extra_class }}">
+      <a
+        href="{% if sort_query_params %}?{{ sort_query_params|slice:'1:' }}{% else %}?{% endif %}"
+        {% if target_id %}
+          hx-get="{% if sort_query_params %}?{{ sort_query_params|slice:'1:' }}{% else %}?{% endif %}"
+          hx-target="#{{ target_id }}"
+          hx-select="#{{ target_id }}"
+          hx-swap="outerHTML show:#{{ target_id }}:top"
+          hx-push-url="true"
+        {% endif %}
+        class="group inline-flex items-center gap-1.5 font-bold text-petroleo transition hover:text-turquesa focus:outline-none focus-visible:underline dark:text-white {% if align == 'text-right' %}justify-end{% elif align == 'text-center' %}justify-center{% endif %}"
+        title="Remover ordenação por {{ label }}"
+      >
+        <span>{{ label }}</span>
+        <span class="inline-flex items-center text-turquesa" aria-hidden="true">
+          <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </span>
+      </a>
+    </th>
+  {% else %}
+    <th scope="col" aria-sort="none" class="{% if align %}{{ align }}{% else %}text-left{% endif %} {{ extra_class }}">
+      <a
+        href="?{{ s_param }}={{ field }}{{ sort_query_params }}"
+        {% if target_id %}
+          hx-get="?{{ s_param }}={{ field }}{{ sort_query_params }}"
+          hx-target="#{{ target_id }}"
+          hx-select="#{{ target_id }}"
+          hx-swap="outerHTML show:#{{ target_id }}:top"
+          hx-push-url="true"
+        {% endif %}
+        class="group inline-flex items-center gap-1.5 text-grafite transition hover:text-turquesa focus:outline-none focus-visible:underline dark:text-white/70 dark:hover:text-turquesa {% if align == 'text-right' %}justify-end{% elif align == 'text-center' %}justify-center{% endif %}"
+        title="Ordenar por {{ label }} de forma crescente"
+      >
+        <span>{{ label }}</span>
+        <span class="inline-flex items-center text-grafite/30 transition-colors group-hover:text-turquesa dark:text-white/30 dark:group-hover:text-turquesa" aria-hidden="true">
+          <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+          </svg>
+        </span>
+      </a>
+    </th>
+  {% endif %}
+{% endwith %}

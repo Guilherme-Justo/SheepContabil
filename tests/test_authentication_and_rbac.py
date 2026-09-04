@@ -157,3 +157,55 @@ def test_dashboard_run_filters_and_pagination(
     assert resp_manual.context["has_active_filters"] is True
     for run in resp_manual.context["page_obj"]:
         assert run.trigger == RunTrigger.MANUAL
+
+
+def test_dashboard_runs_sorting_and_whitelist_security(
+    client: Client,
+    administrator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    client.force_login(administrator)
+
+    AutomationRun.objects.create(
+        module=modules["SC-04"],
+        status=RunStatus.RUNNING,
+        trigger=RunTrigger.MANUAL,
+    )
+    AutomationRun.objects.create(
+        module=modules["SC-20"],
+        status=RunStatus.SUCCEEDED,
+        trigger=RunTrigger.SCHEDULED,
+    )
+
+    url = reverse("automations:dashboard")
+
+    # 1. Sem sort: padrão natural, cabeçalhos com aria-sort="none"
+    resp_nat = client.get(url)
+    assert resp_nat.status_code == 200
+    html_nat = resp_nat.content.decode()
+    assert 'aria-sort="none"' in html_nat
+    assert 'hx-target="#dashboard-runs-region"' in html_nat
+
+    # 2. Sort por módulo ASC: SC-04 antes de SC-20
+    resp_asc = client.get(f"{url}?sort=module")
+    assert resp_asc.status_code == 200
+    html_asc = resp_asc.content.decode()
+    assert 'aria-sort="ascending"' in html_asc
+    assert "sort=-module" in html_asc
+    runs_asc = list(resp_asc.context["page_obj"])
+    assert runs_asc[0].module.code == "SC-04"
+    assert runs_asc[1].module.code == "SC-20"
+
+    # 3. Sort por módulo DESC: SC-20 antes de SC-04
+    resp_desc = client.get(f"{url}?sort=-module")
+    assert resp_desc.status_code == 200
+    html_desc = resp_desc.content.decode()
+    assert 'aria-sort="descending"' in html_desc
+    runs_desc = list(resp_desc.context["page_obj"])
+    assert runs_desc[0].module.code == "SC-20"
+    assert runs_desc[1].module.code == "SC-04"
+
+    # 4. Whitelist fallback: parâmetro inválido retorna default seguro
+    resp_invalid = client.get(f"{url}?sort=malicious_field")
+    assert resp_invalid.status_code == 200
+    assert resp_invalid.context["current_sort"] == ""

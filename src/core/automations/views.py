@@ -1,14 +1,17 @@
 import hashlib
 import re
+from collections import defaultdict
 from datetime import timedelta
 from io import BytesIO
 from typing import Any, cast
+from urllib.parse import urlencode
 from uuid import UUID
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, Max, Q
 from django.http import (
     FileResponse,
@@ -17,7 +20,7 @@ from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
 )
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_sameorigin
@@ -30,6 +33,7 @@ from core.automations.forms import (
     SC04QueueFilterForm,
     SC04ReviewForm,
     SC04UploadForm,
+    SC05ClientFilterForm,
     SC05OperationFilterForm,
     SC05OperationForm,
     SC20CertificateFilterForm,
@@ -43,6 +47,7 @@ from core.automations.models import (
     CommunicationStatus,
     DigitalCertificate,
     DocumentDecision,
+    DocumentIntake,
     DocumentReview,
     DocumentReviewStatus,
     DocumentRouting,
@@ -77,11 +82,14 @@ from core.automations.sc06.forms import BriefingAnswersForm, SC06CasesFilterForm
 from core.automations.sc06.pdf import build_briefing_pdf
 from core.automations.sc06.rules import build_frontend_config
 from core.automations.sc06.services import (
+    DEFAULT_TEMPLATE_CODE,
     PublishedTemplateUnavailable,
     cancel_briefing,
     complete_briefing,
     create_briefing,
+    discard_empty_briefing,
     get_latest_published_version,
+    is_briefing_empty,
     save_briefing_draft,
 )
 from core.automations.sc20.services import create_sc20_run
@@ -89,6 +97,61 @@ from core.automations.tasks import run_sc04_task, run_sc05_task, run_sc20_task
 from core.identity.models import User
 
 DEFAULT_PAGE_SIZE = 7
+
+
+def _extract_sort_and_query_params(
+    request: HttpRequest,
+    sort_key: str = "sort",
+    page_key: str = "page",
+) -> tuple[str, str, str]:
+    """Extract current sort parameter and build query strings for pagination and sorting.
+
+    Returns:
+        tuple of (current_sort, pagination_query_params, sort_query_params)
+        - current_sort: e.g. "created_at", "-created_at", or ""
+        - pagination_query_params: query string preserving sort and filters, excluding 'page'
+        - sort_query_params: query string preserving filters, excluding 'page' and 'sort'
+    """
+    current_sort = request.GET.get(sort_key, "").strip()
+
+    pagination_dict = request.GET.copy()
+    pagination_dict.pop(page_key, None)
+    pagination_query_params = f"&{pagination_dict.urlencode()}" if pagination_dict else ""
+
+    sort_dict = request.GET.copy()
+    sort_dict.pop(page_key, None)
+    sort_dict.pop(sort_key, None)
+    sort_query_params = f"&{sort_dict.urlencode()}" if sort_dict else ""
+
+    return current_sort, pagination_query_params, sort_query_params
+
+
+def _apply_sorting(
+    queryset: Any,
+    sort_param: str,
+    whitelist: dict[str, str],
+    default_order: str | tuple[str, ...],
+) -> tuple[Any, str]:
+    """Apply safe sorting to a queryset using a strict whitelist.
+
+    Whitelist maps user-facing column keys to database model field names.
+    Supports ascending ("field") and descending ("-field").
+    Falls back gracefully to default_order on absent or unauthorized params.
+
+    Returns:
+        tuple of (sorted_queryset, valid_active_sort)
+    """
+    if sort_param:
+        is_desc = sort_param.startswith("-")
+        clean_key = sort_param[1:] if is_desc else sort_param
+        if clean_key in whitelist:
+            db_field = whitelist[clean_key]
+            order_expr = f"-{db_field}" if is_desc else db_field
+            return queryset.order_by(order_expr), sort_param
+
+    if isinstance(default_order, (tuple, list)):
+        return queryset.order_by(*default_order), ""
+    return queryset.order_by(default_order), ""
 
 
 def _visible_modules(request: HttpRequest) -> AutomationModuleQuerySet:
@@ -106,11 +169,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         .order_by("code")
     )
 
-    runs = (
-        AutomationRun.objects.filter(module__in=modules)
-        .select_related("module", "triggered_by")
-        .order_by("-created_at")
-    )
+    runs = AutomationRun.objects.filter(module__in=modules).select_related("module", "triggered_by")
 
     filter_form = DashboardRunFilterForm(
         request.GET if request.GET else None,
@@ -131,13 +190,23 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             runs = runs.filter(trigger=selected_trigger)
             has_active_filters = True
 
+    DASHBOARD_SORT_FIELDS = {
+        "module": "module__code",
+        "created_at": "created_at",
+        "trigger": "trigger",
+        "status": "status",
+    }
+    current_sort, query_params, sort_query_params = _extract_sort_and_query_params(request)
+    runs, valid_sort = _apply_sorting(
+        runs,
+        current_sort,
+        DASHBOARD_SORT_FIELDS,
+        default_order="-created_at",
+    )
+
     paginator = Paginator(runs, per_page=DEFAULT_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
-
-    query_dict = request.GET.copy()
-    query_dict.pop("page", None)
-    query_params = f"&{query_dict.urlencode()}" if query_dict else ""
 
     return render(
         request,
@@ -150,6 +219,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "filter_form": filter_form,
             "has_active_filters": has_active_filters,
             "query_params": query_params,
+            "current_sort": valid_sort,
+            "sort_query_params": sort_query_params,
         },
     )
 
@@ -447,17 +518,52 @@ def _sc04_dashboard_context(
     upload_form: SC04UploadForm | None = None,
 ) -> dict[str, Any]:
     filter_form = SC04QueueFilterForm(request.GET or None)
-    queue = _sc04_queue_queryset(module, filter_form)
+    current_sort, query_params_formatted, sort_query_params = _extract_sort_and_query_params(
+        request
+    )
+    queue, valid_sort = _sc04_queue_queryset(module, filter_form, sort_param=current_sort)
     paginator = Paginator(queue, per_page=DEFAULT_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
     queue_rows = []
+    document_ids = [item.intake.document_id for item in page_obj.object_list]
+    intakes_by_doc: dict[UUID, list[DocumentIntake]] = defaultdict(list)
+    if document_ids:
+        intakes = (
+            DocumentIntake.objects.filter(document_id__in=document_ids)
+            .select_related("run")
+            .prefetch_related("run_items")
+            .order_by("received_at")
+        )
+        for intake in intakes:
+            intakes_by_doc[intake.document_id].append(intake)
+
     for item in page_obj.object_list:
         document = item.intake.document
+        history = intakes_by_doc.get(document.id) or [item.intake]
+        total_occurrences = len(history)
+        is_multi_intake = total_occurrences > 1
+        latest_intake = history[-1] if history else item.intake
+        first_intake = history[0] if history else item.intake
+        display_filename = latest_intake.original_filename or item.intake.original_filename
+        display_source = (
+            latest_intake.get_source_display()
+            if latest_intake
+            else item.intake.get_source_display()
+        )
+        display_received_at = latest_intake.received_at if latest_intake else item.created_at
         queue_rows.append(
             {
                 "item": item,
                 "document": document,
+                "latest_intake": latest_intake,
+                "first_intake": first_intake,
+                "intakes_history": history,
+                "total_occurrences": total_occurrences,
+                "is_multi_intake": is_multi_intake,
+                "display_filename": display_filename,
+                "display_source": display_source,
+                "display_received_at": display_received_at,
                 "type_confidence_percent": int(document.type_confidence * 100),
                 "client_confidence_percent": int(document.client_confidence * 100),
             }
@@ -488,7 +594,6 @@ def _sc04_dashboard_context(
     query_params = request.GET.copy()
     query_params.pop("page", None)
     filter_querystring = query_params.urlencode()
-    query_params_formatted = f"&{filter_querystring}" if filter_querystring else ""
     has_active_filters = bool(
         filter_form.is_valid()
         and (
@@ -519,6 +624,8 @@ def _sc04_dashboard_context(
         "is_paginated": page_obj.has_other_pages(),
         "filter_querystring": filter_querystring,
         "query_params": query_params_formatted,
+        "current_sort": valid_sort,
+        "sort_query_params": sort_query_params,
         "queue_refresh_url": queue_refresh_url,
         "has_active_queue": documents.filter(
             status__in=(DocumentStatus.QUEUED, DocumentStatus.PROCESSING)
@@ -529,18 +636,36 @@ def _sc04_dashboard_context(
     }
 
 
+SC04_QUEUE_SORT_FIELDS = {
+    "file": "intake__original_filename",
+    "source": "intake__source",
+    "client": "intake__document__matched_client__name",
+    "status": "intake__document__status",
+    "received_at": "created_at",
+}
+
+
 def _sc04_queue_queryset(
     module: AutomationModule,
     filter_form: SC04QueueFilterForm,
-) -> Any:
-    queue = DocumentRunItem.objects.filter(run__module=module).select_related(
+    sort_param: str = "",
+) -> tuple[Any, str]:
+    queue = DocumentRunItem.objects.filter(
+        run__module=module,
+        intake__is_duplicate=False,
+    ).select_related(
         "run",
         "intake",
         "intake__document",
         "intake__document__matched_client",
     )
     if not filter_form.is_valid():
-        return queue.order_by("-created_at")
+        return _apply_sorting(
+            queue,
+            sort_param,
+            SC04_QUEUE_SORT_FIELDS,
+            default_order="-created_at",
+        )
     status = str(filter_form.cleaned_data.get("status") or "")
     source = str(filter_form.cleaned_data.get("source") or "")
     outcome = str(filter_form.cleaned_data.get("outcome") or "")
@@ -548,15 +673,35 @@ def _sc04_queue_queryset(
     if status:
         queue = queue.filter(intake__document__status=status)
     if source:
-        queue = queue.filter(intake__source=source)
-    if outcome:
-        queue = queue.filter(outcome=outcome)
+        matching_doc_ids = FiscalDocument.objects.filter(
+            intakes__run__module=module,
+            intakes__source=source,
+        ).values_list("id", flat=True)
+        queue = queue.filter(intake__document_id__in=matching_doc_ids)
+    if outcome == DocumentRunOutcome.NEW:
+        queue = queue.filter(outcome=DocumentRunOutcome.NEW)
+    elif outcome:
+        matching_doc_ids = FiscalDocument.objects.filter(
+            intakes__run__module=module,
+            intakes__run_items__outcome=outcome,
+        ).values_list("id", flat=True)
+        queue = queue.filter(intake__document_id__in=matching_doc_ids)
     if query:
-        queue = queue.filter(
-            Q(intake__original_filename__icontains=query)
-            | Q(intake__document__matched_client__name__icontains=query)
+        matching_doc_ids = (
+            FiscalDocument.objects.filter(intakes__run__module=module)
+            .filter(
+                Q(intakes__original_filename__icontains=query)
+                | Q(matched_client__name__icontains=query)
+            )
+            .values_list("id", flat=True)
         )
-    return queue.order_by("-created_at")
+        queue = queue.filter(intake__document_id__in=matching_doc_ids)
+    return _apply_sorting(
+        queue,
+        sort_param,
+        SC04_QUEUE_SORT_FIELDS,
+        default_order="-created_at",
+    )
 
 
 def _sc04_document_context(
@@ -721,6 +866,54 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
                 return redirect("automations:run-detail", run_id=creation.run.id)
 
     clients = SC05Client.objects.all()
+
+    clients_filter_form = SC05ClientFilterForm(request.GET if request.GET else None)
+    filtered_clients = clients
+    has_active_client_filters = False
+    if clients_filter_form.is_valid():
+        clients_q = str(clients_filter_form.cleaned_data.get("clients_q") or "").strip()
+        clients_status = str(clients_filter_form.cleaned_data.get("clients_status") or "")
+        if clients_q:
+            clean_digits = re.sub(r"\D", "", clients_q)
+            client_q_filter = Q(name__icontains=clients_q) | Q(
+                external_reference__icontains=clients_q
+            )
+            if clean_digits:
+                client_q_filter |= Q(document__icontains=clean_digits)
+            filtered_clients = filtered_clients.filter(client_q_filter)
+            has_active_client_filters = True
+        if clients_status:
+            filtered_clients = filtered_clients.filter(status=clients_status)
+            has_active_client_filters = True
+
+    SC05_CLIENTS_SORT_FIELDS = {
+        "client": "name",
+        "name": "name",
+        "document": "document",
+        "status": "status",
+    }
+    clients_current_sort, clients_query_params_formatted, clients_sort_query_params = (
+        _extract_sort_and_query_params(request, sort_key="clients_sort", page_key="clients_page")
+    )
+    filtered_clients, valid_clients_sort = _apply_sorting(
+        filtered_clients,
+        clients_current_sort,
+        SC05_CLIENTS_SORT_FIELDS,
+        default_order="name",
+    )
+
+    clients_clear_dict = request.GET.copy()
+    clients_clear_dict.pop("clients_page", None)
+    clients_clear_dict.pop("clients_sort", None)
+    clients_clear_dict.pop("clients_q", None)
+    clients_clear_dict.pop("clients_status", None)
+    clients_clear_qs = clients_clear_dict.urlencode()
+    clients_clear_query_params = f"?{clients_clear_qs}" if clients_clear_qs else ""
+
+    clients_paginator = Paginator(filtered_clients, per_page=DEFAULT_PAGE_SIZE)
+    clients_page_number = request.GET.get("clients_page", 1)
+    clients_page_obj = clients_paginator.get_page(clients_page_number)
+
     filter_form = SC05OperationFilterForm(request.GET if request.GET else None)
     operations = (
         SC05Operation.objects.select_related("client", "run", "run__triggered_by")
@@ -743,10 +936,25 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         if status_val:
             operations = operations.filter(run__status=status_val)
 
+    SC05_OPERATIONS_SORT_FIELDS = {
+        "created_at": "created_at",
+        "client": "client__name",
+        "action": "action",
+        "status": "run__status",
+    }
+    current_sort, query_params_formatted, sort_query_params = _extract_sort_and_query_params(
+        request
+    )
+    operations, valid_sort = _apply_sorting(
+        operations,
+        current_sort,
+        SC05_OPERATIONS_SORT_FIELDS,
+        default_order="-created_at",
+    )
+
     query_params = request.GET.copy()
     query_params.pop("page", None)
     filter_querystring = query_params.urlencode()
-    query_params_formatted = f"&{filter_querystring}" if filter_querystring else ""
     has_active_filters = bool(
         filter_form.is_valid()
         and (
@@ -756,7 +964,16 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         )
     )
 
-    paginator = Paginator(operations.order_by("-created_at"), per_page=DEFAULT_PAGE_SIZE)
+    operations_clear_dict = request.GET.copy()
+    operations_clear_dict.pop("page", None)
+    operations_clear_dict.pop("sort", None)
+    operations_clear_dict.pop("q", None)
+    operations_clear_dict.pop("action", None)
+    operations_clear_dict.pop("status", None)
+    operations_clear_qs = operations_clear_dict.urlencode()
+    operations_clear_query_params = f"?{operations_clear_qs}" if operations_clear_qs else ""
+
+    paginator = Paginator(operations, per_page=DEFAULT_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
 
@@ -775,8 +992,19 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "filter_form": filter_form,
             "has_active_filters": has_active_filters,
             "query_params": query_params_formatted,
+            "current_sort": valid_sort,
+            "sort_query_params": sort_query_params,
             "filter_querystring": filter_querystring,
-            "clients": clients,
+            "operations_clear_query_params": operations_clear_query_params,
+            "clients_filter_form": clients_filter_form,
+            "has_active_client_filters": has_active_client_filters,
+            "clients_query_params": clients_query_params_formatted,
+            "clients_current_sort": valid_clients_sort,
+            "clients_sort_query_params": clients_sort_query_params,
+            "clients_clear_query_params": clients_clear_query_params,
+            "clients": clients_page_obj,
+            "clients_page_obj": clients_page_obj,
+            "clients_paginator": clients_paginator,
             "operations": page_obj,
             "page_obj": page_obj,
             "paginator": paginator,
@@ -894,9 +1122,14 @@ def sc06_briefing_detail(request: HttpRequest, briefing_id: str) -> HttpResponse
         if action not in {"save", "complete", "cancel"}:
             return HttpResponseBadRequest("Ação inválida.")
         if action == "cancel":
-            cancel_briefing(briefing.id, cancelled_by=cast(User, request.user))
-            messages.info(request, "Briefing societário cancelado e arquivado.")
-            return redirect("automations:module-detail", slug=briefing.run.module.slug)
+            module_slug = briefing.run.module.slug
+            if is_briefing_empty(briefing):
+                discard_empty_briefing(briefing.id)
+                messages.info(request, "Rascunho vazio descartado sem resíduos.")
+            else:
+                cancel_briefing(briefing.id, cancelled_by=cast(User, request.user))
+                messages.info(request, "Briefing societário cancelado e arquivado.")
+            return redirect("automations:module-detail", slug=module_slug)
         submitted_answers = {
             field_name: request.POST.get(field_name, "") for field_name in form.fields
         }
@@ -935,6 +1168,111 @@ def sc06_briefing_detail(request: HttpRequest, briefing_id: str) -> HttpResponse
             "form": form,
             "sections": form.sections,
             "frontend_config": build_frontend_config(schema, submitted_answers),
+            "is_new": False,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def sc06_briefing_new(request: HttpRequest) -> HttpResponse:
+    module = get_object_or_404(
+        AutomationModule.objects.filter(pk__in=_visible_modules(request)),
+        pk="SC-06",
+    )
+    try:
+        template_version = get_latest_published_version(DEFAULT_TEMPLATE_CODE)
+    except PublishedTemplateUnavailable:
+        messages.error(
+            request,
+            "O template publicado está indisponível. Solicite a configuração ao administrador.",
+        )
+        return redirect("automations:module-detail", slug=module.slug)
+
+    data_source = request.POST if request.method == "POST" else request.GET
+    start_form = BriefingStartForm(
+        {
+            "client_name": data_source.get("client_name", ""),
+            "client_document": data_source.get("client_document", ""),
+        }
+    )
+    if not start_form.is_valid():
+        messages.error(request, "Informe os dados válidos do cliente para iniciar o briefing.")
+        return redirect("automations:module-detail", slug=module.slug)
+
+    client_name = start_form.cleaned_data["client_name"]
+    client_document = start_form.cleaned_data["client_document"]
+    schema = template_version.schema
+    form = BriefingAnswersForm(
+        schema=schema,
+        data=request.POST if request.method == "POST" else None,
+    )
+    submitted_answers: dict[str, object] = {}
+
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+        if action not in {"save", "complete", "cancel"}:
+            return HttpResponseBadRequest("Ação inválida.")
+        if action == "cancel":
+            messages.info(request, "Atendimento descartado sem resíduos.")
+            return redirect("automations:module-detail", slug=module.slug)
+
+        submitted_answers = {
+            field_name: request.POST.get(field_name, "") for field_name in form.fields
+        }
+        if form.is_valid():
+            submitted_answers = form.answer_payload
+            try:
+                with transaction.atomic():
+                    briefing = create_briefing(
+                        client_name=client_name,
+                        client_document=client_document,
+                        created_by=cast(User, request.user),
+                    )
+                    if action == "save":
+                        briefing = save_briefing_draft(briefing.id, form.answer_payload)
+                        messages.success(
+                            request, "Rascunho salvo com as regras condicionais aplicadas."
+                        )
+                    else:
+                        briefing = complete_briefing(
+                            briefing.id,
+                            form.answer_payload,
+                            completed_by=cast(User, request.user),
+                        )
+                        messages.success(request, "Briefing concluído e resultado consolidado.")
+            except ValidationError as exc:
+                _apply_validation_error(form, exc)
+            else:
+                next_url = request.POST.get("next")
+                if action == "save" and next_url and next_url.startswith("/"):
+                    return redirect(next_url)
+                return redirect(
+                    "automations:sc06-briefing-detail",
+                    briefing_id=briefing.id,
+                )
+
+    transient_briefing = SocietaryBriefing(
+        template_version=template_version,
+        client_name=client_name,
+        client_document=client_document,
+        created_by=cast(User, request.user),
+        status=SocietaryBriefingStatus.DRAFT,
+        answers=submitted_answers,
+    )
+
+    return render(
+        request,
+        "automations/sc06_form.html",
+        {
+            "module": module,
+            "briefing": transient_briefing,
+            "form": form,
+            "sections": form.sections,
+            "frontend_config": build_frontend_config(schema, submitted_answers),
+            "is_new": True,
+            "client_name": client_name,
+            "client_document": client_document,
         },
     )
 
@@ -957,11 +1295,7 @@ def _sc06_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             return HttpResponseBadRequest("Ação inválida.")
         if start_form.is_valid():
             try:
-                briefing = create_briefing(
-                    client_name=start_form.cleaned_data["client_name"],
-                    client_document=start_form.cleaned_data["client_document"],
-                    created_by=cast(User, request.user),
-                )
+                get_latest_published_version(DEFAULT_TEMPLATE_CODE)
             except PublishedTemplateUnavailable:
                 start_form.add_error(
                     None,
@@ -969,11 +1303,13 @@ def _sc06_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
                     "Solicite a configuração ao administrador.",
                 )
             else:
-                messages.success(request, "Briefing criado; responda apenas o caminho aplicável.")
-                return redirect(
-                    "automations:sc06-briefing-detail",
-                    briefing_id=briefing.id,
+                params = urlencode(
+                    {
+                        "client_name": start_form.cleaned_data["client_name"],
+                        "client_document": start_form.cleaned_data["client_document"],
+                    }
                 )
+                return redirect(f"{reverse('automations:sc06-briefing-new')}?{params}")
 
     briefings = SocietaryBriefing.objects.filter(run__module=module).select_related(
         "template_version", "created_by", "completed_by", "run"
@@ -1139,10 +1475,25 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         elif status_val:
             certificates = certificates.filter(status=status_val)
 
+    SC20_CERTIFICATES_SORT_FIELDS = {
+        "client": "client_name",
+        "document": "client_document",
+        "expires_on": "valid_until",
+        "status": "status",
+    }
+    current_sort, query_params_formatted, sort_query_params = _extract_sort_and_query_params(
+        request
+    )
+    certificates, valid_sort = _apply_sorting(
+        certificates,
+        current_sort,
+        SC20_CERTIFICATES_SORT_FIELDS,
+        default_order=("valid_until", "client_name", "serial_number"),
+    )
+
     query_params_dict = request.GET.copy()
     query_params_dict.pop("page", None)
     filter_querystring = query_params_dict.urlencode()
-    query_params_formatted = f"&{filter_querystring}" if filter_querystring else ""
     has_active_filters = bool(
         filter_form.is_valid()
         and (
@@ -1174,6 +1525,8 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "filter_form": filter_form,
             "has_active_filters": has_active_filters,
             "query_params": query_params_formatted,
+            "current_sort": valid_sort,
+            "sort_query_params": sort_query_params,
             "filter_querystring": filter_querystring,
             "certificates": certificates_page,
             "certificates_paginator": certificates_paginator,
