@@ -86,9 +86,9 @@
         {% if upload_form.attachment.errors %}<p class="field-error" role="alert">{{ upload_form.attachment.errors.0 }}</p>{% endif %}
       </div>
 
-      <div class="sc04-confirmation">
+      <div class="sc04-confirmation cursor-pointer select-none">
         {{ upload_form.confirm_synthetic }}
-        <label for="{{ upload_form.confirm_synthetic.id_for_label }}">{{ upload_form.confirm_synthetic.label }}</label>
+        <label for="{{ upload_form.confirm_synthetic.id_for_label }}" class="cursor-pointer select-none">{{ upload_form.confirm_synthetic.label }}</label>
       </div>
       {% if upload_form.confirm_synthetic.errors %}<p class="field-error" role="alert">{{ upload_form.confirm_synthetic.errors.0 }}</p>{% endif %}
 

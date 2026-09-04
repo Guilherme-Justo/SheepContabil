@@ -439,10 +439,56 @@
   .sc04-filter-bar input:focus, .sc04-filter-bar select:focus {
     border-color: #1fa69a; box-shadow: 0 0 0 4px rgba(31,166,154,.12);
   }
-  .sc04-form-control textarea { min-height: 6rem; resize: vertical; }
-  .sc04-confirmation { display: flex; align-items: flex-start; gap: .6rem; color: #42636b; font-size: .72rem; line-height: 1.45; }
-  .sc04-confirmation input { width: 1rem; height: 1rem; margin-top: .1rem; flex: 0 0 auto; accent-color: #10505f; }
-  .sc04-filter-bar { display: grid; gap: .65rem; }
+  .sc04-confirmation { display: flex; align-items: flex-start; gap: .6rem; color: #42636b; font-size: .72rem; line-height: 1.45; cursor: pointer; user-select: none; }
+  .sc04-confirmation label { cursor: pointer; user-select: none; }
+
+  /* Controles de Checkbox Moderno do Design System (WCAG AA) */
+  .custom-checkbox,
+  .sc04-confirmation input[type="checkbox"],
+  .sc06-field-control input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 1.15rem;
+    height: 1.15rem;
+    margin-top: .1rem;
+    flex: 0 0 auto;
+    border-radius: .35rem;
+    border: 1.5px solid rgba(16, 80, 95, .3);
+    background-color: #ffffff;
+    cursor: pointer;
+    display: grid;
+    place-content: center;
+    transition: all .15s ease-in-out;
+  }
+  .custom-checkbox:hover,
+  .sc04-confirmation input[type="checkbox"]:hover,
+  .sc06-field-control input[type="checkbox"]:hover {
+    border-color: #1fa69a;
+    background-color: rgba(31, 166, 154, .06);
+  }
+  .custom-checkbox:focus-visible,
+  .sc04-confirmation input[type="checkbox"]:focus-visible,
+  .sc06-field-control input[type="checkbox"]:focus-visible {
+    outline: none;
+    border-color: #1fa69a;
+    box-shadow: 0 0 0 3px rgba(31, 166, 154, .28);
+  }
+  .custom-checkbox:checked,
+  .sc04-confirmation input[type="checkbox"]:checked,
+  .sc06-field-control input[type="checkbox"]:checked {
+    background-color: #1fa69a;
+    border-color: #1fa69a;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 75% 75%;
+  }
+  .custom-checkbox:disabled,
+  .sc04-confirmation input[type="checkbox"]:disabled,
+  .sc06-field-control input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
   .sc04-secondary-button, .sc04-retry-button {
     display: inline-flex; align-items: center; justify-content: center; gap: .55rem; white-space: nowrap;
     border: 1px solid rgba(16,80,95,.2); border-radius: .75rem; background: white; padding: .66rem .82rem;
@@ -656,10 +702,10 @@
     border-color: #1fa69a; box-shadow: 0 0 0 4px rgba(31,166,154,.12);
   }
   .sc06-field-control input[aria-invalid="true"], .sc06-field-control select[aria-invalid="true"], .sc06-field-control textarea[aria-invalid="true"] { border-color: #c4453d; }
-  .sc06-field-control input[type="checkbox"], .sc06-field-control input[type="radio"] { width: 1rem; height: 1rem; accent-color: #10505f; }
+  .sc06-field-control input[type="radio"] { width: 1rem; height: 1rem; accent-color: #10505f; }
   .sc06-field-control > div, .sc06-field-control ul { display: grid; gap: .55rem; }
   .sc06-field-control label:has(input[type="checkbox"]), .sc06-field-control label:has(input[type="radio"]) {
-    display: flex; align-items: center; gap: .55rem; color: #42636b; font-size: .75rem;
+    display: flex; align-items: center; gap: .55rem; color: #42636b; font-size: .75rem; cursor: pointer; user-select: none;
   }
   .sc06-section-empty { color: #5a7078; font-size: .75rem; }
   .sc06-form-actions {
@@ -977,6 +1023,33 @@
   .sc06-field-control label:has(input[type="checkbox"]), .sc06-field-control label:has(input[type="radio"]),
   .sc04-confirmation {
     color: rgba(255,255,255,.85);
+  }
+
+  /* Checkbox Moderno em Dark Mode */
+  .custom-checkbox,
+  .sc04-confirmation input[type="checkbox"],
+  .sc06-field-control input[type="checkbox"] {
+    border-color: rgba(255, 255, 255, .25);
+    background-color: rgba(255, 255, 255, .07);
+  }
+  .custom-checkbox:hover,
+  .sc04-confirmation input[type="checkbox"]:hover,
+  .sc06-field-control input[type="checkbox"]:hover {
+    border-color: #1fa69a;
+    background-color: rgba(31, 166, 154, .15);
+  }
+  .custom-checkbox:focus-visible,
+  .sc04-confirmation input[type="checkbox"]:focus-visible,
+  .sc06-field-control input[type="checkbox"]:focus-visible {
+    border-color: #1fa69a;
+    box-shadow: 0 0 0 3px rgba(31, 166, 154, .35);
+  }
+  .custom-checkbox:checked,
+  .sc04-confirmation input[type="checkbox"]:checked,
+  .sc06-field-control input[type="checkbox"]:checked {
+    background-color: #1fa69a;
+    border-color: #1fa69a;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
   }
 
   /* Tables */
