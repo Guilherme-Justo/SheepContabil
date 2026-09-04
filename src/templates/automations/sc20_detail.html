@@ -59,11 +59,54 @@
 </div>
 
 <section class="mt-10 grid gap-7 2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start">
-  <div class="min-w-0">
-    <div class="section-heading">
-      <p class="eyebrow">Carteira acompanhada</p>
-      <h2>Certificados digitais</h2>
-      <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Consulte validade, responsável e contato de cada certificado cadastrado.</p>
+  <div class="min-w-0" id="sc20-certificates-region">
+    <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <p class="eyebrow">Carteira acompanhada</p>
+        <h2>Certificados digitais</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Consulte validade, responsável e contato de cada certificado cadastrado.</p>
+      </div>
+
+      <form
+        action="{% url 'automations:module-detail' module.slug %}"
+        method="get"
+        class="flex flex-wrap items-center gap-2"
+        role="search"
+        aria-label="Filtrar carteira de certificados"
+        hx-get="{% url 'automations:module-detail' module.slug %}"
+        hx-target="#sc20-certificates-region"
+        hx-select="#sc20-certificates-region"
+        hx-swap="outerHTML show:none"
+        hx-push-url="true"
+      >
+        <div class="min-w-44">
+          <label for="{{ filter_form.q.id_for_label }}" class="sr-only">{{ filter_form.q.label }}</label>
+          {{ filter_form.q }}
+        </div>
+        <div class="min-w-36">
+          <label for="{{ filter_form.status.id_for_label }}" class="sr-only">Estado</label>
+          {{ filter_form.status }}
+        </div>
+        <button
+          type="submit"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
+        >
+          Filtrar
+        </button>
+        {% if has_active_filters %}
+          <a
+            href="{% url 'automations:module-detail' module.slug %}"
+            class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+            hx-get="{% url 'automations:module-detail' module.slug %}"
+            hx-target="#sc20-certificates-region"
+            hx-select="#sc20-certificates-region"
+            hx-swap="outerHTML show:none"
+            hx-push-url="true"
+          >
+            Limpar
+          </a>
+        {% endif %}
+      </form>
     </div>
 
     <div class="table-shell mt-5 overflow-x-auto">
@@ -106,11 +149,21 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="6" class="py-12 text-center text-grafite">Nenhum certificado cadastrado. Use o formulário ao lado para iniciar o acompanhamento.</td></tr>
+          <tr>
+            <td colspan="6" class="py-12 text-center text-grafite">
+              {% if has_active_filters %}
+                Nenhum certificado localizado com os filtros selecionados.
+              {% else %}
+                Nenhum certificado cadastrado. Use o formulário ao lado para iniciar o acompanhamento.
+              {% endif %}
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+
+    {% include "components/pagination.html" with page_obj=certificates paginator=certificates_paginator query_params=query_params item_label="certificados" nav_label="Navegação dos certificados digitais" target_id="sc20-certificates-region" %}
   </div>
 
   <aside class="sc20-form-card" aria-labelledby="certificate-form-title">
@@ -144,85 +197,93 @@
 </section>
 
 <section class="mt-12" aria-labelledby="attempts-title">
-  <div class="section-heading flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-    <div>
-      <p class="eyebrow">Rastreabilidade</p>
-      <h2 id="attempts-title">Histórico de avisos</h2>
-      <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Cada tentativa permanece registrada, inclusive quando a entrega simulada falha.</p>
+  <div id="sc20-attempts-region">
+    <div class="section-heading flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <p class="eyebrow">Rastreabilidade</p>
+        <h2 id="attempts-title">Histórico de avisos</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Cada tentativa permanece registrada, inclusive quando a entrega simulada falha.</p>
+      </div>
+      <span class="soft-badge self-start sm:self-auto">Canal simulado</span>
     </div>
-    <span class="soft-badge self-start sm:self-auto">Canal simulado</span>
-  </div>
 
-  <div class="table-shell mt-5 overflow-x-auto">
-    <table class="data-table sc20-attempts-table">
-      <caption class="sr-only">Histórico de tentativas de comunicação sobre certificados</caption>
-      <thead>
-        <tr>
-          <th scope="col">Destinatário</th>
-          <th scope="col">Canal</th>
-          <th scope="col">Resultado</th>
-          <th scope="col">Data e hora</th>
-          <th scope="col" class="text-right">Ação</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for attempt in attempts %}
-        <tr>
-          <td>
-            <strong>{{ attempt.recipient }}</strong>
-            {% if attempt.certificate %}<span class="mt-1 block text-xs">{{ attempt.certificate.client_name }}</span>{% endif %}
-          </td>
-          <td>{{ attempt.get_channel_display }}</td>
-          <td>
-            <span class="status-badge status-{{ attempt.status_tone }}"><i></i>{{ attempt.get_status_display }}</span>
-            {% if attempt.error_message %}<span class="mt-2 block max-w-sm text-xs leading-5 text-carmim">{{ attempt.error_message }}</span>{% endif %}
-          </td>
-          <td class="font-mono text-xs">{{ attempt.created_at|date:"d/m/Y H:i" }}</td>
-          <td class="text-right">
-            {% if attempt.status == "failed" and attempt.communication.status == "failed" %}
-            <form method="post" class="inline-block">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="retry">
-              <input type="hidden" name="attempt_id" value="{{ attempt.id }}">
-              <button type="submit" class="sc20-retry-button" aria-label="Tentar novamente o aviso para {{ attempt.recipient }}">Tentar novamente</button>
-            </form>
-            {% elif attempt.status == "failed" %}
-            <span class="text-xs text-grafite">Superado</span>
-            {% else %}
-            <span class="text-xs text-grafite">Concluído</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="5" class="py-12 text-center text-grafite">Nenhum aviso foi registrado. Execute a verificação para analisar os certificados.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="table-shell mt-5 overflow-x-auto">
+      <table class="data-table sc20-attempts-table">
+        <caption class="sr-only">Histórico de tentativas de comunicação sobre certificados</caption>
+        <thead>
+          <tr>
+            <th scope="col">Destinatário</th>
+            <th scope="col">Canal</th>
+            <th scope="col">Resultado</th>
+            <th scope="col">Data e hora</th>
+            <th scope="col" class="text-right">Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for attempt in attempts %}
+          <tr>
+            <td>
+              <strong>{{ attempt.recipient }}</strong>
+              {% if attempt.certificate %}<span class="mt-1 block text-xs">{{ attempt.certificate.client_name }}</span>{% endif %}
+            </td>
+            <td>{{ attempt.get_channel_display }}</td>
+            <td>
+              <span class="status-badge status-{{ attempt.status_tone }}"><i></i>{{ attempt.get_status_display }}</span>
+              {% if attempt.error_message %}<span class="mt-2 block max-w-sm text-xs leading-5 text-carmim">{{ attempt.error_message }}</span>{% endif %}
+            </td>
+            <td class="font-mono text-xs">{{ attempt.created_at|date:"d/m/Y H:i" }}</td>
+            <td class="text-right">
+              {% if attempt.status == "failed" and attempt.communication.status == "failed" %}
+              <form method="post" class="inline-block">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="retry">
+                <input type="hidden" name="attempt_id" value="{{ attempt.id }}">
+                <button type="submit" class="sc20-retry-button" aria-label="Tentar novamente o aviso para {{ attempt.recipient }}">Tentar novamente</button>
+              </form>
+              {% elif attempt.status == "failed" %}
+              <span class="text-xs text-grafite">Superado</span>
+              {% else %}
+              <span class="text-xs text-grafite">Concluído</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="py-12 text-center text-grafite">Nenhum aviso foi registrado. Execute a verificação para analisar os certificados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% include "components/pagination.html" with page_obj=attempts paginator=attempts_paginator item_label="avisos" nav_label="Navegação dos avisos" target_id="sc20-attempts-region" page_param="attempts_page" %}
   </div>
 </section>
 
 <section class="mt-12" aria-labelledby="runs-title">
-  <div class="section-heading">
-    <p class="eyebrow">Processamento</p>
-    <h2 id="runs-title">Execuções do SC-20</h2>
-    <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">A execução manual e as futuras execuções agendadas compartilham a mesma regra e o mesmo histórico.</p>
-  </div>
-  <div class="table-shell mt-5 overflow-x-auto">
-    <table class="data-table">
-      <caption class="sr-only">Histórico de execuções da verificação de certificados</caption>
-      <thead><tr><th scope="col">Data e hora</th><th scope="col">Origem</th><th scope="col">Duração</th><th scope="col">Estado</th><th scope="col" class="text-right">Resultado</th></tr></thead>
-      <tbody>
-        {% for run in runs %}
-        <tr>
-          <td class="font-mono text-xs">{{ run.created_at|date:"d/m/Y H:i" }}</td>
-          <td>{{ run.get_trigger_display }}</td>
-          <td class="font-mono text-xs">{{ run.duration_label }}</td>
-          <td><span class="status-badge status-{{ run.status_tone }}"><i></i>{{ run.get_status_display }}</span></td>
-          <td class="text-right"><a href="{% url 'automations:run-detail' run.id %}" class="table-link">Ver execução</a></td>
-        </tr>
-        {% empty %}<tr><td colspan="5" class="py-10 text-center text-grafite">Nenhuma execução funcional registrada.</td></tr>{% endfor %}
-      </tbody>
-    </table>
+  <div id="sc20-runs-region">
+    <div class="section-heading">
+      <p class="eyebrow">Processamento</p>
+      <h2 id="runs-title">Execuções do SC-20</h2>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">A execução manual e as futuras execuções agendadas compartilham a mesma regra e o mesmo histórico.</p>
+    </div>
+    <div class="table-shell mt-5 overflow-x-auto">
+      <table class="data-table">
+        <caption class="sr-only">Histórico de execuções da verificação de certificados</caption>
+        <thead><tr><th scope="col">Data e hora</th><th scope="col">Origem</th><th scope="col">Duração</th><th scope="col">Estado</th><th scope="col" class="text-right">Resultado</th></tr></thead>
+        <tbody>
+          {% for run in runs %}
+          <tr>
+            <td class="font-mono text-xs">{{ run.created_at|date:"d/m/Y H:i" }}</td>
+            <td>{{ run.get_trigger_display }}</td>
+            <td class="font-mono text-xs">{{ run.duration_label }}</td>
+            <td><span class="status-badge status-{{ run.status_tone }}"><i></i>{{ run.get_status_display }}</span></td>
+            <td class="text-right"><a href="{% url 'automations:run-detail' run.id %}" class="table-link">Ver execução</a></td>
+          </tr>
+          {% empty %}<tr><td colspan="5" class="py-10 text-center text-grafite">Nenhuma execução funcional registrada.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% include "components/pagination.html" with page_obj=runs paginator=runs_paginator item_label="execuções" nav_label="Navegação das execuções do módulo" target_id="sc20-runs-region" page_param="runs_page" %}
   </div>
 </section>
 {% endblock %}

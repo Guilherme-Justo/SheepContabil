@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any
@@ -77,7 +78,7 @@ class AutomationModule(models.Model):
     objects = AutomationModuleQuerySet.as_manager()
 
     class Meta:
-        ordering = ("sort_order", "code")
+        ordering = ("code",)
         verbose_name = "módulo de automação"
         verbose_name_plural = "módulos de automação"
 
@@ -162,6 +163,10 @@ class AutomationRun(models.Model):
     def duration_label(self) -> str:
         duration = self.duration
         if duration is None:
+            if self.status == RunStatus.RUNNING or (self.started_at and not self.finished_at):
+                return "Em andamento"
+            if self.status in {RunStatus.QUEUED, RunStatus.PENDING}:
+                return "Aguardando início"
             return "—"
         total_seconds = max(0, int(duration.total_seconds()))
         minutes, seconds = divmod(total_seconds, 60)
@@ -1324,6 +1329,15 @@ class SocietaryBriefing(models.Model):
         if self.status == SocietaryBriefingStatus.CANCELLED:
             return "neutral"
         return "warning"
+
+    @property
+    def formatted_client_document(self) -> str:
+        digits = re.sub(r"\D", "", str(self.client_document))
+        if len(digits) == 11:
+            return f"{digits[:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:]}"
+        if len(digits) == 14:
+            return f"{digits[:2]}.{digits[2:5]}.{digits[5:8]}/{digits[8:12]}-{digits[12:]}"
+        return self.client_document
 
 
 class SC05ClientStatus(models.TextChoices):

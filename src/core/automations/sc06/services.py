@@ -147,6 +147,32 @@ def complete_briefing(
     return briefing
 
 
+@transaction.atomic
+def cancel_briefing(
+    briefing_id: UUID | str,
+    *,
+    cancelled_by: User,
+) -> SocietaryBriefing:
+    briefing = _locked_briefing(briefing_id)
+    _require_draft(briefing)
+    now = timezone.now()
+    briefing.status = SocietaryBriefingStatus.CANCELLED
+    briefing.save(update_fields=("status", "updated_at"))
+
+    run = briefing.run
+    run.status = RunStatus.CANCELLED
+    run.finished_at = now
+    run.summary = f"Briefing cancelado por {cancelled_by.label} antes da conclusão."
+    run.metadata = {
+        **briefing.run.metadata,
+        "cancelled_by_id": cancelled_by.id,
+        "cancelled_by_label": cancelled_by.label,
+        "cancelled_at": now.isoformat(),
+    }
+    run.save(update_fields=("status", "finished_at", "summary", "metadata"))
+    return briefing
+
+
 def _locked_briefing(briefing_id: UUID | str) -> SocietaryBriefing:
     return (
         SocietaryBriefing.objects.select_for_update()

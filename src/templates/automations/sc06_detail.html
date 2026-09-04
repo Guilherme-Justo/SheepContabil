@@ -52,18 +52,22 @@
   </aside>
 </section>
 
-<section class="mt-8 grid gap-4 sm:grid-cols-3" aria-label="Resumo dos briefings">
+<section class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Resumo dos briefings">
   <article class="sc06-summary-card">
     <span class="sc06-summary-icon" aria-hidden="true">≡</span>
     <div><p>Total de casos</p><strong>{{ summary.total|default:0 }}</strong><small>briefings registrados</small></div>
   </article>
   <article class="sc06-summary-card sc06-summary-warning">
     <span class="sc06-summary-icon" aria-hidden="true">◷</span>
-    <div><p>Em elaboração</p><strong>{{ summary.draft|default:0 }}</strong><small>rascunhos que podem ser retomados</small></div>
+    <div><p>Em elaboração</p><strong>{{ summary.draft|default:0 }}</strong><small>rascunhos pendentes</small></div>
   </article>
   <article class="sc06-summary-card sc06-summary-success">
     <span class="sc06-summary-icon" aria-hidden="true">✓</span>
     <div><p>Concluídos</p><strong>{{ summary.completed|default:0 }}</strong><small>documentos consolidados</small></div>
+  </article>
+  <article class="sc06-summary-card">
+    <span class="sc06-summary-icon text-grafite/70" aria-hidden="true">✕</span>
+    <div><p>Cancelados</p><strong>{{ summary.cancelled|default:0 }}</strong><small>casos descontinuados</small></div>
   </article>
 </section>
 
@@ -76,50 +80,97 @@
 </div>
 
 <section class="mt-10" aria-labelledby="sc06-cases-title">
-  <div class="section-heading flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-    <div>
-      <p class="eyebrow">Rastreabilidade societária</p>
-      <h2 id="sc06-cases-title">Casos em atendimento</h2>
-      <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Retome rascunhos, consulte respostas consolidadas e baixe briefings concluídos.</p>
-    </div>
-    {% if active_template %}
-      <span class="soft-badge self-start sm:self-auto">Template {{ active_template.version|default:"ativo" }}</span>
-    {% endif %}
-  </div>
-
-  <div class="sc06-case-list mt-5">
-    {% for briefing in briefings %}
-    <article class="sc06-case-card">
-      <div class="sc06-case-identity">
-        <span class="sc06-case-monogram" aria-hidden="true">{{ briefing.client_name|first|upper }}</span>
-        <div class="min-w-0">
-          <h3>{{ briefing.client_name }}</h3>
-          <p class="font-mono">{{ briefing.client_document }}</p>
-        </div>
+  <div id="sc06-cases-region">
+    <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <p class="eyebrow">Rastreabilidade societária</p>
+        <h2 id="sc06-cases-title">Casos em atendimento</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Retome rascunhos, consulte respostas consolidadas e baixe briefings concluídos.</p>
       </div>
 
-      <div class="sc06-case-meta">
-        <span class="status-badge status-{{ briefing.status_tone|default:'neutral' }}"><i></i>{{ briefing.get_status_display }}</span>
-        <p>Atualizado em <time datetime="{{ briefing.updated_at|date:'c' }}">{{ briefing.updated_at|date:"d/m/Y H:i" }}</time></p>
-      </div>
-
-      <div class="sc06-case-actions">
-        <a href="{% url 'automations:sc06-briefing-detail' briefing_id=briefing.id %}" class="sc06-case-primary-link">
-          {% if briefing.status == "draft" %}Retomar{% else %}Visualizar{% endif %}
-          <span aria-hidden="true">→</span>
-        </a>
-        {% if briefing.status == "completed" %}
-          <a href="{% url 'automations:sc06-briefing-pdf' briefing_id=briefing.id %}" class="sc06-case-secondary-link">Baixar PDF</a>
+      <form
+        method="get"
+        class="flex flex-wrap items-center gap-2"
+        role="search"
+        aria-label="Filtrar casos societários"
+        hx-get="{% url 'automations:module-detail' module.slug %}"
+        hx-target="#sc06-cases-region"
+        hx-select="#sc06-cases-region"
+        hx-swap="outerHTML show:none"
+        hx-push-url="true"
+      >
+        <div class="min-w-44">{{ filter_form.q }}</div>
+        <div class="min-w-36">{{ filter_form.status }}</div>
+        <button
+          type="submit"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
+        >
+          Filtrar
+        </button>
+        {% if has_active_filters %}
+          <a
+            href="{% url 'automations:module-detail' module.slug %}"
+            class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+            hx-get="{% url 'automations:module-detail' module.slug %}"
+            hx-target="#sc06-cases-region"
+            hx-select="#sc06-cases-region"
+            hx-swap="outerHTML show:none"
+            hx-push-url="true"
+          >
+            Limpar
+          </a>
         {% endif %}
-      </div>
-    </article>
-    {% empty %}
-    <div class="empty-state">
-      <span class="sc06-empty-icon" aria-hidden="true">＋</span>
-      <h3 class="mt-4 font-display text-lg font-semibold">Nenhum briefing iniciado</h3>
-      <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-grafite">Preencha os dados sintéticos no painel acima para criar o primeiro atendimento societário.</p>
+      </form>
     </div>
-    {% endfor %}
+
+    <div class="sc06-case-list mt-5">
+      {% for briefing in page_obj %}
+      <article class="sc06-case-card">
+        <div class="sc06-case-identity">
+          <span class="sc06-case-monogram" aria-hidden="true">{{ briefing.client_name|first|upper }}</span>
+          <div class="min-w-0">
+            <h3>{{ briefing.client_name }}</h3>
+            <p class="font-mono">{{ briefing.formatted_client_document }}</p>
+          </div>
+        </div>
+
+        <div class="sc06-case-meta">
+          <span class="status-badge status-{{ briefing.status_tone|default:'neutral' }}"><i></i>{{ briefing.get_status_display }}</span>
+          <p>Atualizado em <time datetime="{{ briefing.updated_at|date:'c' }}">{{ briefing.updated_at|date:"d/m/Y H:i" }}</time></p>
+        </div>
+
+        <div class="sc06-case-actions">
+          <a href="{% url 'automations:sc06-briefing-detail' briefing_id=briefing.id %}" class="sc06-case-primary-link">
+            {% if briefing.status == "draft" %}Retomar{% else %}Visualizar{% endif %}
+            <span aria-hidden="true">→</span>
+          </a>
+          {% if briefing.status == "completed" %}
+            <a href="{% url 'automations:sc06-briefing-pdf' briefing_id=briefing.id %}" class="sc06-case-secondary-link">Baixar PDF</a>
+          {% endif %}
+        </div>
+      </article>
+      {% empty %}
+      <div class="empty-state">
+        <span class="sc06-empty-icon" aria-hidden="true">＋</span>
+        <h3 class="mt-4 font-display text-lg font-semibold">
+          {% if has_active_filters %}
+            Nenhum briefing localizado
+          {% else %}
+            Nenhum briefing iniciado
+          {% endif %}
+        </h3>
+        <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-grafite">
+          {% if has_active_filters %}
+            Nenhum caso societário corresponde aos filtros de busca informados.
+          {% else %}
+            Preencha os dados sintéticos no painel acima para criar o primeiro atendimento societário.
+          {% endif %}
+        </p>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% include "components/pagination.html" with page_obj=page_obj paginator=paginator query_params=query_params item_label="casos" nav_label="Navegação dos casos societários" target_id="sc06-cases-region" %}
   </div>
 </section>
 {% endblock %}

@@ -20,7 +20,7 @@ from core.automations.models import (
     SocietaryBriefing,
     SocietaryBriefingStatus,
 )
-from core.automations.sc06.services import complete_briefing, create_briefing
+from core.automations.sc06.services import cancel_briefing, complete_briefing, create_briefing
 from core.identity.models import User
 
 pytestmark = pytest.mark.django_db
@@ -185,6 +185,7 @@ def test_server_blocks_completion_when_conditional_requirements_are_missing(
     briefing.run.refresh_from_db()
     html = response.content.decode()
     assert response.status_code == 200
+    assert "Revise o briefing antes de continuar." in html
     assert html.count("Este campo é obrigatório") >= 4
     assert briefing.status == SocietaryBriefingStatus.DRAFT
     assert briefing.run.status == RunStatus.RUNNING
@@ -276,3 +277,129 @@ def test_draft_pdf_and_repeat_completion_fail_safely(
 
     assert repeated.status_code == 400
     assert AutomationRun.objects.count() == 1
+
+
+def test_cancel_draft_action_via_post_and_redirects(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    societary_operator: User,
+    administrator: User,
+) -> None:
+    _publish_template(administrator)
+    briefing = create_briefing(
+        client_name="Caso Para Cancelar",
+        client_document="12345678901",
+        created_by=societary_operator,
+    )
+    detail_url = reverse(
+        "automations:sc06-briefing-detail",
+        kwargs={"briefing_id": briefing.id},
+    )
+    client.force_login(societary_operator)
+
+    # POST action=cancel
+    response = client.post(detail_url, {"action": "cancel"})
+    expected_redirect = reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
+    assert response.url == expected_redirect
+
+    briefing.refresh_from_db()
+    assert briefing.status == SocietaryBriefingStatus.CANCELLED
+    assert briefing.run.status == RunStatus.CANCELLED
+
+    # Reading detail page shows cancelled banner and fieldset disabled
+    detail_page = client.get(detail_url)
+    assert detail_page.status_code == 200
+    content = detail_page.content.decode()
+    assert "Briefing cancelado e arquivado" in content
+    assert "<fieldset disabled" in content
+
+
+def test_sc06_detail_pagination_and_formatted_document(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    societary_operator: User,
+    administrator: User,
+) -> None:
+    _publish_template(administrator)
+    for i in range(8):
+        create_briefing(
+            client_name=f"Cliente {i + 1:02d}",
+            client_document=f"{i:011d}",
+            created_by=societary_operator,
+        )
+
+    module_url = reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
+    client.force_login(societary_operator)
+
+    # Page 1
+    resp1 = client.get(module_url)
+    assert resp1.status_code == 200
+    assert resp1.context["paginator"].num_pages == 2
+    assert len(resp1.context["page_obj"]) == 7
+    assert resp1.context["page_obj"].number == 1
+    assert "Navegação dos casos societários" in resp1.content.decode()
+
+    # Page 2
+    resp2 = client.get(f"{module_url}?page=2")
+    assert resp2.status_code == 200
+    assert len(resp2.context["page_obj"]) == 1
+    assert resp2.context["page_obj"].number == 2
+
+
+def test_sc06_cases_filters_and_htmx_pagination(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    societary_operator: User,
+    administrator: User,
+) -> None:
+    _publish_template(administrator)
+    b1 = create_briefing(
+        client_name="Alfa Consultoria",
+        client_document="11122233344",
+        created_by=societary_operator,
+    )
+    b2 = create_briefing(
+        client_name="Beta Contabilidade",
+        client_document="55566677788",
+        created_by=societary_operator,
+    )
+    b3 = create_briefing(
+        client_name="Gama Tech",
+        client_document="99988877766",
+        created_by=societary_operator,
+    )
+    cancel_briefing(b3.id, cancelled_by=societary_operator)
+
+    module_url = reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
+    client.force_login(societary_operator)
+
+    # 1. Busca por nome parcial
+    resp_q_name = client.get(f"{module_url}?q=Alfa")
+    assert resp_q_name.status_code == 200
+    assert len(resp_q_name.context["page_obj"]) == 1
+    assert resp_q_name.context["page_obj"][0].id == b1.id
+    assert resp_q_name.context["has_active_filters"] is True
+
+    resp_q_beta = client.get(f"{module_url}?q=Beta")
+    assert resp_q_beta.status_code == 200
+    assert len(resp_q_beta.context["page_obj"]) == 1
+    assert resp_q_beta.context["page_obj"][0].id == b2.id
+
+    # 2. Busca por documento formatado ou dígitos
+    resp_q_doc = client.get(f"{module_url}?q=999.888")
+    assert resp_q_doc.status_code == 200
+    assert len(resp_q_doc.context["page_obj"]) == 1
+    assert resp_q_doc.context["page_obj"][0].id == b3.id
+
+    # 3. Filtro por status cancelado
+    resp_cancelled = client.get(f"{module_url}?status={SocietaryBriefingStatus.CANCELLED}")
+    assert resp_cancelled.status_code == 200
+    assert len(resp_cancelled.context["page_obj"]) == 1
+    assert resp_cancelled.context["page_obj"][0].status == SocietaryBriefingStatus.CANCELLED
+
+    # 4. Atributos HTMX presentes no HTML da página
+    html = resp_cancelled.content.decode()
+    assert 'hx-target="#sc06-cases-region"' in html
+    assert 'hx-swap="outerHTML show:none"' in html
+    assert 'hx-push-url="true"' in html
+    assert "Limpar" in html

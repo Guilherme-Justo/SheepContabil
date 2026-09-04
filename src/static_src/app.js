@@ -20,12 +20,73 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
   setSc04PollingError(event, false);
 });
 
+const formatDocument = (value) => {
+  if (!value) return "";
+  const digits = String(value).replace(/\D/g, "").slice(0, 14);
+  if (digits.length <= 11) {
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+    if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  }
+  if (digits.length <= 12) {
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+  }
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+};
+
+document.addEventListener("input", (e) => {
+  const target = e.target;
+  if (!target || !target.matches) return;
+  if (
+    target.matches('[data-mask="document"]') ||
+    target.matches('[data-sc06-answer="current_cnpj"]') ||
+    target.name === "client_document"
+  ) {
+    const start = target.selectionStart;
+    const oldLength = target.value.length;
+    const formatted = formatDocument(target.value);
+    if (target.value !== formatted) {
+      target.value = formatted;
+      if (start !== null) {
+        const newLength = formatted.length;
+        const newPos = Math.max(0, start + (newLength - oldLength));
+        target.setSelectionRange(newPos, newPos);
+      }
+    }
+  }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll('[data-mask="document"], [data-sc06-answer="current_cnpj"], input[name="client_document"]').forEach((field) => {
+    if (field.value) field.value = formatDocument(field.value);
+  });
+});
+
 window.sc06BriefingForm = (config) => ({
   config,
   answers: { ...(config.initialAnswers || config.answers || {}) },
+  initialSnapshot: "",
+  isSubmitting: false,
+  showUnsavedModal: false,
+  showCancelModal: false,
+  pendingNavigationUrl: "",
 
   init() {
-    this.$nextTick(() => this.syncFromDom(this.$root));
+    this.$nextTick(() => {
+      this.syncFromDom(this.$root);
+      this.$root.querySelectorAll('[data-mask="document"], [data-sc06-answer="current_cnpj"]').forEach((field) => {
+        if (field.value) field.value = formatDocument(field.value);
+      });
+      this.initialSnapshot = JSON.stringify(this.answers);
+    });
+
+    window.addEventListener("beforeunload", (e) => {
+      if (this.isDirty && !this.isSubmitting) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    });
   },
 
   syncFromDom(root) {
@@ -129,5 +190,76 @@ window.sc06BriefingForm = (config) => ({
   get progressPercent() {
     if (!this.visibleQuestionCount) return 0;
     return Math.round((this.answeredCount / this.visibleQuestionCount) * 100);
+  },
+
+  get visibleSections() {
+    return (this.config.sections || [])
+      .filter((section) => this.isSectionVisible(section.id))
+      .map((section) => section.id);
+  },
+
+  getSectionIndex(sectionId) {
+    const index = this.visibleSections.indexOf(sectionId);
+    if (index === -1) return "—";
+    return String(index + 1).padStart(2, "0");
+  },
+
+  get parsedPartnerList() {
+    const raw = this.answers.partner_names;
+    if (!raw || typeof raw !== "string") return [];
+    const items = raw
+      .split(/[\n,;]+/)
+      .map((item) => {
+        const namePart = item.replace(/\s*-\s*\d{2,3}.*$/, "").trim();
+        return namePart || item.trim();
+      })
+      .filter((item) => item.length > 0);
+    return [...new Set(items)];
+  },
+
+  get isDirty() {
+    if (!this.initialSnapshot) return false;
+    return JSON.stringify(this.answers) !== this.initialSnapshot;
+  },
+
+  promptLeave(url) {
+    if (!this.isDirty) {
+      window.location.href = url;
+      return;
+    }
+    this.pendingNavigationUrl = url;
+    this.showUnsavedModal = true;
+  },
+
+  saveAndLeave() {
+    this.isSubmitting = true;
+    const form = this.$root.querySelector("form");
+    if (!form) {
+      window.location.href = this.pendingNavigationUrl;
+      return;
+    }
+    let nextInput = form.querySelector('input[name="next"]');
+    if (!nextInput) {
+      nextInput = document.createElement("input");
+      nextInput.type = "hidden";
+      nextInput.name = "next";
+      form.appendChild(nextInput);
+    }
+    nextInput.value = this.pendingNavigationUrl;
+
+    let actionInput = form.querySelector('input[name="action"][type="hidden"]');
+    if (!actionInput) {
+      actionInput = document.createElement("input");
+      actionInput.type = "hidden";
+      actionInput.name = "action";
+      form.appendChild(actionInput);
+    }
+    actionInput.value = "save";
+    form.submit();
+  },
+
+  discardAndLeave() {
+    this.isSubmitting = true;
+    window.location.href = this.pendingNavigationUrl;
   },
 });

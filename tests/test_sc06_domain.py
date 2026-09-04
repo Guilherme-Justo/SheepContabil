@@ -29,6 +29,7 @@ from core.automations.sc06.rules import (
     validate_template_schema,
 )
 from core.automations.sc06.services import (
+    cancel_briefing,
     complete_briefing,
     create_briefing,
     get_latest_published_version,
@@ -313,3 +314,59 @@ def test_incomplete_completion_preserves_draft_and_running_execution(
     briefing.run.refresh_from_db()
     assert briefing.status == SocietaryBriefingStatus.DRAFT
     assert briefing.run.status == RunStatus.RUNNING
+
+
+def test_married_partner_must_belong_to_declared_partners(
+    administrator: User,
+) -> None:
+    _published_version(administrator)
+    answers = {
+        **_complete_sp_opening_answers(),
+        "partner_names": "Carlos Drumond de Andrade\nClarice Lispector",
+        "has_married_partner": True,
+        "married_partner_name": "Estranho Nao Cadastrado",
+        "marriage_regime": "partial_community",
+    }
+    with pytest.raises(ValidationError) as captured:
+        sanitize_answers(SC06_SCHEMA_V1, answers, require_complete=True)
+
+    assert "married_partner_name" in captured.value.error_dict
+    assert "deve coincidir com um dos nomes declarados" in str(
+        captured.value.error_dict["married_partner_name"][0]
+    )
+
+    # With declared partner name:
+    answers["married_partner_name"] = "Clarice Lispector"
+    sanitized = sanitize_answers(SC06_SCHEMA_V1, answers, require_complete=True)
+    assert sanitized["married_partner_name"] == "Clarice Lispector"
+
+
+def test_cancel_briefing_lifecycle_and_document_formatting(
+    modules: dict[str, AutomationModule],
+    administrator: User,
+) -> None:
+    _published_version(administrator)
+    briefing = create_briefing(
+        client_name="Cliente Para Cancelamento",
+        client_document="12345678901",
+        created_by=administrator,
+    )
+    assert briefing.status == SocietaryBriefingStatus.DRAFT
+    assert briefing.formatted_client_document == "123.456.789-01"
+
+    cnpj_briefing = create_briefing(
+        client_name="Empresa CNPJ",
+        client_document="12345678000199",
+        created_by=administrator,
+    )
+    assert cnpj_briefing.formatted_client_document == "12.345.678/0001-99"
+
+    cancelled = cancel_briefing(briefing.id, cancelled_by=administrator)
+    assert cancelled.status == SocietaryBriefingStatus.CANCELLED
+    assert cancelled.run.status == RunStatus.CANCELLED
+    assert cancelled.run.finished_at is not None
+    assert "cancelado" in cancelled.run.summary.lower()
+
+    # Cannot cancel already cancelled briefing:
+    with pytest.raises(ValidationError):
+        cancel_briefing(briefing.id, cancelled_by=administrator)

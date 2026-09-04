@@ -9,6 +9,7 @@ from django.conf import settings
 from django.core.files.uploadedfile import UploadedFile
 
 from core.automations.models import (
+    CertificateStatus,
     CommunicationChannel,
     DigitalCertificate,
     DocumentClassificationAttempt,
@@ -17,6 +18,8 @@ from core.automations.models import (
     DocumentStatus,
     DocumentType,
     FiscalClient,
+    RunStatus,
+    RunTrigger,
     SC05Action,
     SC05Client,
     SC05ClientStatus,
@@ -137,26 +140,55 @@ class SC04ReviewForm(A11yFormMixin, forms.Form):
 
 
 class SC04QueueFilterForm(A11yFormMixin, forms.Form):
+    _widget_class = (
+        "form-input text-xs py-1.5 px-2.5 rounded-lg border-grafite/25 "
+        "dark:border-white/15 dark:bg-[#091216] dark:text-white"
+    )
+
+    q = forms.CharField(
+        label="Buscar",
+        required=False,
+        max_length=120,
+        widget=forms.TextInput(
+            attrs={
+                "class": _widget_class,
+                "placeholder": "Buscar arquivo ou cliente...",
+                "aria-label": "Buscar por arquivo ou cliente",
+            }
+        ),
+    )
     status = forms.ChoiceField(
         label="Estado",
         required=False,
         choices=[("", "Todos os estados"), *DocumentStatus.choices],
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por estado",
+            }
+        ),
     )
     source = forms.ChoiceField(
         label="Origem",
         required=False,
         choices=[("", "Todas as origens"), *DocumentSource.choices],
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por origem",
+            }
+        ),
     )
     outcome = forms.ChoiceField(
         label="Resultado",
         required=False,
         choices=[("", "Todos os resultados"), *DocumentRunOutcome.choices],
-    )
-    q = forms.CharField(
-        label="Buscar",
-        required=False,
-        max_length=120,
-        widget=forms.TextInput(attrs={"placeholder": "Arquivo ou cliente"}),
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por resultado",
+            }
+        ),
     )
 
 
@@ -217,6 +249,41 @@ class DigitalCertificateForm(A11yFormMixin, forms.ModelForm):  # type: ignore[ty
         return cleaned_data
 
 
+class SC20CertificateFilterForm(A11yFormMixin, forms.Form):
+    _widget_class = (
+        "form-input text-xs py-1.5 px-2.5 rounded-lg border-grafite/25 "
+        "dark:border-white/15 dark:bg-[#091216] dark:text-white"
+    )
+
+    q = forms.CharField(
+        label="Buscar",
+        required=False,
+        max_length=120,
+        widget=forms.TextInput(
+            attrs={
+                "class": _widget_class,
+                "placeholder": "Buscar cliente ou CPF/CNPJ...",
+                "aria-label": "Buscar por cliente ou documento",
+            }
+        ),
+    )
+    status = forms.ChoiceField(
+        label="Estado",
+        required=False,
+        choices=[
+            ("", "Todos os estados"),
+            ("expiring", "Vencendo em 60 dias"),
+            *CertificateStatus.choices,
+        ],
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por estado",
+            }
+        ),
+    )
+
+
 class BriefingStartForm(A11yFormMixin, forms.Form):
     client_name = forms.CharField(
         label="Cliente sintético",
@@ -231,12 +298,13 @@ class BriefingStartForm(A11yFormMixin, forms.Form):
     client_document = forms.CharField(
         label="CPF ou CNPJ sintético",
         max_length=18,
-        help_text="Informe 11 ou 14 dígitos fictícios.",
+        help_text="Informe 11 dígitos (CPF) ou 14 dígitos (CNPJ).",
         widget=forms.TextInput(
             attrs={
                 "autocomplete": "off",
                 "inputmode": "numeric",
-                "placeholder": "00.000.000/0000-00",
+                "data-mask": "document",
+                "placeholder": "000.000.000-00 ou 00.000.000/0000-00",
             }
         ),
     )
@@ -249,6 +317,48 @@ class BriefingStartForm(A11yFormMixin, forms.Form):
         if len(document) not in {11, 14}:
             raise forms.ValidationError("Informe um CPF ou CNPJ sintético com 11 ou 14 dígitos.")
         return document
+
+
+class SC05OperationFilterForm(A11yFormMixin, forms.Form):
+    _widget_class = (
+        "form-input text-xs py-1.5 px-2.5 rounded-lg border-grafite/25 "
+        "dark:border-white/15 dark:bg-[#091216] dark:text-white"
+    )
+
+    q = forms.CharField(
+        label="Buscar",
+        required=False,
+        max_length=120,
+        widget=forms.TextInput(
+            attrs={
+                "class": _widget_class,
+                "placeholder": "Buscar cliente ou CNPJ...",
+                "aria-label": "Buscar por cliente ou CNPJ",
+            }
+        ),
+    )
+    action = forms.ChoiceField(
+        label="Ação",
+        required=False,
+        choices=[("", "Todas as ações"), *SC05Action.choices],
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por ação",
+            }
+        ),
+    )
+    status = forms.ChoiceField(
+        label="Estado",
+        required=False,
+        choices=[("", "Todos os estados"), *RunStatus.choices],
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por estado",
+            }
+        ),
+    )
 
 
 class SC05OperationForm(A11yFormMixin, forms.Form):
@@ -292,3 +402,54 @@ class SC05OperationForm(A11yFormMixin, forms.Form):
         elif action == SC05Action.UNBLOCK and client.status != SC05ClientStatus.BLOCKED:
             self.add_error("action", "O cliente ainda está ativo.")
         return cleaned_data
+
+
+class DashboardRunFilterForm(A11yFormMixin, forms.Form):
+    _widget_class = (
+        "form-input text-xs py-1.5 px-2.5 rounded-lg border-grafite/25 "
+        "dark:border-white/15 dark:bg-[#091216] dark:text-white"
+    )
+
+    module = forms.ChoiceField(
+        label="Automação",
+        required=False,
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por automação",
+            }
+        ),
+    )
+    status = forms.ChoiceField(
+        label="Estado",
+        required=False,
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por estado",
+            }
+        ),
+    )
+    trigger = forms.ChoiceField(
+        label="Disparo",
+        required=False,
+        widget=forms.Select(
+            attrs={
+                "class": _widget_class,
+                "aria-label": "Filtrar por tipo de disparo",
+            }
+        ),
+    )
+
+    def __init__(self, *args: Any, modules: Any = None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        module_choices = [("", "Todas as automações")]
+        if modules is not None:
+            module_choices.extend((m.code, f"{m.code} · {m.name}") for m in modules)
+        cast(forms.ChoiceField, self.fields["module"]).choices = module_choices
+        cast(forms.ChoiceField, self.fields["status"]).choices = [("", "Todos os estados")] + list(
+            RunStatus.choices
+        )
+        cast(forms.ChoiceField, self.fields["trigger"]).choices = [
+            ("", "Todos os disparos")
+        ] + list(RunTrigger.choices)
