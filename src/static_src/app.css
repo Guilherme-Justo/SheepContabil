@@ -49,6 +49,25 @@
     font-size: .78rem; font-weight: 500; transition: background .16s, color .16s;
   }
   .sidebar-link:hover { background: rgba(255,255,255,.07); color: white; }
+  .portal-sidebar {
+    transition: padding .2s ease, background-color .15s ease;
+  }
+  .portal-sidebar.is-collapsed {
+    padding-inline: .55rem !important;
+  }
+  .portal-sidebar.is-collapsed .sidebar-link {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: .65rem .25rem !important;
+    width: 100% !important;
+  }
+  .portal-sidebar.is-collapsed .sidebar-link span:first-child {
+    font-size: .72rem !important;
+    font-weight: 600 !important;
+    letter-spacing: -.02em;
+    text-align: center !important;
+  }
   .sidebar-signout {
     width: 100%; border: 1px solid rgba(255,255,255,.15); border-radius: .75rem;
     padding: .65rem .8rem; text-align: left; font-size: .78rem; color: rgba(255,255,255,.7);
@@ -897,8 +916,8 @@
   .environment-badge { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: rgba(255,255,255,.85); }
   .nature-ai { background: rgba(31,166,154,.22); color: #1fa69a; }
   .nature-rpa { background: rgba(232,163,61,.22); color: #e8a33d; }
-  .nature-control { background: rgba(31,166,154,.20); color: #5ec0b7; }
   .card-arrow { background: rgba(255,255,255,.1); color: white; }
+  .module-card:hover .card-arrow { background: #1fa69a; color: white; }
   .notice { background: rgba(255,255,255,.05); color: rgba(255,255,255,.9); }
   .empty-state { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.1); }
   .status-dot { box-shadow: 0 0 0 4px rgba(31,166,154,.25); }

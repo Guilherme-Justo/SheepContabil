@@ -27,30 +27,127 @@
 <body class="min-h-full text-tinta antialiased">
   <a href="#main-content" class="skip-link">Pular para o conteúdo</a>
   {% if request.user.is_authenticated %}
-    <div class="min-h-screen lg:grid lg:grid-cols-[17rem_1fr]">
-      <aside class="portal-sidebar">
-        <a href="{% url 'automations:dashboard' %}" class="block" aria-label="Ir para o início">
-          <img src="{% static 'brand/logo-dark.png' %}" alt="SheepContabil" class="h-11 w-auto">
-        </a>
-        <nav class="mt-10" aria-label="Módulos de automação">
-          <p class="sidebar-label">Automações</p>
-          <div class="mt-3 space-y-1.5">
+    <div
+      x-data="{
+        sidebarCollapsed: localStorage.getItem('sheep_sidebar_collapsed') === 'true',
+        automationsOpen: localStorage.getItem('sheep_sidebar_automations_open') !== 'false',
+        toggleSidebar() {
+          this.sidebarCollapsed = !this.sidebarCollapsed;
+          localStorage.setItem('sheep_sidebar_collapsed', this.sidebarCollapsed);
+        },
+        toggleAutomations() {
+          this.automationsOpen = !this.automationsOpen;
+          localStorage.setItem('sheep_sidebar_automations_open', this.automationsOpen);
+        }
+      }"
+      :class="sidebarCollapsed ? 'lg:grid-cols-[4.75rem_1fr]' : 'lg:grid-cols-[17rem_1fr]'"
+      class="min-h-screen transition-[grid-template-columns] duration-200 lg:grid"
+    >
+      <aside class="portal-sidebar" :class="sidebarCollapsed ? 'is-collapsed' : ''">
+        <div class="flex items-center" :class="sidebarCollapsed ? 'flex-col gap-3' : 'justify-between'">
+          <a href="{% url 'automations:dashboard' %}" class="block focus:outline-none" :title="sidebarCollapsed ? 'SheepContabil · Início' : ''" aria-label="Ir para o início">
+            <img
+              x-show="!sidebarCollapsed"
+              src="{% static 'brand/logo-dark.png' %}"
+              alt="SheepContabil"
+              class="h-10 w-auto"
+            >
+            <img
+              x-show="sidebarCollapsed"
+              x-cloak
+              src="{% static 'brand/favicon.png' %}"
+              alt="SheepContabil"
+              class="h-8 w-8 rounded-lg"
+            >
+          </a>
+          <button
+            type="button"
+            @click="toggleSidebar()"
+            class="hidden lg:inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+            :title="sidebarCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'"
+            :aria-label="sidebarCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'"
+            :aria-expanded="!sidebarCollapsed"
+          >
+            <svg class="h-4 w-4 transform transition-transform duration-200" :class="sidebarCollapsed ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+          </button>
+        </div>
+
+        <nav class="mt-8" aria-label="Módulos de automação">
+          <div x-show="!sidebarCollapsed">
+            <button
+              type="button"
+              @click="toggleAutomations()"
+              class="flex w-full items-center justify-between sidebar-label text-left hover:text-white transition-colors cursor-pointer group"
+              :aria-expanded="automationsOpen"
+              aria-controls="sidebar-automations-list"
+              title="Alternar exibição das automações"
+            >
+              <span class="flex items-center gap-2">
+                <span>Automações</span>
+                {% if navigation_modules %}
+                  <span class="rounded-full bg-white/10 px-1.5 py-0.5 text-[0.6rem] font-semibold text-white/60 group-hover:text-white/80">
+                    {{ navigation_modules|length }}
+                  </span>
+                {% endif %}
+              </span>
+              <span class="text-white/40 group-hover:text-white transition-transform duration-200" :class="automationsOpen ? 'rotate-0' : '-rotate-90'" aria-hidden="true">▾</span>
+            </button>
+          </div>
+
+          <div
+            id="sidebar-automations-list"
+            x-show="automationsOpen || sidebarCollapsed"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 -translate-y-1"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 -translate-y-1"
+            class="mt-3 space-y-1.5"
+          >
             {% for nav_module in navigation_modules %}
-              <a href="{% url 'automations:module-detail' nav_module.slug %}" class="sidebar-link">
+              <a
+                href="{% url 'automations:module-detail' nav_module.slug %}"
+                class="sidebar-link"
+                title="{{ nav_module.code }} · {{ nav_module.name }}"
+              >
                 <span class="font-mono text-xs text-turquesa">{{ nav_module.code }}</span>
-                <span>{{ nav_module.name }}</span>
+                <span x-show="!sidebarCollapsed" class="truncate">{{ nav_module.name }}</span>
               </a>
             {% empty %}
-              <p class="rounded-xl bg-white/5 px-3 py-4 text-sm text-white/60">Nenhum módulo liberado.</p>
+              <p x-show="!sidebarCollapsed" class="rounded-xl bg-white/5 px-3 py-4 text-sm text-white/60">Nenhum módulo liberado.</p>
             {% endfor %}
           </div>
         </nav>
-        <div class="mt-auto border-t border-white/10 pt-5">
-          <p class="text-sm font-semibold text-white">{{ request.user.label }}</p>
-          <p class="mt-1 text-xs text-white/75">{{ request.user.get_role_display }}</p>
-          <form action="{% url 'identity:logout' %}" method="post" class="mt-4">
+
+        <div class="mt-auto border-t border-white/10 pt-5" :class="sidebarCollapsed ? 'flex flex-col items-center gap-3' : ''">
+          <div x-show="!sidebarCollapsed">
+            <p class="text-sm font-semibold text-white">{{ request.user.label }}</p>
+            <p class="mt-1 text-xs text-white/75">{{ request.user.get_role_display }}</p>
+          </div>
+          <div
+            x-show="sidebarCollapsed"
+            x-cloak
+            class="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-turquesa border border-white/15"
+            title="{{ request.user.label }} ({{ request.user.get_role_display }})"
+          >
+            {{ request.user.username|slice:":2"|upper }}
+          </div>
+          <form action="{% url 'identity:logout' %}" method="post" :class="sidebarCollapsed ? 'w-auto' : 'mt-4'">
             {% csrf_token %}
-            <button type="submit" class="sidebar-signout">Sair com segurança</button>
+            <button
+              type="submit"
+              :class="sidebarCollapsed ? 'flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer' : 'sidebar-signout'"
+              title="Sair com segurança"
+              aria-label="Sair com segurança"
+            >
+              <span x-show="!sidebarCollapsed">Sair com segurança</span>
+              <svg x-show="sidebarCollapsed" x-cloak class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </form>
         </div>
       </aside>
