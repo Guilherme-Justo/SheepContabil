@@ -40,7 +40,7 @@
 </section>
 
 <section class="mt-10" aria-labelledby="runs-heading">
-  <div id="dashboard-runs-region">
+  <div id="dashboard-runs-region" class="scroll-mt-24">
     <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <p class="eyebrow">Rastreabilidade</p>
@@ -55,7 +55,7 @@
         hx-get="{% url 'automations:dashboard' %}"
         hx-target="#dashboard-runs-region"
         hx-select="#dashboard-runs-region"
-        hx-swap="outerHTML show:none"
+        hx-swap="outerHTML show:#dashboard-runs-region:top"
         hx-push-url="true"
       >
         <div class="min-w-36">{{ filter_form.module }}</div>
@@ -74,7 +74,7 @@
             hx-get="{% url 'automations:dashboard' %}"
             hx-target="#dashboard-runs-region"
             hx-select="#dashboard-runs-region"
-            hx-swap="outerHTML show:none"
+            hx-swap="outerHTML show:#dashboard-runs-region:top"
             hx-push-url="true"
           >
             Limpar

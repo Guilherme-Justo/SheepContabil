@@ -59,7 +59,7 @@
 </div>
 
 <section class="mt-10 grid gap-7 2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start">
-  <div class="min-w-0" id="sc20-certificates-region">
+  <div class="min-w-0 scroll-mt-24" id="sc20-certificates-region">
     <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <p class="eyebrow">Carteira acompanhada</p>
@@ -76,7 +76,7 @@
         hx-get="{% url 'automations:module-detail' module.slug %}"
         hx-target="#sc20-certificates-region"
         hx-select="#sc20-certificates-region"
-        hx-swap="outerHTML show:none"
+        hx-swap="outerHTML show:#sc20-certificates-region:top"
         hx-push-url="true"
       >
         <div class="min-w-44">
@@ -100,7 +100,7 @@
             hx-get="{% url 'automations:module-detail' module.slug %}"
             hx-target="#sc20-certificates-region"
             hx-select="#sc20-certificates-region"
-            hx-swap="outerHTML show:none"
+            hx-swap="outerHTML show:#sc20-certificates-region:top"
             hx-push-url="true"
           >
             Limpar
@@ -197,7 +197,7 @@
 </section>
 
 <section class="mt-12" aria-labelledby="attempts-title">
-  <div id="sc20-attempts-region">
+  <div id="sc20-attempts-region" class="scroll-mt-24">
     <div class="section-heading flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <p class="eyebrow">Rastreabilidade</p>
@@ -259,7 +259,7 @@
 </section>
 
 <section class="mt-12" aria-labelledby="runs-title">
-  <div id="sc20-runs-region">
+  <div id="sc20-runs-region" class="scroll-mt-24">
     <div class="section-heading">
       <p class="eyebrow">Processamento</p>
       <h2 id="runs-title">Execuções do SC-20</h2>

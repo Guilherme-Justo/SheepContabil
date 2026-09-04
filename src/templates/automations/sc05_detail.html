@@ -82,7 +82,7 @@
 </section>
 
 <section class="mt-12" aria-labelledby="sc05-history-title">
-  <div id="sc05-operations-region">
+  <div id="sc05-operations-region" class="scroll-mt-24">
     <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <p class="eyebrow">Rastreabilidade</p>
@@ -99,7 +99,7 @@
         hx-get="{% url 'automations:module-detail' module.slug %}"
         hx-target="#sc05-operations-region"
         hx-select="#sc05-operations-region"
-        hx-swap="outerHTML show:none"
+        hx-swap="outerHTML show:#sc05-operations-region:top"
         hx-push-url="true"
       >
         <div class="min-w-44">
@@ -127,7 +127,7 @@
             hx-get="{% url 'automations:module-detail' module.slug %}"
             hx-target="#sc05-operations-region"
             hx-select="#sc05-operations-region"
-            hx-swap="outerHTML show:none"
+            hx-swap="outerHTML show:#sc05-operations-region:top"
             hx-push-url="true"
           >
             Limpar

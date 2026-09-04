@@ -438,6 +438,7 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     assert "page=2" in frag
     assert 'aria-label="Primeira página"' in frag
     assert 'aria-label="Última página"' in frag
+    assert 'show:#sc04-queue-region:top' in frag
 
 
 def test_sc04_filter_button_and_compact_empty_table(

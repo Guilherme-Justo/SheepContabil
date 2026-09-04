@@ -400,6 +400,6 @@ def test_sc06_cases_filters_and_htmx_pagination(
     # 4. Atributos HTMX presentes no HTML da página
     html = resp_cancelled.content.decode()
     assert 'hx-target="#sc06-cases-region"' in html
-    assert 'hx-swap="outerHTML show:none"' in html
+    assert 'hx-swap="outerHTML show:#sc06-cases-region:top"' in html
     assert 'hx-push-url="true"' in html
     assert "Limpar" in html

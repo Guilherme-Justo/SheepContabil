@@ -98,7 +98,7 @@
   </aside>
 
   <div class="min-w-0">
-    <div id="sc04-queue-region">
+    <div id="sc04-queue-region" class="scroll-mt-24">
       <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p class="eyebrow">Fila operacional</p>
@@ -117,7 +117,7 @@
         hx-get="{% url 'automations:module-detail' module.slug %}"
         hx-target="#sc04-queue-region"
         hx-select="#sc04-queue-region"
-        hx-swap="outerHTML show:none"
+        hx-swap="outerHTML show:#sc04-queue-region:top"
         hx-push-url="true"
       >
         <div class="min-w-44">
@@ -149,7 +149,7 @@
             hx-get="{% url 'automations:module-detail' module.slug %}"
             hx-target="#sc04-queue-region"
             hx-select="#sc04-queue-region"
-            hx-swap="outerHTML show:none"
+            hx-swap="outerHTML show:#sc04-queue-region:top"
             hx-push-url="true"
           >
             Limpar
@@ -163,7 +163,7 @@
 </section>
 
 <section class="mt-12" aria-labelledby="sc04-runs-title">
-  <div id="sc04-runs-region">
+  <div id="sc04-runs-region" class="scroll-mt-24">
     <div class="section-heading">
       <p class="eyebrow">Rastreabilidade</p>
       <h2 id="sc04-runs-title">Execuções do SC-04</h2>
