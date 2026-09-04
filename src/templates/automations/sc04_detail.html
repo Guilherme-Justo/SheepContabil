@@ -136,6 +136,9 @@
           <label for="{{ queue_filter_form.outcome.id_for_label }}" class="sr-only">Resultado da ingestão</label>
           {{ queue_filter_form.outcome }}
         </div>
+        {% if current_sort %}
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+        {% endif %}
         <button
           type="submit"
           class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"

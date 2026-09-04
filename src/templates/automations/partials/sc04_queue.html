@@ -19,13 +19,13 @@
       <caption class="sr-only">Fila de documentos recebidos pela triagem fiscal</caption>
       <thead>
         <tr>
-          <th scope="col">Arquivo</th>
-          <th scope="col">Origem</th>
+          {% include "components/sortable_th.html" with field="file" label="Arquivo" current_sort=current_sort sort_query_params=sort_query_params target_id="sc04-queue-region" %}
+          {% include "components/sortable_th.html" with field="source" label="Origem" current_sort=current_sort sort_query_params=sort_query_params target_id="sc04-queue-region" %}
           <th scope="col">Ingestão</th>
           <th scope="col">Classificação</th>
-          <th scope="col">Cliente</th>
-          <th scope="col">Estado</th>
-          <th scope="col">Recebido</th>
+          {% include "components/sortable_th.html" with field="client" label="Cliente" current_sort=current_sort sort_query_params=sort_query_params target_id="sc04-queue-region" %}
+          {% include "components/sortable_th.html" with field="status" label="Estado" current_sort=current_sort sort_query_params=sort_query_params target_id="sc04-queue-region" %}
+          {% include "components/sortable_th.html" with field="received_at" label="Recebido" current_sort=current_sort sort_query_params=sort_query_params target_id="sc04-queue-region" %}
           <th scope="col" class="text-right">Abrir</th>
         </tr>
       </thead>

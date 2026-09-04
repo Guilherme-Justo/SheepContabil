@@ -91,6 +91,59 @@ from core.identity.models import User
 DEFAULT_PAGE_SIZE = 7
 
 
+def _extract_sort_and_query_params(
+    request: HttpRequest,
+) -> tuple[str, str, str]:
+    """Extract current sort parameter and build query strings for pagination and sorting.
+
+    Returns:
+        tuple of (current_sort, pagination_query_params, sort_query_params)
+        - current_sort: e.g. "created_at", "-created_at", or ""
+        - pagination_query_params: query string preserving sort and filters, excluding 'page'
+        - sort_query_params: query string preserving filters, excluding 'page' and 'sort'
+    """
+    current_sort = request.GET.get("sort", "").strip()
+
+    pagination_dict = request.GET.copy()
+    pagination_dict.pop("page", None)
+    pagination_query_params = f"&{pagination_dict.urlencode()}" if pagination_dict else ""
+
+    sort_dict = request.GET.copy()
+    sort_dict.pop("page", None)
+    sort_dict.pop("sort", None)
+    sort_query_params = f"&{sort_dict.urlencode()}" if sort_dict else ""
+
+    return current_sort, pagination_query_params, sort_query_params
+
+
+def _apply_sorting(
+    queryset: Any,
+    sort_param: str,
+    whitelist: dict[str, str],
+    default_order: str | tuple[str, ...],
+) -> tuple[Any, str]:
+    """Apply safe sorting to a queryset using a strict whitelist.
+
+    Whitelist maps user-facing column keys to database model field names.
+    Supports ascending ("field") and descending ("-field").
+    Falls back gracefully to default_order on absent or unauthorized params.
+
+    Returns:
+        tuple of (sorted_queryset, valid_active_sort)
+    """
+    if sort_param:
+        is_desc = sort_param.startswith("-")
+        clean_key = sort_param[1:] if is_desc else sort_param
+        if clean_key in whitelist:
+            db_field = whitelist[clean_key]
+            order_expr = f"-{db_field}" if is_desc else db_field
+            return queryset.order_by(order_expr), sort_param
+
+    if isinstance(default_order, (tuple, list)):
+        return queryset.order_by(*default_order), ""
+    return queryset.order_by(default_order), ""
+
+
 def _visible_modules(request: HttpRequest) -> AutomationModuleQuerySet:
     return AutomationModule.objects.visible_to(request.user).select_related("area").order_by("code")
 
@@ -109,7 +162,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     runs = (
         AutomationRun.objects.filter(module__in=modules)
         .select_related("module", "triggered_by")
-        .order_by("-created_at")
     )
 
     filter_form = DashboardRunFilterForm(
@@ -131,13 +183,23 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             runs = runs.filter(trigger=selected_trigger)
             has_active_filters = True
 
+    DASHBOARD_SORT_FIELDS = {
+        "module": "module__code",
+        "created_at": "created_at",
+        "trigger": "trigger",
+        "status": "status",
+    }
+    current_sort, query_params, sort_query_params = _extract_sort_and_query_params(request)
+    runs, valid_sort = _apply_sorting(
+        runs,
+        current_sort,
+        DASHBOARD_SORT_FIELDS,
+        default_order="-created_at",
+    )
+
     paginator = Paginator(runs, per_page=DEFAULT_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
-
-    query_dict = request.GET.copy()
-    query_dict.pop("page", None)
-    query_params = f"&{query_dict.urlencode()}" if query_dict else ""
 
     return render(
         request,
@@ -150,6 +212,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "filter_form": filter_form,
             "has_active_filters": has_active_filters,
             "query_params": query_params,
+            "current_sort": valid_sort,
+            "sort_query_params": sort_query_params,
         },
     )
 
@@ -447,7 +511,10 @@ def _sc04_dashboard_context(
     upload_form: SC04UploadForm | None = None,
 ) -> dict[str, Any]:
     filter_form = SC04QueueFilterForm(request.GET or None)
-    queue = _sc04_queue_queryset(module, filter_form)
+    current_sort, query_params_formatted, sort_query_params = (
+        _extract_sort_and_query_params(request)
+    )
+    queue, valid_sort = _sc04_queue_queryset(module, filter_form, sort_param=current_sort)
     paginator = Paginator(queue, per_page=DEFAULT_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
@@ -488,7 +555,6 @@ def _sc04_dashboard_context(
     query_params = request.GET.copy()
     query_params.pop("page", None)
     filter_querystring = query_params.urlencode()
-    query_params_formatted = f"&{filter_querystring}" if filter_querystring else ""
     has_active_filters = bool(
         filter_form.is_valid()
         and (
@@ -519,6 +585,8 @@ def _sc04_dashboard_context(
         "is_paginated": page_obj.has_other_pages(),
         "filter_querystring": filter_querystring,
         "query_params": query_params_formatted,
+        "current_sort": valid_sort,
+        "sort_query_params": sort_query_params,
         "queue_refresh_url": queue_refresh_url,
         "has_active_queue": documents.filter(
             status__in=(DocumentStatus.QUEUED, DocumentStatus.PROCESSING)
@@ -529,10 +597,20 @@ def _sc04_dashboard_context(
     }
 
 
+SC04_QUEUE_SORT_FIELDS = {
+    "file": "intake__original_filename",
+    "source": "intake__source",
+    "client": "intake__document__matched_client__name",
+    "status": "intake__document__status",
+    "received_at": "created_at",
+}
+
+
 def _sc04_queue_queryset(
     module: AutomationModule,
     filter_form: SC04QueueFilterForm,
-) -> Any:
+    sort_param: str = "",
+) -> tuple[Any, str]:
     queue = DocumentRunItem.objects.filter(run__module=module).select_related(
         "run",
         "intake",
@@ -540,7 +618,12 @@ def _sc04_queue_queryset(
         "intake__document__matched_client",
     )
     if not filter_form.is_valid():
-        return queue.order_by("-created_at")
+        return _apply_sorting(
+            queue,
+            sort_param,
+            SC04_QUEUE_SORT_FIELDS,
+            default_order="-created_at",
+        )
     status = str(filter_form.cleaned_data.get("status") or "")
     source = str(filter_form.cleaned_data.get("source") or "")
     outcome = str(filter_form.cleaned_data.get("outcome") or "")
@@ -556,7 +639,12 @@ def _sc04_queue_queryset(
             Q(intake__original_filename__icontains=query)
             | Q(intake__document__matched_client__name__icontains=query)
         )
-    return queue.order_by("-created_at")
+    return _apply_sorting(
+        queue,
+        sort_param,
+        SC04_QUEUE_SORT_FIELDS,
+        default_order="-created_at",
+    )
 
 
 def _sc04_document_context(
@@ -743,10 +831,25 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         if status_val:
             operations = operations.filter(run__status=status_val)
 
+    SC05_OPERATIONS_SORT_FIELDS = {
+        "created_at": "created_at",
+        "client": "client__name",
+        "action": "action",
+        "status": "run__status",
+    }
+    current_sort, query_params_formatted, sort_query_params = (
+        _extract_sort_and_query_params(request)
+    )
+    operations, valid_sort = _apply_sorting(
+        operations,
+        current_sort,
+        SC05_OPERATIONS_SORT_FIELDS,
+        default_order="-created_at",
+    )
+
     query_params = request.GET.copy()
     query_params.pop("page", None)
     filter_querystring = query_params.urlencode()
-    query_params_formatted = f"&{filter_querystring}" if filter_querystring else ""
     has_active_filters = bool(
         filter_form.is_valid()
         and (
@@ -756,7 +859,7 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         )
     )
 
-    paginator = Paginator(operations.order_by("-created_at"), per_page=DEFAULT_PAGE_SIZE)
+    paginator = Paginator(operations, per_page=DEFAULT_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
 
@@ -775,6 +878,8 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "filter_form": filter_form,
             "has_active_filters": has_active_filters,
             "query_params": query_params_formatted,
+            "current_sort": valid_sort,
+            "sort_query_params": sort_query_params,
             "filter_querystring": filter_querystring,
             "clients": clients,
             "operations": page_obj,
@@ -1139,10 +1244,25 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         elif status_val:
             certificates = certificates.filter(status=status_val)
 
+    SC20_CERTIFICATES_SORT_FIELDS = {
+        "client": "client_name",
+        "document": "client_document",
+        "expires_on": "valid_until",
+        "status": "status",
+    }
+    current_sort, query_params_formatted, sort_query_params = (
+        _extract_sort_and_query_params(request)
+    )
+    certificates, valid_sort = _apply_sorting(
+        certificates,
+        current_sort,
+        SC20_CERTIFICATES_SORT_FIELDS,
+        default_order=("valid_until", "client_name", "serial_number"),
+    )
+
     query_params_dict = request.GET.copy()
     query_params_dict.pop("page", None)
     filter_querystring = query_params_dict.urlencode()
-    query_params_formatted = f"&{filter_querystring}" if filter_querystring else ""
     has_active_filters = bool(
         filter_form.is_valid()
         and (
@@ -1174,6 +1294,8 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "filter_form": filter_form,
             "has_active_filters": has_active_filters,
             "query_params": query_params_formatted,
+            "current_sort": valid_sort,
+            "sort_query_params": sort_query_params,
             "filter_querystring": filter_querystring,
             "certificates": certificates_page,
             "certificates_paginator": certificates_paginator,

@@ -223,3 +223,66 @@ def test_sc20_certificates_filters_and_pagination(
     assert response_expiring.status_code == 200
     assert len(response_expiring.context["certificates"]) == 5
     assert "Limpar" in response_expiring.content.decode()
+
+
+def test_sc20_certificates_sorting_and_whitelist_security(
+    client: Client,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    client.force_login(processes_operator)
+    url = _module_url(modules)
+
+    DigitalCertificate.objects.create(
+        serial_number="CERT-SORT-01",
+        client_name="Zeta Transportes",
+        client_document="11111111000101",
+        responsible_name="Responsavel Zeta",
+        contact_email="zeta@example.test",
+        preferred_channel=CommunicationChannel.EMAIL,
+        valid_until=timezone.localdate() + timedelta(days=50),
+        status=CertificateStatus.ACTIVE,
+    )
+    DigitalCertificate.objects.create(
+        serial_number="CERT-SORT-02",
+        client_name="Alpha Tecnologia",
+        client_document="22222222000102",
+        responsible_name="Responsavel Alpha",
+        contact_email="alpha@example.test",
+        preferred_channel=CommunicationChannel.EMAIL,
+        valid_until=timezone.localdate() + timedelta(days=10),
+        status=CertificateStatus.ACTIVE,
+    )
+
+    # 1. Sem sort: natural, cabeçalhos neutros com aria-sort="none"
+    resp_nat = client.get(url)
+    assert resp_nat.status_code == 200
+    html_nat = resp_nat.content.decode()
+    assert 'aria-sort="none"' in html_nat
+    assert 'hx-target="#sc20-certificates-region"' in html_nat
+
+    # 2. Sort por cliente ASC: Alpha antes de Zeta
+    resp_asc = client.get(f"{url}?sort=client")
+    assert resp_asc.status_code == 200
+    html_asc = resp_asc.content.decode()
+    assert 'aria-sort="ascending"' in html_asc
+    pos_alpha = html_asc.find("Alpha Tecnologia")
+    pos_zeta = html_asc.find("Zeta Transportes")
+    assert pos_alpha != -1 and pos_zeta != -1
+    assert pos_alpha < pos_zeta
+
+    # 3. Sort por cliente DESC: Zeta antes de Alpha
+    resp_desc = client.get(f"{url}?sort=-client")
+    assert resp_desc.status_code == 200
+    html_desc = resp_desc.content.decode()
+    assert 'aria-sort="descending"' in html_desc
+    pos_alpha = html_desc.find("Alpha Tecnologia")
+    pos_zeta = html_desc.find("Zeta Transportes")
+    assert pos_zeta != -1 and pos_alpha != -1
+    assert pos_zeta < pos_alpha
+
+    # 4. Whitelist fallback: campo inválido não quebra a página
+    resp_invalid = client.get(f"{url}?sort=invalid_column")
+    assert resp_invalid.status_code == 200
+    assert resp_invalid.context["current_sort"] == ""
+

@@ -473,3 +473,83 @@ def test_sc04_filter_button_and_compact_empty_table(
     assert 'hx-select="#sc04-queue-region"' in page_filtered
     assert "Nenhum arquivo localizado com os filtros selecionados." in page_filtered
     assert "Limpar filtros" not in page_filtered
+
+
+def test_sc04_queue_sorting_and_whitelist_security(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    fiscal_operator: User,
+) -> None:
+    sc04 = modules["SC-04"]
+    client.force_login(fiscal_operator)
+
+    client_a = FiscalClient.objects.create(
+        code="CLI-ALPHA",
+        route_prefix="alpha",
+        name="Alpha Consultoria",
+        document_number="11111111000101",
+    )
+    client_b = FiscalClient.objects.create(
+        code="CLI-BETA",
+        route_prefix="beta",
+        name="Beta Logistica",
+        document_number="22222222000102",
+    )
+
+    _, doc_a, item_a, _ = _document_case(sc04, suffix="doc-zebra")
+    doc_a.matched_client = client_a
+    doc_a.save(update_fields=["matched_client"])
+    item_a.intake.original_filename = "zebra_invoice.xml"
+    item_a.intake.save(update_fields=["original_filename"])
+
+    _, doc_b, item_b, _ = _document_case(sc04, suffix="doc-alpha")
+    doc_b.matched_client = client_b
+    doc_b.save(update_fields=["matched_client"])
+    item_b.intake.original_filename = "alpha_nfse.xml"
+    item_b.intake.save(update_fields=["original_filename"])
+
+    url = reverse("automations:module-detail", kwargs={"slug": sc04.slug})
+
+    # 1. Sem sort: natural, cabeçalhos neutros com aria-sort="none"
+    resp_nat = client.get(url)
+    assert resp_nat.status_code == 200
+    html_nat = resp_nat.content.decode()
+    assert 'aria-sort="none"' in html_nat
+    assert 'hx-target="#sc04-queue-region"' in html_nat
+
+    # 2. Sort ascendente por arquivo: alpha_nfse antes de zebra_invoice
+    resp_file_asc = client.get(f"{url}?sort=file")
+    assert resp_file_asc.status_code == 200
+    html_file_asc = resp_file_asc.content.decode()
+    assert 'aria-sort="ascending"' in html_file_asc
+    assert "sort=-file" in html_file_asc
+    pos_alpha = html_file_asc.find("alpha_nfse.xml")
+    pos_zebra = html_file_asc.find("zebra_invoice.xml")
+    assert pos_alpha != -1 and pos_zebra != -1
+    assert pos_alpha < pos_zebra
+
+    # 3. Sort descendente por arquivo: zebra_invoice antes de alpha_nfse
+    resp_file_desc = client.get(f"{url}?sort=-file")
+    assert resp_file_desc.status_code == 200
+    html_file_desc = resp_file_desc.content.decode()
+    assert 'aria-sort="descending"' in html_file_desc
+    pos_alpha = html_file_desc.find("alpha_nfse.xml")
+    pos_zebra = html_file_desc.find("zebra_invoice.xml")
+    assert pos_alpha != -1 and pos_zebra != -1
+    assert pos_zebra < pos_alpha
+
+    # 4. Sort por cliente ascendente: Alpha antes de Beta
+    resp_client_asc = client.get(f"{url}?sort=client")
+    assert resp_client_asc.status_code == 200
+    html_client_asc = resp_client_asc.content.decode()
+    assert 'aria-sort="ascending"' in html_client_asc
+    pos_a = html_client_asc.find("Alpha Consultoria")
+    pos_b = html_client_asc.find("Beta Logistica")
+    assert pos_a != -1 and pos_b != -1
+    assert pos_a < pos_b
+
+    # 5. Whitelist / Proteção contra SQL injection: campo arbitrário cai no padrão
+    resp_malicious = client.get(f"{url}?sort=__injection_attempt")
+    assert resp_malicious.status_code == 200
+    assert resp_malicious.context["current_sort"] == ""
+

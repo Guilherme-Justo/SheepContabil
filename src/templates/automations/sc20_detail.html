@@ -87,6 +87,9 @@
           <label for="{{ filter_form.status.id_for_label }}" class="sr-only">Estado</label>
           {{ filter_form.status }}
         </div>
+        {% if current_sort %}
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+        {% endif %}
         <button
           type="submit"
           class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
@@ -114,11 +117,11 @@
         <caption class="sr-only">Certificados digitais acompanhados pelo SC-20</caption>
         <thead>
           <tr>
-            <th scope="col">Cliente</th>
-            <th scope="col">Documento</th>
-            <th scope="col">Validade</th>
+            {% include "components/sortable_th.html" with field="client" label="Cliente" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
+            {% include "components/sortable_th.html" with field="document" label="Documento" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
+            {% include "components/sortable_th.html" with field="expires_on" label="Validade" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
             <th scope="col">Prazo</th>
-            <th scope="col">Estado</th>
+            {% include "components/sortable_th.html" with field="status" label="Estado" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
             <th scope="col">Contato</th>
           </tr>
         </thead>

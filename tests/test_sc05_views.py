@@ -428,3 +428,71 @@ def test_sc05_operations_filters_and_pagination(
     ops_unblock = list(response_unblock.context["operations"])
     assert len(ops_unblock) == 1
     assert ops_unblock[0].client.name == "Beta Servicos S.A."
+
+
+def test_sc05_operations_sorting_and_whitelist_security(
+    client: Client,
+    technology_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    client_a = SC05Client.objects.create(
+        external_reference="cli-zeta-sort",
+        name="Zeta Telecomunicações",
+        document="11111111000101",
+    )
+    client_b = SC05Client.objects.create(
+        external_reference="cli-alfa-sort",
+        name="Alfa Softwares",
+        document="22222222000102",
+    )
+
+    create_sc05_run(
+        module=modules["SC-05"],
+        client=client_a,
+        action=SC05Action.BLOCK,
+        scenario=SC05Scenario.HAPPY_PATH,
+        triggered_by=technology_operator,
+        request_key=uuid4(),
+    )
+    create_sc05_run(
+        module=modules["SC-05"],
+        client=client_b,
+        action=SC05Action.BLOCK,
+        scenario=SC05Scenario.HAPPY_PATH,
+        triggered_by=technology_operator,
+        request_key=uuid4(),
+    )
+
+    client.force_login(technology_operator)
+    url = _module_url(modules)
+
+    # 1. Sem sort: natural, cabeçalhos neutros com aria-sort="none"
+    resp_nat = client.get(url)
+    assert resp_nat.status_code == 200
+    html_nat = resp_nat.content.decode("utf-8")
+    assert 'aria-sort="none"' in html_nat
+    assert 'hx-target="#sc05-operations-region"' in html_nat
+
+    # 2. Sort por cliente ASC: Alfa antes de Zeta
+    resp_asc = client.get(f"{url}?sort=client")
+    assert resp_asc.status_code == 200
+    html_asc = resp_asc.content.decode("utf-8")
+    assert 'aria-sort="ascending"' in html_asc
+    ops_asc = list(resp_asc.context["operations"])
+    assert ops_asc[0].client.name == "Alfa Softwares"
+    assert ops_asc[1].client.name == "Zeta Telecomunicações"
+
+    # 3. Sort por cliente DESC: Zeta antes de Alfa
+    resp_desc = client.get(f"{url}?sort=-client")
+    assert resp_desc.status_code == 200
+    html_desc = resp_desc.content.decode("utf-8")
+    assert 'aria-sort="descending"' in html_desc
+    ops_desc = list(resp_desc.context["operations"])
+    assert ops_desc[0].client.name == "Zeta Telecomunicações"
+    assert ops_desc[1].client.name == "Alfa Softwares"
+
+    # 4. Whitelist fallback: campo inválido não quebra a página
+    resp_invalid = client.get(f"{url}?sort=hack_attempt")
+    assert resp_invalid.status_code == 200
+    assert resp_invalid.context["current_sort"] == ""
+

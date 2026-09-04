@@ -114,6 +114,9 @@
           <label for="{{ filter_form.status.id_for_label }}" class="sr-only">Estado</label>
           {{ filter_form.status }}
         </div>
+        {% if current_sort %}
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+        {% endif %}
         <button
           type="submit"
           class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
@@ -139,7 +142,16 @@
     <div class="table-shell mt-5 overflow-x-auto">
       <table class="data-table sc05-history-table">
         <caption class="sr-only">Histórico de bloqueios e desbloqueios</caption>
-        <thead><tr><th scope="col">Data</th><th scope="col">Cliente</th><th scope="col">Ação</th><th scope="col">Responsável</th><th scope="col">Estado</th><th scope="col" class="text-right">Resultado</th></tr></thead>
+        <thead>
+          <tr>
+            {% include "components/sortable_th.html" with field="created_at" label="Data" current_sort=current_sort sort_query_params=sort_query_params target_id="sc05-operations-region" %}
+            {% include "components/sortable_th.html" with field="client" label="Cliente" current_sort=current_sort sort_query_params=sort_query_params target_id="sc05-operations-region" %}
+            {% include "components/sortable_th.html" with field="action" label="Ação" current_sort=current_sort sort_query_params=sort_query_params target_id="sc05-operations-region" %}
+            <th scope="col">Responsável</th>
+            {% include "components/sortable_th.html" with field="status" label="Estado" current_sort=current_sort sort_query_params=sort_query_params target_id="sc05-operations-region" %}
+            <th scope="col" class="text-right">Resultado</th>
+          </tr>
+        </thead>
         <tbody>
           {% for operation in page_obj %}
           <tr>
