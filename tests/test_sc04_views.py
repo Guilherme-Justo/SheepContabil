@@ -387,6 +387,9 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     assert "15</strong> arquivos" in page1
     assert ">1</strong> de" in page1
     assert "page=2" in page1
+    assert 'aria-label="Primeira página"' not in page1  # disabled span on page 1
+    assert 'aria-label="Última página"' in page1  # active link to page 3
+    assert "page=3" in page1
 
     # Page 2
     resp_p2 = client.get(
@@ -399,8 +402,31 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     assert "14</strong> de" in page2
     assert ">2</strong> de" in page2
     assert "page=1" in page2
+    assert 'aria-label="Primeira página"' in page2  # active link to page 1
+    assert 'aria-label="Última página"' in page2  # active link to page 3
 
-    # Queue fragment with filter + page
+    # Page 3 (last page of queue)
+    resp_p3 = client.get(
+        reverse("automations:module-detail", kwargs={"slug": sc04.slug}),
+        {"page": "3"},
+    )
+    assert resp_p3.status_code == 200
+    page3 = resp_p3.content.decode()
+    assert "15</strong> a" in page3
+    assert 'aria-label="Primeira página"' in page3  # active link to page 1
+
+    # Queue fragment on last page (Page 3) - isolated from other paginators
+    resp_frag_p3 = client.get(
+        reverse("automations:sc04-queue-fragment"),
+        {"page": "3"},
+    )
+    assert resp_frag_p3.status_code == 200
+    frag_p3 = resp_frag_p3.content.decode()
+    assert "15</strong> a" in frag_p3
+    assert 'aria-label="Primeira página"' in frag_p3  # active link to page 1
+    assert 'aria-label="Última página"' not in frag_p3  # disabled span on last page
+
+    # Queue fragment with filter + page 2
     resp_fragment = client.get(
         reverse("automations:sc04-queue-fragment"),
         {"q": "paginated", "page": "2"},
@@ -410,6 +436,8 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     assert "8</strong> a" in frag
     assert "q=paginated" in frag
     assert "page=2" in frag
+    assert 'aria-label="Primeira página"' in frag
+    assert 'aria-label="Última página"' in frag
 
 
 def test_sc04_filter_button_and_compact_empty_table(

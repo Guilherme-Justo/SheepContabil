@@ -7,8 +7,22 @@
     Mostrando <strong class="text-tinta dark:text-white">{{ page_obj.start_index }}</strong> a <strong class="text-tinta dark:text-white">{{ page_obj.end_index }}</strong> de <strong class="text-tinta dark:text-white">{{ paginator.count }}</strong> {{ item_label|default:"itens" }}
     · Página <strong class="text-tinta dark:text-white">{{ page_obj.number }}</strong> de <strong class="text-tinta dark:text-white">{{ paginator.num_pages }}</strong>
   </p>
-  <div class="flex items-center gap-1.5">
+  <div class="flex flex-wrap items-center justify-center gap-1.5 sm:flex-nowrap">
     {% if page_obj.has_previous %}
+      <a
+        href="?{{ page_param|default:'page' }}=1{{ query_params }}"
+        {% if target_id %}
+          hx-get="?{{ page_param|default:'page' }}=1{{ query_params }}"
+          hx-target="#{{ target_id }}"
+          hx-select="#{{ target_id }}"
+          hx-swap="outerHTML show:none"
+          hx-push-url="true"
+        {% endif %}
+        class="inline-flex items-center gap-1 rounded-lg border border-grafite/25 px-2.5 py-1.5 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+        aria-label="Primeira página"
+      >
+        <span aria-hidden="true">«</span> <span class="hidden sm:inline">Primeira</span>
+      </a>
       <a
         href="?{{ page_param|default:'page' }}={{ page_obj.previous_page_number }}{{ query_params }}"
         {% if target_id %}
@@ -18,14 +32,17 @@
           hx-swap="outerHTML show:none"
           hx-push-url="true"
         {% endif %}
-        class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+        class="inline-flex items-center gap-1 rounded-lg border border-grafite/25 px-2 sm:px-3 py-1.5 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
         aria-label="Página anterior"
       >
-        ← Anterior
+        <span aria-hidden="true">←</span> <span class="hidden sm:inline">Anterior</span>
       </a>
     {% else %}
-      <span class="inline-flex items-center rounded-lg border border-grafite/15 px-3 py-1.5 text-xs font-medium text-grafite/40 dark:border-white/5 dark:text-white/30 cursor-not-allowed">
-        ← Anterior
+      <span class="inline-flex items-center gap-1 rounded-lg border border-grafite/15 px-2 sm:px-2.5 py-1.5 text-xs font-medium text-grafite/40 dark:border-white/5 dark:text-white/30 cursor-not-allowed" aria-disabled="true">
+        <span aria-hidden="true">«</span> <span class="hidden sm:inline">Primeira</span>
+      </span>
+      <span class="inline-flex items-center gap-1 rounded-lg border border-grafite/15 px-2 sm:px-3 py-1.5 text-xs font-medium text-grafite/40 dark:border-white/5 dark:text-white/30 cursor-not-allowed" aria-disabled="true">
+        <span aria-hidden="true">←</span> <span class="hidden sm:inline">Anterior</span>
       </span>
     {% endif %}
 
@@ -63,14 +80,31 @@
           hx-swap="outerHTML show:none"
           hx-push-url="true"
         {% endif %}
-        class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+        class="inline-flex items-center gap-1 rounded-lg border border-grafite/25 px-2 sm:px-3 py-1.5 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
         aria-label="Próxima página"
       >
-        Próxima →
+        <span class="hidden sm:inline">Próxima</span> <span aria-hidden="true">→</span>
+      </a>
+      <a
+        href="?{{ page_param|default:'page' }}={{ paginator.num_pages }}{{ query_params }}"
+        {% if target_id %}
+          hx-get="?{{ page_param|default:'page' }}={{ paginator.num_pages }}{{ query_params }}"
+          hx-target="#{{ target_id }}"
+          hx-select="#{{ target_id }}"
+          hx-swap="outerHTML show:none"
+          hx-push-url="true"
+        {% endif %}
+        class="inline-flex items-center gap-1 rounded-lg border border-grafite/25 px-2 sm:px-2.5 py-1.5 text-xs font-medium text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+        aria-label="Última página"
+      >
+        <span class="hidden sm:inline">Última</span> <span aria-hidden="true">»</span>
       </a>
     {% else %}
-      <span class="inline-flex items-center rounded-lg border border-grafite/15 px-3 py-1.5 text-xs font-medium text-grafite/40 dark:border-white/5 dark:text-white/30 cursor-not-allowed">
-        Próxima →
+      <span class="inline-flex items-center gap-1 rounded-lg border border-grafite/15 px-2 sm:px-3 py-1.5 text-xs font-medium text-grafite/40 dark:border-white/5 dark:text-white/30 cursor-not-allowed" aria-disabled="true">
+        <span class="hidden sm:inline">Próxima</span> <span aria-hidden="true">→</span>
+      </span>
+      <span class="inline-flex items-center gap-1 rounded-lg border border-grafite/15 px-2 sm:px-2.5 py-1.5 text-xs font-medium text-grafite/40 dark:border-white/5 dark:text-white/30 cursor-not-allowed" aria-disabled="true">
+        <span class="hidden sm:inline">Última</span> <span aria-hidden="true">»</span>
       </span>
     {% endif %}
   </div>
