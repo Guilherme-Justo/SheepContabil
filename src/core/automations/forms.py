@@ -446,6 +446,10 @@ class DashboardRunFilterForm(A11yFormMixin, forms.Form):
         module_choices = [("", "Todas as automações")]
         if modules is not None:
             module_choices.extend((m.code, f"{m.code} · {m.name}") for m in modules)
-        self.fields["module"].choices = module_choices
-        self.fields["status"].choices = [("", "Todos os estados")] + list(RunStatus.choices)
-        self.fields["trigger"].choices = [("", "Todos os disparos")] + list(RunTrigger.choices)
+        cast(forms.ChoiceField, self.fields["module"]).choices = module_choices
+        cast(forms.ChoiceField, self.fields["status"]).choices = [("", "Todos os estados")] + list(
+            RunStatus.choices
+        )
+        cast(forms.ChoiceField, self.fields["trigger"]).choices = [
+            ("", "Todos os disparos")
+        ] + list(RunTrigger.choices)
