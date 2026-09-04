@@ -55,6 +55,11 @@ urlpatterns = [
         name="sc05-artifact",
     ),
     path(
+        "briefings-societarios/novo/",
+        views.sc06_briefing_new,
+        name="sc06-briefing-new",
+    ),
+    path(
         "briefings-societarios/<uuid:briefing_id>/",
         views.sc06_briefing_detail,
         name="sc06-briefing-detail",

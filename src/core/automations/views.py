@@ -4,12 +4,14 @@ from collections import defaultdict
 from datetime import timedelta
 from io import BytesIO
 from typing import Any, cast
+from urllib.parse import urlencode
 from uuid import UUID
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, Max, Q
 from django.http import (
     FileResponse,
@@ -18,7 +20,7 @@ from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
 )
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_sameorigin
@@ -80,11 +82,14 @@ from core.automations.sc06.forms import BriefingAnswersForm, SC06CasesFilterForm
 from core.automations.sc06.pdf import build_briefing_pdf
 from core.automations.sc06.rules import build_frontend_config
 from core.automations.sc06.services import (
+    DEFAULT_TEMPLATE_CODE,
     PublishedTemplateUnavailable,
     cancel_briefing,
     complete_briefing,
     create_briefing,
+    discard_empty_briefing,
     get_latest_published_version,
+    is_briefing_empty,
     save_briefing_draft,
 )
 from core.automations.sc20.services import create_sc20_run
@@ -1118,9 +1123,14 @@ def sc06_briefing_detail(request: HttpRequest, briefing_id: str) -> HttpResponse
         if action not in {"save", "complete", "cancel"}:
             return HttpResponseBadRequest("Ação inválida.")
         if action == "cancel":
-            cancel_briefing(briefing.id, cancelled_by=cast(User, request.user))
-            messages.info(request, "Briefing societário cancelado e arquivado.")
-            return redirect("automations:module-detail", slug=briefing.run.module.slug)
+            module_slug = briefing.run.module.slug
+            if is_briefing_empty(briefing):
+                discard_empty_briefing(briefing.id)
+                messages.info(request, "Rascunho vazio descartado sem resíduos.")
+            else:
+                cancel_briefing(briefing.id, cancelled_by=cast(User, request.user))
+                messages.info(request, "Briefing societário cancelado e arquivado.")
+            return redirect("automations:module-detail", slug=module_slug)
         submitted_answers = {
             field_name: request.POST.get(field_name, "") for field_name in form.fields
         }
@@ -1159,6 +1169,111 @@ def sc06_briefing_detail(request: HttpRequest, briefing_id: str) -> HttpResponse
             "form": form,
             "sections": form.sections,
             "frontend_config": build_frontend_config(schema, submitted_answers),
+            "is_new": False,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def sc06_briefing_new(request: HttpRequest) -> HttpResponse:
+    module = get_object_or_404(
+        AutomationModule.objects.filter(pk__in=_visible_modules(request)),
+        pk="SC-06",
+    )
+    try:
+        template_version = get_latest_published_version(DEFAULT_TEMPLATE_CODE)
+    except PublishedTemplateUnavailable:
+        messages.error(
+            request,
+            "O template publicado está indisponível. Solicite a configuração ao administrador.",
+        )
+        return redirect("automations:module-detail", slug=module.slug)
+
+    data_source = request.POST if request.method == "POST" else request.GET
+    start_form = BriefingStartForm(
+        {
+            "client_name": data_source.get("client_name", ""),
+            "client_document": data_source.get("client_document", ""),
+        }
+    )
+    if not start_form.is_valid():
+        messages.error(request, "Informe os dados válidos do cliente para iniciar o briefing.")
+        return redirect("automations:module-detail", slug=module.slug)
+
+    client_name = start_form.cleaned_data["client_name"]
+    client_document = start_form.cleaned_data["client_document"]
+    schema = template_version.schema
+    form = BriefingAnswersForm(
+        schema=schema,
+        data=request.POST if request.method == "POST" else None,
+    )
+    submitted_answers: dict[str, object] = {}
+
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+        if action not in {"save", "complete", "cancel"}:
+            return HttpResponseBadRequest("Ação inválida.")
+        if action == "cancel":
+            messages.info(request, "Atendimento descartado sem resíduos.")
+            return redirect("automations:module-detail", slug=module.slug)
+
+        submitted_answers = {
+            field_name: request.POST.get(field_name, "") for field_name in form.fields
+        }
+        if form.is_valid():
+            submitted_answers = form.answer_payload
+            try:
+                with transaction.atomic():
+                    briefing = create_briefing(
+                        client_name=client_name,
+                        client_document=client_document,
+                        created_by=cast(User, request.user),
+                    )
+                    if action == "save":
+                        briefing = save_briefing_draft(briefing.id, form.answer_payload)
+                        messages.success(
+                            request, "Rascunho salvo com as regras condicionais aplicadas."
+                        )
+                    else:
+                        briefing = complete_briefing(
+                            briefing.id,
+                            form.answer_payload,
+                            completed_by=cast(User, request.user),
+                        )
+                        messages.success(request, "Briefing concluído e resultado consolidado.")
+            except ValidationError as exc:
+                _apply_validation_error(form, exc)
+            else:
+                next_url = request.POST.get("next")
+                if action == "save" and next_url and next_url.startswith("/"):
+                    return redirect(next_url)
+                return redirect(
+                    "automations:sc06-briefing-detail",
+                    briefing_id=briefing.id,
+                )
+
+    transient_briefing = SocietaryBriefing(
+        template_version=template_version,
+        client_name=client_name,
+        client_document=client_document,
+        created_by=cast(User, request.user),
+        status=SocietaryBriefingStatus.DRAFT,
+        answers=submitted_answers,
+    )
+
+    return render(
+        request,
+        "automations/sc06_form.html",
+        {
+            "module": module,
+            "briefing": transient_briefing,
+            "form": form,
+            "sections": form.sections,
+            "frontend_config": build_frontend_config(schema, submitted_answers),
+            "is_new": True,
+            "client_name": client_name,
+            "client_document": client_document,
         },
     )
 
@@ -1181,11 +1296,7 @@ def _sc06_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             return HttpResponseBadRequest("Ação inválida.")
         if start_form.is_valid():
             try:
-                briefing = create_briefing(
-                    client_name=start_form.cleaned_data["client_name"],
-                    client_document=start_form.cleaned_data["client_document"],
-                    created_by=cast(User, request.user),
-                )
+                get_latest_published_version(DEFAULT_TEMPLATE_CODE)
             except PublishedTemplateUnavailable:
                 start_form.add_error(
                     None,
@@ -1193,11 +1304,13 @@ def _sc06_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
                     "Solicite a configuração ao administrador.",
                 )
             else:
-                messages.success(request, "Briefing criado; responda apenas o caminho aplicável.")
-                return redirect(
-                    "automations:sc06-briefing-detail",
-                    briefing_id=briefing.id,
+                params = urlencode(
+                    {
+                        "client_name": start_form.cleaned_data["client_name"],
+                        "client_document": start_form.cleaned_data["client_document"],
+                    }
                 )
+                return redirect(f"{reverse('automations:sc06-briefing-new')}?{params}")
 
     briefings = SocietaryBriefing.objects.filter(run__module=module).select_related(
         "template_version", "created_by", "completed_by", "run"
