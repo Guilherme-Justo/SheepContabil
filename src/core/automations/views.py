@@ -31,6 +31,7 @@ from core.automations.forms import (
     SC04QueueFilterForm,
     SC04ReviewForm,
     SC04UploadForm,
+    SC05ClientFilterForm,
     SC05OperationFilterForm,
     SC05OperationForm,
     SC20CertificateFilterForm,
@@ -95,6 +96,8 @@ DEFAULT_PAGE_SIZE = 7
 
 def _extract_sort_and_query_params(
     request: HttpRequest,
+    sort_key: str = "sort",
+    page_key: str = "page",
 ) -> tuple[str, str, str]:
     """Extract current sort parameter and build query strings for pagination and sorting.
 
@@ -104,15 +107,15 @@ def _extract_sort_and_query_params(
         - pagination_query_params: query string preserving sort and filters, excluding 'page'
         - sort_query_params: query string preserving filters, excluding 'page' and 'sort'
     """
-    current_sort = request.GET.get("sort", "").strip()
+    current_sort = request.GET.get(sort_key, "").strip()
 
     pagination_dict = request.GET.copy()
-    pagination_dict.pop("page", None)
+    pagination_dict.pop(page_key, None)
     pagination_query_params = f"&{pagination_dict.urlencode()}" if pagination_dict else ""
 
     sort_dict = request.GET.copy()
-    sort_dict.pop("page", None)
-    sort_dict.pop("sort", None)
+    sort_dict.pop(page_key, None)
+    sort_dict.pop(sort_key, None)
     sort_query_params = f"&{sort_dict.urlencode()}" if sort_dict else ""
 
     return current_sort, pagination_query_params, sort_query_params
@@ -859,6 +862,54 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
                 return redirect("automations:run-detail", run_id=creation.run.id)
 
     clients = SC05Client.objects.all()
+
+    clients_filter_form = SC05ClientFilterForm(request.GET if request.GET else None)
+    filtered_clients = clients
+    has_active_client_filters = False
+    if clients_filter_form.is_valid():
+        clients_q = str(clients_filter_form.cleaned_data.get("clients_q") or "").strip()
+        clients_status = str(clients_filter_form.cleaned_data.get("clients_status") or "")
+        if clients_q:
+            clean_digits = re.sub(r"\D", "", clients_q)
+            client_q_filter = Q(name__icontains=clients_q) | Q(
+                external_reference__icontains=clients_q
+            )
+            if clean_digits:
+                client_q_filter |= Q(document__icontains=clean_digits)
+            filtered_clients = filtered_clients.filter(client_q_filter)
+            has_active_client_filters = True
+        if clients_status:
+            filtered_clients = filtered_clients.filter(status=clients_status)
+            has_active_client_filters = True
+
+    SC05_CLIENTS_SORT_FIELDS = {
+        "client": "name",
+        "name": "name",
+        "document": "document",
+        "status": "status",
+    }
+    clients_current_sort, clients_query_params_formatted, clients_sort_query_params = (
+        _extract_sort_and_query_params(request, sort_key="clients_sort", page_key="clients_page")
+    )
+    filtered_clients, valid_clients_sort = _apply_sorting(
+        filtered_clients,
+        clients_current_sort,
+        SC05_CLIENTS_SORT_FIELDS,
+        default_order="name",
+    )
+
+    clients_clear_dict = request.GET.copy()
+    clients_clear_dict.pop("clients_page", None)
+    clients_clear_dict.pop("clients_sort", None)
+    clients_clear_dict.pop("clients_q", None)
+    clients_clear_dict.pop("clients_status", None)
+    clients_clear_qs = clients_clear_dict.urlencode()
+    clients_clear_query_params = f"?{clients_clear_qs}" if clients_clear_qs else ""
+
+    clients_paginator = Paginator(filtered_clients, per_page=DEFAULT_PAGE_SIZE)
+    clients_page_number = request.GET.get("clients_page", 1)
+    clients_page_obj = clients_paginator.get_page(clients_page_number)
+
     filter_form = SC05OperationFilterForm(request.GET if request.GET else None)
     operations = (
         SC05Operation.objects.select_related("client", "run", "run__triggered_by")
@@ -909,6 +960,15 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         )
     )
 
+    operations_clear_dict = request.GET.copy()
+    operations_clear_dict.pop("page", None)
+    operations_clear_dict.pop("sort", None)
+    operations_clear_dict.pop("q", None)
+    operations_clear_dict.pop("action", None)
+    operations_clear_dict.pop("status", None)
+    operations_clear_qs = operations_clear_dict.urlencode()
+    operations_clear_query_params = f"?{operations_clear_qs}" if operations_clear_qs else ""
+
     paginator = Paginator(operations, per_page=DEFAULT_PAGE_SIZE)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
@@ -931,7 +991,16 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "current_sort": valid_sort,
             "sort_query_params": sort_query_params,
             "filter_querystring": filter_querystring,
-            "clients": clients,
+            "operations_clear_query_params": operations_clear_query_params,
+            "clients_filter_form": clients_filter_form,
+            "has_active_client_filters": has_active_client_filters,
+            "clients_query_params": clients_query_params_formatted,
+            "clients_current_sort": valid_clients_sort,
+            "clients_sort_query_params": clients_sort_query_params,
+            "clients_clear_query_params": clients_clear_query_params,
+            "clients": clients_page_obj,
+            "clients_page_obj": clients_page_obj,
+            "clients_paginator": clients_paginator,
             "operations": page_obj,
             "page_obj": page_obj,
             "paginator": paginator,

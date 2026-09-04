@@ -496,3 +496,121 @@ def test_sc05_operations_sorting_and_whitelist_security(
     assert resp_invalid.status_code == 200
     assert resp_invalid.context["current_sort"] == ""
 
+
+def test_sc05_clients_table_sorting_filtering_pagination_and_isolation(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    technology_operator: User,
+) -> None:
+    clients_data = [
+        ("cli-01", "Beta Comércio", "11000000000101", SC05ClientStatus.ACTIVE),
+        ("cli-02", "Alfa Sistemas", "22000000000102", SC05ClientStatus.BLOCKED),
+        ("cli-03", "Zeta Logística", "33000000000103", SC05ClientStatus.ACTIVE),
+        ("cli-04", "Delta Transportes", "44000000000104", SC05ClientStatus.PARTIAL),
+        ("cli-05", "Gama Serviços", "55000000000105", SC05ClientStatus.ACTIVE),
+        ("cli-06", "Epsilon Alimentos", "66000000000106", SC05ClientStatus.BLOCKED),
+        ("cli-07", "Eta Engenharia", "77000000000107", SC05ClientStatus.ACTIVE),
+        ("cli-08", "Theta Consultoria", "88000000000108", SC05ClientStatus.ACTIVE),
+    ]
+    created_clients = []
+    for ref, name, doc, status in clients_data:
+        c = SC05Client.objects.create(
+            external_reference=ref,
+            name=name,
+            document=doc,
+            status=status,
+        )
+        created_clients.append(c)
+
+    create_sc05_run(
+        module=modules["SC-05"],
+        client=created_clients[0],
+        action=SC05Action.BLOCK,
+        scenario=SC05Scenario.HAPPY_PATH,
+        triggered_by=technology_operator,
+        request_key=uuid4(),
+    )
+
+    client.force_login(technology_operator)
+    url = _module_url(modules)
+
+    # 1. Sem filtros: ordenação natural por nome (Alfa Sistemas primeiro)
+    resp = client.get(url)
+    assert resp.status_code == 200
+    html = resp.content.decode("utf-8")
+    assert 'id="sc05-clients-region"' in html
+    assert 'hx-target="#sc05-clients-region"' in html
+    assert 'name="clients_q"' in html
+    assert 'name="clients_status"' in html
+    clients_page_1 = list(resp.context["clients"])
+    assert len(clients_page_1) == 7
+    assert clients_page_1[0].name == "Alfa Sistemas"
+    assert resp.context["summary"]["total"] == 8
+    assert resp.context["summary"]["active"] == 5
+    assert resp.context["summary"]["blocked"] == 2
+    assert resp.context["summary"]["partial"] == 1
+
+    # 2. Paginação: página 2 de clientes
+    resp_p2 = client.get(f"{url}?clients_page=2")
+    assert resp_p2.status_code == 200
+    clients_page_2 = list(resp_p2.context["clients"])
+    assert len(clients_page_2) == 1
+    assert clients_page_2[0].name == "Zeta Logística"
+
+    # 3. Ordenação por nome DESC: Zeta Logística primeiro
+    resp_desc = client.get(f"{url}?clients_sort=-name")
+    assert resp_desc.status_code == 200
+    html_desc = resp_desc.content.decode("utf-8")
+    assert 'aria-sort="descending"' in html_desc
+    clients_desc = list(resp_desc.context["clients"])
+    assert clients_desc[0].name == "Zeta Logística"
+
+    # 4. Ordenação por documento ASC
+    resp_doc_asc = client.get(f"{url}?clients_sort=document")
+    assert resp_doc_asc.status_code == 200
+    clients_doc_asc = list(resp_doc_asc.context["clients"])
+    assert clients_doc_asc[0].document == "11000000000101"
+
+    # 5. Ordenação por status DESC: partial antes de blocked e active
+    resp_status = client.get(f"{url}?clients_sort=-status")
+    assert resp_status.status_code == 200
+    clients_status_list = list(resp_status.context["clients"])
+    assert clients_status_list[0].status == SC05ClientStatus.PARTIAL
+
+    # 6. Fallback de segurança contra ordenação inválida
+    resp_safe = client.get(f"{url}?clients_sort=sql_injection")
+    assert resp_safe.status_code == 200
+    assert resp_safe.context["clients_current_sort"] == ""
+
+    # 7. Filtro por texto (clients_q)
+    resp_filter_q = client.get(f"{url}?clients_q=Delta")
+    assert resp_filter_q.status_code == 200
+    filtered_q = list(resp_filter_q.context["clients"])
+    assert len(filtered_q) == 1
+    assert filtered_q[0].name == "Delta Transportes"
+    assert resp_filter_q.context["summary"]["total"] == 8
+
+    # 8. Filtro por status (clients_status)
+    resp_filter_st = client.get(f"{url}?clients_status=blocked")
+    assert resp_filter_st.status_code == 200
+    filtered_st = list(resp_filter_st.context["clients"])
+    assert len(filtered_st) == 2
+    assert all(c.status == SC05ClientStatus.BLOCKED for c in filtered_st)
+
+    # 9. Filtro sem resultados: empty state contextual
+    resp_empty = client.get(f"{url}?clients_q=InexistenteXYZ")
+    assert resp_empty.status_code == 200
+    assert len(list(resp_empty.context["clients"])) == 0
+    empty_html = resp_empty.content.decode("utf-8")
+    assert "Nenhum cliente localizado com os filtros selecionados." in empty_html
+
+    # 10. Convivência e isolamento entre tabelas
+    combined_url = f"{url}?clients_q=Alfa&clients_sort=name&q=Beta&sort=created_at"
+    resp_comb = client.get(combined_url)
+    assert resp_comb.status_code == 200
+    html_comb = resp_comb.content.decode("utf-8")
+    assert '<input type="hidden" name="q" value="Beta">' in html_comb
+    assert '<input type="hidden" name="sort" value="created_at">' in html_comb
+    assert '<input type="hidden" name="clients_q" value="Alfa">' in html_comb
+    assert '<input type="hidden" name="clients_sort" value="name">' in html_comb
+

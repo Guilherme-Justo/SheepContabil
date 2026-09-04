@@ -1,10 +1,10 @@
-{% with active_sort=current_sort desc_prefix="-"|add:field %}
+{% with active_sort=current_sort desc_prefix="-"|add:field s_param=sort_param|default:"sort" %}
   {% if active_sort == field %}
     <th scope="col" aria-sort="ascending" class="{% if align %}{{ align }}{% else %}text-left{% endif %} {{ extra_class }}">
       <a
-        href="?sort={{ desc_prefix }}{{ sort_query_params }}"
+        href="?{{ s_param }}={{ desc_prefix }}{{ sort_query_params }}"
         {% if target_id %}
-          hx-get="?sort={{ desc_prefix }}{{ sort_query_params }}"
+          hx-get="?{{ s_param }}={{ desc_prefix }}{{ sort_query_params }}"
           hx-target="#{{ target_id }}"
           hx-select="#{{ target_id }}"
           hx-swap="outerHTML show:#{{ target_id }}:top"
@@ -46,9 +46,9 @@
   {% else %}
     <th scope="col" aria-sort="none" class="{% if align %}{{ align }}{% else %}text-left{% endif %} {{ extra_class }}">
       <a
-        href="?sort={{ field }}{{ sort_query_params }}"
+        href="?{{ s_param }}={{ field }}{{ sort_query_params }}"
         {% if target_id %}
-          hx-get="?sort={{ field }}{{ sort_query_params }}"
+          hx-get="?{{ s_param }}={{ field }}{{ sort_query_params }}"
           hx-target="#{{ target_id }}"
           hx-select="#{{ target_id }}"
           hx-swap="outerHTML show:#{{ target_id }}:top"

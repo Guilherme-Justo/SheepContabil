@@ -54,30 +54,115 @@
 </div>
 
 <section class="mt-10" aria-labelledby="sc05-clients-title">
-  <div class="section-heading">
-    <p class="eyebrow">Projeção operacional</p>
-    <h2 id="sc05-clients-title">Clientes do fluxo</h2>
-    <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">O estado abaixo é atualizado apenas depois que os três portais confirmam a operação.</p>
-  </div>
-  <div class="table-shell mt-5 overflow-x-auto">
-    <table class="data-table sc05-clients-table">
-      <caption class="sr-only">Clientes sintéticos disponíveis no SC-05</caption>
-      <thead><tr><th scope="col">Cliente</th><th scope="col">Documento</th><th scope="col">Estado</th><th scope="col">Próxima ação</th></tr></thead>
-      <tbody>
-        {% for client in clients %}
-        <tr>
-          <td><strong>{{ client.name }}</strong><span class="mt-1 block font-mono text-xs">{{ client.external_reference }}</span></td>
-          <td class="font-mono text-xs">{{ client.document }}</td>
-          <td><span class="status-badge status-{{ client.status_tone }}"><i></i>{{ client.get_status_display }}</span></td>
-          <td>
-            {% if client.status == 'active' %}<span class="text-sm text-grafite">Bloquear</span>
-            {% elif client.status == 'blocked' %}<span class="text-sm text-grafite">Desbloquear</span>
-            {% else %}<span class="text-sm text-carmim">Retomar execução parcial</span>{% endif %}
-          </td>
-        </tr>
-        {% empty %}<tr><td colspan="4" class="py-10 text-center text-grafite">Nenhum cliente sintético foi carregado.</td></tr>{% endfor %}
-      </tbody>
-    </table>
+  <div id="sc05-clients-region" class="scroll-mt-24">
+    <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <p class="eyebrow">Projeção operacional</p>
+        <h2 id="sc05-clients-title">Clientes do fluxo</h2>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">O estado abaixo é atualizado apenas depois que os três portais confirmam a operação.</p>
+      </div>
+
+      <form
+        action="{% url 'automations:module-detail' module.slug %}"
+        method="get"
+        class="flex flex-wrap items-center gap-2"
+        role="search"
+        aria-label="Filtrar clientes do fluxo"
+        hx-get="{% url 'automations:module-detail' module.slug %}"
+        hx-target="#sc05-clients-region"
+        hx-select="#sc05-clients-region"
+        hx-swap="outerHTML show:#sc05-clients-region:top"
+        hx-push-url="true"
+      >
+        <div class="min-w-44">
+          <label for="{{ clients_filter_form.clients_q.id_for_label }}" class="sr-only">{{ clients_filter_form.clients_q.label }}</label>
+          {{ clients_filter_form.clients_q }}
+        </div>
+        <div class="min-w-36">
+          <label for="{{ clients_filter_form.clients_status.id_for_label }}" class="sr-only">Estado</label>
+          {{ clients_filter_form.clients_status }}
+        </div>
+        {% if clients_current_sort %}
+          <input type="hidden" name="clients_sort" value="{{ clients_current_sort }}">
+        {% endif %}
+        {# Preserva os parâmetros da tabela de operações #}
+        {% if filter_form.q.value %}
+          <input type="hidden" name="q" value="{{ filter_form.q.value }}">
+        {% endif %}
+        {% if filter_form.action.value %}
+          <input type="hidden" name="action" value="{{ filter_form.action.value }}">
+        {% endif %}
+        {% if filter_form.status.value %}
+          <input type="hidden" name="status" value="{{ filter_form.status.value }}">
+        {% endif %}
+        {% if current_sort %}
+          <input type="hidden" name="sort" value="{{ current_sort }}">
+        {% endif %}
+        {% if page_obj.number and page_obj.number > 1 %}
+          <input type="hidden" name="page" value="{{ page_obj.number }}">
+        {% endif %}
+
+        <button
+          type="submit"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
+        >
+          Filtrar
+        </button>
+        {% if has_active_client_filters %}
+          <a
+            href="{% url 'automations:module-detail' module.slug %}{{ clients_clear_query_params }}"
+            class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+            hx-get="{% url 'automations:module-detail' module.slug %}{{ clients_clear_query_params }}"
+            hx-target="#sc05-clients-region"
+            hx-select="#sc05-clients-region"
+            hx-swap="outerHTML show:#sc05-clients-region:top"
+            hx-push-url="true"
+          >
+            Limpar
+          </a>
+        {% endif %}
+      </form>
+    </div>
+
+    <div class="table-shell mt-5 overflow-x-auto">
+      <table class="data-table sc05-clients-table">
+        <caption class="sr-only">Clientes sintéticos disponíveis no SC-05</caption>
+        <thead>
+          <tr>
+            {% include "components/sortable_th.html" with field="name" label="Cliente" current_sort=clients_current_sort sort_query_params=clients_sort_query_params sort_param="clients_sort" target_id="sc05-clients-region" %}
+            {% include "components/sortable_th.html" with field="document" label="Documento" current_sort=clients_current_sort sort_query_params=clients_sort_query_params sort_param="clients_sort" target_id="sc05-clients-region" %}
+            {% include "components/sortable_th.html" with field="status" label="Estado" current_sort=clients_current_sort sort_query_params=clients_sort_query_params sort_param="clients_sort" target_id="sc05-clients-region" %}
+            <th scope="col">Próxima ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for client in clients %}
+          <tr>
+            <td><strong>{{ client.name }}</strong><span class="mt-1 block font-mono text-xs">{{ client.external_reference }}</span></td>
+            <td class="font-mono text-xs">{{ client.document }}</td>
+            <td><span class="status-badge status-{{ client.status_tone }}"><i></i>{{ client.get_status_display }}</span></td>
+            <td>
+              {% if client.status == 'active' %}<span class="text-sm text-grafite">Bloquear</span>
+              {% elif client.status == 'blocked' %}<span class="text-sm text-grafite">Desbloquear</span>
+              {% else %}<span class="text-sm text-carmim">Retomar execução parcial</span>{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4" class="py-10 text-center text-grafite">
+              {% if has_active_client_filters %}
+                Nenhum cliente localizado com os filtros selecionados.
+              {% else %}
+                Nenhum cliente sintético foi carregado.
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% include "components/pagination.html" with page_obj=clients_page_obj paginator=clients_paginator query_params=clients_query_params page_param="clients_page" item_label="clientes" nav_label="Navegação dos clientes do fluxo" target_id="sc05-clients-region" %}
   </div>
 </section>
 
@@ -117,6 +202,20 @@
         {% if current_sort %}
           <input type="hidden" name="sort" value="{{ current_sort }}">
         {% endif %}
+        {# Preserva os parâmetros da tabela de clientes #}
+        {% if clients_filter_form.clients_q.value %}
+          <input type="hidden" name="clients_q" value="{{ clients_filter_form.clients_q.value }}">
+        {% endif %}
+        {% if clients_filter_form.clients_status.value %}
+          <input type="hidden" name="clients_status" value="{{ clients_filter_form.clients_status.value }}">
+        {% endif %}
+        {% if clients_current_sort %}
+          <input type="hidden" name="clients_sort" value="{{ clients_current_sort }}">
+        {% endif %}
+        {% if clients_page_obj.number and clients_page_obj.number > 1 %}
+          <input type="hidden" name="clients_page" value="{{ clients_page_obj.number }}">
+        {% endif %}
+
         <button
           type="submit"
           class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
@@ -125,9 +224,9 @@
         </button>
         {% if has_active_filters %}
           <a
-            href="{% url 'automations:module-detail' module.slug %}"
+            href="{% url 'automations:module-detail' module.slug %}{{ operations_clear_query_params }}"
             class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
-            hx-get="{% url 'automations:module-detail' module.slug %}"
+            hx-get="{% url 'automations:module-detail' module.slug %}{{ operations_clear_query_params }}"
             hx-target="#sc05-operations-region"
             hx-select="#sc05-operations-region"
             hx-swap="outerHTML show:#sc05-operations-region:top"
