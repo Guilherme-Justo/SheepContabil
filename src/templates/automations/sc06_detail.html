@@ -82,17 +82,18 @@
 <section class="mt-10" aria-labelledby="sc06-cases-title">
   <div id="sc06-cases-region" class="scroll-mt-24">
     <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div>
+      <div class="min-w-0 flex-1">
         <p class="eyebrow">Rastreabilidade societária</p>
         <h2 id="sc06-cases-title">Casos em atendimento</h2>
-        <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Retome rascunhos, consulte respostas consolidadas e baixe briefings concluídos.</p>
+        <p class="mt-2 max-w-xl text-sm leading-6 text-grafite">Retome rascunhos, consulte respostas consolidadas e baixe briefings concluídos.</p>
       </div>
 
       <form
         method="get"
-        class="flex flex-wrap items-center gap-2"
+        class="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0 self-start lg:self-end"
         role="search"
         aria-label="Filtrar casos societários"
+        novalidate
         hx-get="{% url 'automations:module-detail' module.slug %}"
         hx-target="#sc06-cases-region"
         hx-select="#sc06-cases-region"
@@ -101,25 +102,27 @@
       >
         <div class="min-w-44">{{ filter_form.q }}</div>
         <div class="min-w-36">{{ filter_form.status }}</div>
-        <button
-          type="submit"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
-        >
-          Filtrar
-        </button>
-        {% if has_active_filters %}
-          <a
-            href="{% url 'automations:module-detail' module.slug %}"
-            class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
-            hx-get="{% url 'automations:module-detail' module.slug %}"
-            hx-target="#sc06-cases-region"
-            hx-select="#sc06-cases-region"
-            hx-swap="outerHTML show:#sc06-cases-region:top"
-            hx-push-url="true"
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button
+            type="submit"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
           >
-            Limpar
-          </a>
-        {% endif %}
+            Filtrar
+          </button>
+          {% if has_active_filters %}
+            <a
+              href="{% url 'automations:module-detail' module.slug %}"
+              class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+              hx-get="{% url 'automations:module-detail' module.slug %}"
+              hx-target="#sc06-cases-region"
+              hx-select="#sc06-cases-region"
+              hx-swap="outerHTML show:#sc06-cases-region:top"
+              hx-push-url="true"
+            >
+              Limpar
+            </a>
+          {% endif %}
+        </div>
       </form>
     </div>
 

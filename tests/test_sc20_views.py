@@ -285,3 +285,31 @@ def test_sc20_certificates_sorting_and_whitelist_security(
     resp_invalid = client.get(f"{url}?sort=invalid_column")
     assert resp_invalid.status_code == 200
     assert resp_invalid.context["current_sort"] == ""
+
+
+def test_sc20_filter_toolbar_alignment_structure(
+    client: Client,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    _certificate()
+    client.force_login(processes_operator)
+    url = _module_url(modules)
+
+    # 1. Sem filtro ativo: formulário com sm:flex-nowrap, shrink-0 e título com min-w-0 flex-1
+    response = client.get(url)
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert 'class="min-w-0 flex-1"' in html
+    assert "sm:flex-nowrap" in html
+    assert "shrink-0" in html
+    assert '<div class="flex items-center gap-1.5 shrink-0">' in html
+    assert "novalidate" in html
+
+    # 2. Com filtro ativo: botão Limpar agrupado junto a Filtrar
+    resp_filtered = client.get(f"{url}?q=Cliente")
+    assert resp_filtered.status_code == 200
+    html_filtered = resp_filtered.content.decode()
+    assert "Limpar" in html_filtered
+    assert "Filtrar" in html_filtered
+    assert '<div class="flex items-center gap-1.5 shrink-0">' in html_filtered
