@@ -189,7 +189,7 @@
         </label>
         {{ field }}
         {% if field.help_text %}<p id="{{ field.id_for_label }}_helptext" class="form-help">{{ field.help_text|safe }}</p>{% endif %}
-        {% if field.errors %}<p class="field-error" role="alert">{{ field.errors.0 }}</p>{% endif %}
+        {% if field.errors %}<p id="{{ field.id_for_label }}_errors" class="field-error" role="alert">{{ field.errors.0 }}</p>{% endif %}
       </div>
       {% endfor %}
 

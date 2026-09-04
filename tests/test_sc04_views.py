@@ -438,7 +438,7 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     assert "page=2" in frag
     assert 'aria-label="Primeira página"' in frag
     assert 'aria-label="Última página"' in frag
-    assert 'show:#sc04-queue-region:top' in frag
+    assert "show:#sc04-queue-region:top" in frag
 
 
 def test_sc04_filter_button_and_compact_empty_table(
@@ -642,3 +642,32 @@ def test_sc04_queue_threading_and_accordion_for_resubmissions(
     assert "3ª via (Reenvio)" in frag_html
 
 
+def test_sc04_upload_form_validation_accessible_and_novalidate(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    fiscal_operator: User,
+) -> None:
+    sc04 = modules["SC-04"]
+    client.force_login(fiscal_operator)
+
+    # 1. GET page: ensure <form ... novalidate> is present on upload form
+    detail_url = reverse("automations:module-detail", kwargs={"slug": sc04.slug})
+    get_resp = client.get(detail_url)
+    assert get_resp.status_code == 200
+    get_html = get_resp.content.decode()
+    upload_url = reverse("automations:sc04-upload")
+    assert f'action="{upload_url}#sc04-upload-title"' in get_html
+    assert "novalidate" in get_html
+
+    # 2. POST without file or confirmation: returns 400 Bad Request
+    post_resp = client.post(upload_url, data={})
+    assert post_resp.status_code == 400
+    post_html = post_resp.content.decode()
+
+    # 3. Check accessible errors rendered simultaneously
+    assert 'id="id_attachment_errors"' in post_html
+    assert 'class="field-error"' in post_html
+    assert "Este campo é obrigatório." in post_html
+    assert 'id="id_confirm_synthetic_errors"' in post_html
+    assert 'role="alert"' in post_html
+    assert 'aria-invalid="true"' in post_html

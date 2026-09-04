@@ -233,6 +233,10 @@
     align-items: center;
     gap: 0.35rem;
     margin-top: .4rem;
+    padding: 0.22rem 0.55rem;
+    border-radius: 0.45rem;
+    background: rgba(196, 69, 61, 0.08);
+    border: 1px solid rgba(196, 69, 61, 0.25);
     font-size: .72rem;
     font-weight: 600;
     color: #c4453d;
@@ -329,12 +333,43 @@
   .sc05-dark-field label { display: block; margin-bottom: .4rem; color: rgba(255,255,255,.78); font-size: .68rem; font-weight: 600; }
   .sc05-dark-field select {
     width: 100%; border: 1px solid rgba(255,255,255,.2); border-radius: .75rem; background: rgba(255,255,255,.08);
-    padding: .7rem .78rem; color: white; outline: none;
+    padding: .7rem .78rem; color: white; outline: none; transition: border-color .15s, background .15s, box-shadow .15s;
   }
   .sc05-dark-field select option { color: #0b1a20; }
   .sc05-dark-field select:focus { border-color: #79d8cf; box-shadow: 0 0 0 4px rgba(31,166,154,.18); }
+  .sc05-dark-field select[aria-invalid="true"] {
+    border-color: #ff6b63 !important;
+    background: rgba(255, 107, 99, 0.12) !important;
+    box-shadow: 0 0 0 1px rgba(255, 107, 99, 0.45) !important;
+  }
+  .sc05-dark-field select[aria-invalid="true"]:focus {
+    border-color: #ff8d85 !important;
+    box-shadow: 0 0 0 4px rgba(255, 107, 99, 0.3) !important;
+  }
   .sc05-dark-field p { margin-top: .35rem; color: rgba(255,255,255,.72); font-size: .6rem; line-height: 1.45; }
-  .sc05-dark-field span { display: block; margin-top: .35rem; color: #ffb9b5; font-size: .65rem; }
+  .sc05-dark-field-error,
+  .sc05-dark-field span[role="alert"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.45rem;
+    padding: 0.22rem 0.55rem;
+    border-radius: 0.45rem;
+    background: rgba(255, 107, 99, 0.14);
+    border: 1px solid rgba(255, 107, 99, 0.35);
+    color: #ff6b63;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .sc05-dark-field-error::before,
+  .sc05-dark-field span[role="alert"]::before {
+    content: "⚠";
+    display: inline-block;
+    font-size: 0.8rem;
+    line-height: 1;
+    color: #ff5247;
+  }
   .sc05-dark-error { border-left: 3px solid #ff8d85; border-radius: .55rem; background: rgba(196,69,61,.2); padding: .7rem .8rem; color: #ffe9e7; font-size: .7rem; }
   .sc05-execute-button, .sc05-resume-button {
     display: flex; align-items: center; justify-content: space-between; gap: 1rem; border: 0; border-radius: .8rem;
@@ -1276,6 +1311,8 @@ label:has(input:disabled) {
   color: #ffe9e7 !important;
 }
 .dark .field-error {
+  background: rgba(255, 107, 99, 0.14) !important;
+  border: 1px solid rgba(255, 107, 99, 0.35) !important;
   color: #ff6b63 !important;
 }
 .dark .field-error::before {
@@ -1283,29 +1320,54 @@ label:has(input:disabled) {
 }
 
 /* Realce acessível para inputs com erro de validação (WCAG AA) */
-input[aria-invalid="true"]:not(.sc06-dark-field input),
-select[aria-invalid="true"]:not(.sc06-dark-field select),
+input[aria-invalid="true"]:not(.sc06-dark-field input):not(.sc05-dark-field select),
+select[aria-invalid="true"]:not(.sc06-dark-field select):not(.sc05-dark-field select),
 textarea[aria-invalid="true"] {
   border-color: #c4453d !important;
   background-color: rgba(196, 69, 61, 0.04) !important;
 }
-input[aria-invalid="true"]:not(.sc06-dark-field input):focus,
-select[aria-invalid="true"]:not(.sc06-dark-field select):focus,
+input[aria-invalid="true"]:not(.sc06-dark-field input):not(.sc05-dark-field select):focus,
+select[aria-invalid="true"]:not(.sc06-dark-field select):not(.sc05-dark-field select):focus,
 textarea[aria-invalid="true"]:focus {
   border-color: #c4453d !important;
   box-shadow: 0 0 0 3px rgba(196, 69, 61, 0.22) !important;
 }
-.dark input[aria-invalid="true"]:not(.sc06-dark-field input),
-.dark select[aria-invalid="true"]:not(.sc06-dark-field select),
+.dark input[aria-invalid="true"]:not(.sc06-dark-field input):not(.sc05-dark-field select),
+.dark select[aria-invalid="true"]:not(.sc06-dark-field select):not(.sc05-dark-field select),
 .dark textarea[aria-invalid="true"] {
   border-color: #ff6b63 !important;
   background-color: rgba(255, 107, 99, 0.08) !important;
 }
-.dark input[aria-invalid="true"]:not(.sc06-dark-field input):focus,
-.dark select[aria-invalid="true"]:not(.sc06-dark-field select):focus,
+.dark input[aria-invalid="true"]:not(.sc06-dark-field input):not(.sc05-dark-field select):focus,
+.dark select[aria-invalid="true"]:not(.sc06-dark-field select):not(.sc05-dark-field select):focus,
 .dark textarea[aria-invalid="true"]:focus {
   border-color: #ff8d85 !important;
   box-shadow: 0 0 0 3px rgba(255, 107, 99, 0.28) !important;
+}
+
+/* Realce específico para checkboxes e file inputs com erro */
+input[type="checkbox"][aria-invalid="true"],
+.sc04-confirmation input[type="checkbox"][aria-invalid="true"] {
+  border-color: #c4453d !important;
+  background-color: rgba(196, 69, 61, 0.06) !important;
+  box-shadow: 0 0 0 2px rgba(196, 69, 61, 0.22) !important;
+}
+.dark input[type="checkbox"][aria-invalid="true"],
+.dark .sc04-confirmation input[type="checkbox"][aria-invalid="true"] {
+  border-color: #ff6b63 !important;
+  background-color: rgba(255, 107, 99, 0.12) !important;
+  box-shadow: 0 0 0 2px rgba(255, 107, 99, 0.28) !important;
+}
+
+.sc04-file-control input[type="file"][aria-invalid="true"] {
+  border-color: #c4453d !important;
+  background-color: rgba(196, 69, 61, 0.04) !important;
+  box-shadow: 0 0 0 2px rgba(196, 69, 61, 0.18) !important;
+}
+.dark .sc04-file-control input[type="file"][aria-invalid="true"] {
+  border-color: #ff6b63 !important;
+  background-color: rgba(255, 107, 99, 0.08) !important;
+  box-shadow: 0 0 0 2px rgba(255, 107, 99, 0.28) !important;
 }
 
 /* SC-06 Card de Evidência de Execução no Dark Mode */

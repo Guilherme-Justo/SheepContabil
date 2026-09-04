@@ -40,7 +40,7 @@
         </label>
         <div class="sc06-dark-field">{{ field }}</div>
         {% if field.help_text %}<p class="sc06-dark-help">{{ field.help_text|safe }}</p>{% endif %}
-        {% if field.errors %}<p class="sc06-dark-field-error" id="{{ field.id_for_label }}_error" role="alert">{{ field.errors.0 }}</p>{% endif %}
+        {% if field.errors %}<p class="sc06-dark-field-error" id="{{ field.id_for_label }}_errors" role="alert">{{ field.errors.0 }}</p>{% endif %}
       </div>
       {% endfor %}
 

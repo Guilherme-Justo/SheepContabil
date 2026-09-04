@@ -33,7 +33,7 @@
         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
         {{ field }}
         {% if field.help_text %}<p>{{ field.help_text }}</p>{% endif %}
-        {% if field.errors %}<span role="alert">{{ field.errors.0 }}</span>{% endif %}
+        {% if field.errors %}<span id="{{ field.id_for_label }}_errors" class="sc05-dark-field-error" role="alert">{{ field.errors.0 }}</span>{% endif %}
       </div>
       {% endfor %}
       <button type="submit" class="sc05-execute-button w-full">Executar sequência <span aria-hidden="true">→</span></button>

@@ -157,7 +157,7 @@
               <div class="sc06-field-control">{{ question.bound_field }}</div>
             {% endif %}
             {% if question.help_text %}<p id="{{ question.bound_field.id_for_label }}_helptext" class="form-help">{{ question.help_text }}</p>{% endif %}
-            {% if question.bound_field.errors %}<p class="field-error" id="{{ question.bound_field.id_for_label }}_error" role="alert">{{ question.bound_field.errors.0 }}</p>{% endif %}
+            {% if question.bound_field.errors %}<p class="field-error" id="{{ question.bound_field.id_for_label }}_errors" role="alert">{{ question.bound_field.errors.0 }}</p>{% endif %}
           </div>
           {% empty %}
           <p class="sc06-section-empty">Nenhuma pergunta é aplicável nesta seção para as respostas atuais.</p>
