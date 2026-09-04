@@ -850,6 +850,52 @@
   .sc05-state-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
 }
 
+/* ==========================================================================
+   Navegação Responsiva Mobile / Zoom Elevado (< 1024px)
+   ========================================================================== */
+@media (max-width: 1023px) {
+  .portal-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 50 !important;
+    width: 17.5rem !important;
+    max-width: 85vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    transform: translateX(-100%) !important;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease !important;
+    box-shadow: none !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+  }
+
+  .portal-sidebar.mobile-open {
+    transform: translateX(0) !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
+  }
+
+  /* No mobile / drawer, garante exibição completa de logos e rótulos */
+  .portal-sidebar .brand-logo-full { display: block !important; }
+  .portal-sidebar .brand-logo-icon { display: none !important; }
+  .portal-sidebar .sidebar-label-container { display: block !important; }
+  .portal-sidebar .sidebar-link span:last-child { display: inline !important; }
+  .portal-sidebar .sidebar-user-details { display: block !important; }
+  .portal-sidebar .sidebar-user-avatar { display: none !important; }
+  .portal-sidebar .sidebar-signout span { display: inline !important; }
+  .portal-sidebar .sidebar-signout {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    padding: 0.65rem 0.8rem !important;
+  }
+}
+
+body.mobile-menu-active {
+  overflow: hidden !important;
+  touch-action: none;
+}
+
 @media (min-width: 1024px) {
   .portal-sidebar {
     position: sticky; top: 0; z-index: 40;

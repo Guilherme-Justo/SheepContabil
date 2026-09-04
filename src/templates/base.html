@@ -34,6 +34,7 @@
       x-data="{
         sidebarCollapsed: localStorage.getItem('sheep_sidebar_collapsed') === 'true',
         automationsOpen: localStorage.getItem('sheep_sidebar_automations_open') !== 'false',
+        mobileMenuOpen: false,
         toggleSidebar() {
           this.sidebarCollapsed = !this.sidebarCollapsed;
           localStorage.setItem('sheep_sidebar_collapsed', this.sidebarCollapsed);
@@ -42,14 +43,48 @@
         toggleAutomations() {
           this.automationsOpen = !this.automationsOpen;
           localStorage.setItem('sheep_sidebar_automations_open', this.automationsOpen);
+        },
+        toggleMobileMenu() {
+          this.mobileMenuOpen = !this.mobileMenuOpen;
+          document.body.classList.toggle('mobile-menu-active', this.mobileMenuOpen);
+        },
+        closeMobileMenu() {
+          this.mobileMenuOpen = false;
+          document.body.classList.remove('mobile-menu-active');
         }
       }"
+      @keydown.escape.window="closeMobileMenu()"
       :class="sidebarCollapsed ? 'lg:grid-cols-[4.75rem_1fr]' : 'lg:grid-cols-[17rem_1fr]'"
       class="portal-layout min-h-screen transition-[grid-template-columns] duration-300 ease-in-out lg:grid"
     >
-      <aside class="portal-sidebar" :class="sidebarCollapsed ? 'is-collapsed' : ''">
+      <!-- Backdrop móvel com desfoque -->
+      <div
+        x-show="mobileMenuOpen"
+        x-cloak
+        x-transition:enter="transition-opacity ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition-opacity ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        @click="closeMobileMenu()"
+        class="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs lg:hidden"
+        aria-hidden="true"
+      ></div>
+
+      <aside
+        id="portal-sidebar"
+        class="portal-sidebar"
+        :class="{
+          'is-collapsed': sidebarCollapsed,
+          'mobile-open': mobileMenuOpen
+        }"
+        :aria-modal="mobileMenuOpen ? 'true' : null"
+        :role="mobileMenuOpen ? 'dialog' : 'complementary'"
+        aria-label="Menu principal"
+      >
         <div class="flex items-center" :class="sidebarCollapsed ? 'flex-col gap-3' : 'justify-between'">
-          <a href="{% url 'automations:dashboard' %}" class="block focus:outline-none" :title="sidebarCollapsed ? 'SheepContabil · Início' : ''" aria-label="Ir para o início">
+          <a href="{% url 'automations:dashboard' %}" class="block focus:outline-none" :title="sidebarCollapsed ? 'SheepContabil · Início' : ''" aria-label="Ir para o início" @click="if (window.innerWidth < 1024) closeMobileMenu()">
             <img
               x-show="!sidebarCollapsed"
               x-transition:enter="transition ease-out duration-200 delay-75"
@@ -86,6 +121,16 @@
           >
             <svg class="h-4 w-4 transform transition-transform duration-300" :class="sidebarCollapsed ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            @click="closeMobileMenu()"
+            class="lg:hidden inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer shrink-0"
+            aria-label="Fechar menu lateral"
+          >
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
@@ -137,6 +182,7 @@
                 href="{% url 'automations:module-detail' nav_module.slug %}"
                 class="sidebar-link group"
                 title="{{ nav_module.code }} · {{ nav_module.name }}"
+                @click="if (window.innerWidth < 1024) closeMobileMenu()"
               >
                 <span class="sidebar-link-badge font-mono text-xs text-turquesa">{{ nav_module.code }}</span>
                 <span
@@ -212,9 +258,27 @@
       </aside>
       <div class="min-w-0">
         <header class="portal-topbar">
-          <div class="min-w-0">
-            <p class="eyebrow dark:text-white/60">Sheep Technology</p>
-            <p class="mt-1 text-sm text-grafite dark:text-white/80">Operação contábil automatizada</p>
+          <div class="flex items-center gap-3 min-w-0">
+            <!-- Botão Hambúrguer Mobile / Zoom Elevado -->
+            <button
+              type="button"
+              @click="toggleMobileMenu()"
+              class="mobile-menu-button lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg border border-grafite/20 text-tinta hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/10 transition-colors shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-turquesa cursor-pointer"
+              :aria-expanded="mobileMenuOpen"
+              aria-controls="portal-sidebar"
+              :aria-label="mobileMenuOpen ? 'Fechar menu de navegação' : 'Abrir menu de navegação'"
+            >
+              <svg x-show="!mobileMenuOpen" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              <svg x-show="mobileMenuOpen" x-cloak class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div class="min-w-0">
+              <p class="eyebrow dark:text-white/60">Sheep Technology</p>
+              <p class="mt-1 text-sm text-grafite dark:text-white/80 truncate">Operação contábil automatizada</p>
+            </div>
           </div>
           <div class="ml-auto flex items-center gap-3">
             <div class="environment-badge"><span></span> Ambiente demonstrativo</div>
