@@ -471,6 +471,19 @@
     padding: 0 !important;
     border-top: none !important;
   }
+  .sc04-timeline-table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+  }
+  .sc04-timeline-table th {
+    background-color: rgba(90, 112, 120, 0.05);
+  }
+  .sc04-timeline-table th:first-child {
+    border-top-left-radius: 0.45rem;
+  }
+  .sc04-timeline-table th:last-child {
+    border-top-right-radius: 0.45rem;
+  }
   .sc04-document-layout { display: grid; gap: 1.5rem; align-items: start; }
   .sc04-preview-surface { overflow: hidden; border: 1px solid rgba(90,112,120,.14); border-radius: .9rem; background: #eef3f4; }
   .sc04-preview-image { display: block; width: 100%; max-height: 42rem; object-fit: contain; }
@@ -968,6 +981,7 @@
 
   /* Tables */
   .data-table th { background: rgba(255,255,255,.05); color: rgba(255,255,255,.75); }
+  .sc04-timeline-table th { background-color: rgba(255, 255, 255, .05); }
   .data-table td { border-top-color: rgba(255,255,255,.08); color: rgba(255,255,255,.75); }
   .data-table td span.text-petroleo { color: #1fa69a; }
   .table-link { color: #1fa69a; }
