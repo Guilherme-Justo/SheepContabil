@@ -56,18 +56,19 @@
 <section class="mt-10" aria-labelledby="sc05-clients-title">
   <div id="sc05-clients-region" class="scroll-mt-24">
     <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div>
+      <div class="min-w-0 flex-1">
         <p class="eyebrow">Projeção operacional</p>
         <h2 id="sc05-clients-title">Clientes do fluxo</h2>
-        <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">O estado abaixo é atualizado apenas depois que os três portais confirmam a operação.</p>
+        <p class="mt-2 max-w-xl text-sm leading-6 text-grafite">O estado abaixo é atualizado apenas depois que os três portais confirmam a operação.</p>
       </div>
 
       <form
         action="{% url 'automations:module-detail' module.slug %}"
         method="get"
-        class="flex flex-wrap items-center gap-2"
+        class="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0 self-start lg:self-end"
         role="search"
         aria-label="Filtrar clientes do fluxo"
+        novalidate
         hx-get="{% url 'automations:module-detail' module.slug %}"
         hx-target="#sc05-clients-region"
         hx-select="#sc05-clients-region"
@@ -102,25 +103,27 @@
           <input type="hidden" name="page" value="{{ page_obj.number }}">
         {% endif %}
 
-        <button
-          type="submit"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
-        >
-          Filtrar
-        </button>
-        {% if has_active_client_filters %}
-          <a
-            href="{% url 'automations:module-detail' module.slug %}{{ clients_clear_query_params }}"
-            class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
-            hx-get="{% url 'automations:module-detail' module.slug %}{{ clients_clear_query_params }}"
-            hx-target="#sc05-clients-region"
-            hx-select="#sc05-clients-region"
-            hx-swap="outerHTML show:#sc05-clients-region:top"
-            hx-push-url="true"
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button
+            type="submit"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
           >
-            Limpar
-          </a>
-        {% endif %}
+            Filtrar
+          </button>
+          {% if has_active_client_filters %}
+            <a
+              href="{% url 'automations:module-detail' module.slug %}{{ clients_clear_query_params }}"
+              class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+              hx-get="{% url 'automations:module-detail' module.slug %}{{ clients_clear_query_params }}"
+              hx-target="#sc05-clients-region"
+              hx-select="#sc05-clients-region"
+              hx-swap="outerHTML show:#sc05-clients-region:top"
+              hx-push-url="true"
+            >
+              Limpar
+            </a>
+          {% endif %}
+        </div>
       </form>
     </div>
 
@@ -169,18 +172,19 @@
 <section class="mt-12" aria-labelledby="sc05-history-title">
   <div id="sc05-operations-region" class="scroll-mt-24">
     <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div>
+      <div class="min-w-0 flex-1">
         <p class="eyebrow">Rastreabilidade</p>
         <h2 id="sc05-history-title">Operações recentes</h2>
-        <p class="mt-2 max-w-2xl text-sm leading-6 text-grafite">Cada operação conserva autor, duração, cenário e resultado por sistema.</p>
+        <p class="mt-2 max-w-xl text-sm leading-6 text-grafite">Cada operação conserva autor, duração, cenário e resultado por sistema.</p>
       </div>
 
       <form
         action="{% url 'automations:module-detail' module.slug %}"
         method="get"
-        class="flex flex-wrap items-center gap-2"
+        class="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0 self-start lg:self-end"
         role="search"
         aria-label="Filtrar histórico de operações"
+        novalidate
         hx-get="{% url 'automations:module-detail' module.slug %}"
         hx-target="#sc05-operations-region"
         hx-select="#sc05-operations-region"
@@ -216,25 +220,27 @@
           <input type="hidden" name="clients_page" value="{{ clients_page_obj.number }}">
         {% endif %}
 
-        <button
-          type="submit"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
-        >
-          Filtrar
-        </button>
-        {% if has_active_filters %}
-          <a
-            href="{% url 'automations:module-detail' module.slug %}{{ operations_clear_query_params }}"
-            class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
-            hx-get="{% url 'automations:module-detail' module.slug %}{{ operations_clear_query_params }}"
-            hx-target="#sc05-operations-region"
-            hx-select="#sc05-operations-region"
-            hx-swap="outerHTML show:#sc05-operations-region:top"
-            hx-push-url="true"
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button
+            type="submit"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
           >
-            Limpar
-          </a>
-        {% endif %}
+            Filtrar
+          </button>
+          {% if has_active_filters %}
+            <a
+              href="{% url 'automations:module-detail' module.slug %}{{ operations_clear_query_params }}"
+              class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+              hx-get="{% url 'automations:module-detail' module.slug %}{{ operations_clear_query_params }}"
+              hx-target="#sc05-operations-region"
+              hx-select="#sc05-operations-region"
+              hx-swap="outerHTML show:#sc05-operations-region:top"
+              hx-push-url="true"
+            >
+              Limpar
+            </a>
+          {% endif %}
+        </div>
       </form>
     </div>
 

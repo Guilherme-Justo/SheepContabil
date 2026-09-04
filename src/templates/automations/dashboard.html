@@ -42,16 +42,17 @@
 <section class="mt-10" aria-labelledby="runs-heading">
   <div id="dashboard-runs-region" class="scroll-mt-24">
     <div class="section-heading flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div>
+      <div class="min-w-0 flex-1">
         <p class="eyebrow">Rastreabilidade</p>
         <h2 id="runs-heading">Execuções recentes</h2>
       </div>
 
       <form
         method="get"
-        class="flex flex-wrap items-center gap-2"
+        class="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0 self-start lg:self-end"
         role="search"
         aria-label="Filtrar execuções"
+        novalidate
         hx-get="{% url 'automations:dashboard' %}"
         hx-target="#dashboard-runs-region"
         hx-select="#dashboard-runs-region"
@@ -64,25 +65,27 @@
         {% if current_sort %}
           <input type="hidden" name="sort" value="{{ current_sort }}">
         {% endif %}
-        <button
-          type="submit"
-          class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
-        >
-          Filtrar
-        </button>
-        {% if has_active_filters %}
-          <a
-            href="{% url 'automations:dashboard' %}"
-            class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
-            hx-get="{% url 'automations:dashboard' %}"
-            hx-target="#dashboard-runs-region"
-            hx-select="#dashboard-runs-region"
-            hx-swap="outerHTML show:#dashboard-runs-region:top"
-            hx-push-url="true"
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button
+            type="submit"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-turquesa px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:opacity-90"
           >
-            Limpar
-          </a>
-        {% endif %}
+            Filtrar
+          </button>
+          {% if has_active_filters %}
+            <a
+              href="{% url 'automations:dashboard' %}"
+              class="inline-flex items-center rounded-lg border border-grafite/25 px-3 py-1.5 text-xs font-semibold text-tinta transition hover:bg-black/5 dark:border-white/15 dark:text-white dark:hover:bg-white/5"
+              hx-get="{% url 'automations:dashboard' %}"
+              hx-target="#dashboard-runs-region"
+              hx-select="#dashboard-runs-region"
+              hx-swap="outerHTML show:#dashboard-runs-region:top"
+              hx-push-url="true"
+            >
+              Limpar
+            </a>
+          {% endif %}
+        </div>
       </form>
     </div>
 
