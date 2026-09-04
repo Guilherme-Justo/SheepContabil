@@ -976,6 +976,8 @@
   .status-danger { background: rgba(196,69,61,.22); color: #ff8d85; border: 1px solid rgba(196,69,61,.3); }
   .status-active { background: rgba(56,189,248,.16); color: #7dd3fc; border: 1px solid rgba(56,189,248,.28); }
   .status-active i { box-shadow: 0 0 0 3px rgba(56,189,248,.25); }
+  .environment-badge { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: rgba(255,255,255,.85); }
+  .environment-badge span { background: #1fa69a; box-shadow: 0 0 0 3px rgba(31,166,154,.25); }
   .nature-ai { background: rgba(31,166,154,.22); color: #79d8cf; border: 1px solid rgba(31,166,154,.3); }
   .nature-rpa { background: rgba(232,163,61,.22); color: #f3ba63; border: 1px solid rgba(232,163,61,.3); }
   .nature-control { background: rgba(56,189,248,.16); color: #7dd3fc; border: 1px solid rgba(56,189,248,.28); }
