@@ -254,6 +254,59 @@
   .notice-info { border-left-color: #10505f; }
   .notice-warning { border-left-color: #e8a33d; background: #fffaf1; }
   .notice-error { border-left-color: #c4453d; background: #fff7f6; color: #91312c; }
+
+  /* Toasts e Notificações Efêmeras Flutuantes */
+  .toast-notification {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border-radius: 0.85rem;
+    padding: 0.85rem 1rem;
+    background: white;
+    border: 1px solid rgba(90, 112, 120, 0.16);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .toast-success { border-left: 3.5px solid #1fa69a; }
+  .toast-info { border-left: 3.5px solid #10505f; }
+  .toast-warning { border-left: 3.5px solid #e8a33d; }
+  .toast-error { border-left: 3.5px solid #c4453d; }
+
+  .toast-title {
+    font-family: "Archivo", sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #5a7078;
+  }
+  .toast-text {
+    margin-top: 0.15rem;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    color: #1a2a30;
+    word-break: break-word;
+  }
+  .toast-dismiss {
+    display: inline-flex;
+    height: 1.5rem;
+    width: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.4rem;
+    color: #5a7078;
+    transition: background-color 0.15s, color 0.15s;
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-left: 0.25rem;
+    border: none;
+    background: transparent;
+  }
+  .toast-dismiss:hover {
+    background: rgba(0, 0, 0, 0.06);
+    color: #1a2a30;
+  }
   .skip-link {
     position: fixed; z-index: 100; top: .75rem; left: .75rem; transform: translateY(-180%);
     border-radius: .7rem; background: #0b1a20; padding: .7rem .9rem; color: white;
@@ -1218,8 +1271,19 @@ body.mobile-menu-active {
   .nature-rpa { background: rgba(232,163,61,.22); color: #f3ba63; border: 1px solid rgba(232,163,61,.3); }
   .nature-control { background: rgba(56,189,248,.16); color: #7dd3fc; border: 1px solid rgba(56,189,248,.28); }
   .card-arrow { background: rgba(255,255,255,.1); color: white; }
-  .module-card:hover .card-arrow { background: #1fa69a; color: white; }
   .notice { background: rgba(255,255,255,.05); color: rgba(255,255,255,.9); }
+  .toast-notification {
+    background: rgba(13, 30, 37, 0.95);
+    border-color: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  }
+  .toast-title { color: rgba(255, 255, 255, 0.6); }
+  .toast-text { color: rgba(255, 255, 255, 0.92); }
+  .toast-dismiss { color: rgba(255, 255, 255, 0.5); }
+  .toast-dismiss:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+  }
   .empty-state { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.1); }
   .status-dot { box-shadow: 0 0 0 4px rgba(31,166,154,.25); }
 
