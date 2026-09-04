@@ -55,9 +55,11 @@
   }
   .sidebar-signout:hover { border-color: rgba(255,255,255,.3); color: white; }
   .portal-topbar {
+    position: sticky; top: 0; z-index: 30;
     display: flex; min-height: 5.3rem; align-items: center; justify-content: space-between; gap: 1.5rem;
-    border-bottom: 1px solid rgba(90,112,120,.14); background: rgba(255,255,255,.78);
-    padding: 1rem 1.25rem; backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(90,112,120,.14); background: rgba(255,255,255,.82);
+    padding: 1rem 1.25rem; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    transition: background-color .15s ease, border-color .15s ease;
   }
   .environment-badge {
     display: none; align-items: center; gap: .55rem; border: 1px solid rgba(90,112,120,.15);
@@ -658,7 +660,16 @@
 }
 
 @media (min-width: 1024px) {
-  .portal-sidebar { position: sticky; top: 0; height: 100vh; padding: 2.25rem 1.4rem; }
+  .portal-sidebar {
+    position: sticky; top: 0; z-index: 40;
+    height: 100vh; max-height: 100vh; min-height: 0; align-self: start;
+    padding: 2.25rem 1.4rem;
+    overflow-y: auto; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent;
+  }
+  .portal-sidebar::-webkit-scrollbar { width: 6px; }
+  .portal-sidebar::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,.15); border-radius: 999px; }
+  .portal-sidebar::-webkit-scrollbar-track { background: transparent; }
   .login-layout { grid-template-columns: minmax(0,1.15fr) minmax(28rem,.85fr); }
   .login-brand-panel { display: block; }
   .login-form-panel { padding: 3rem; }
@@ -668,8 +679,8 @@
 }
 
 @media (min-width: 1536px) {
-  .sc20-form-card { position: sticky; top: 1.5rem; }
-  .sc04-upload-card { position: sticky; top: 1.5rem; }
+  .sc20-form-card { position: sticky; top: 6.8rem; }
+  .sc04-upload-card { position: sticky; top: 6.8rem; }
   .sc06-start-panel { min-height: 23rem; }
 }
 
@@ -685,8 +696,15 @@
 
   body { background: var(--color-nevoa); color: rgba(255,255,255,.9); }
   
-  /* Containers, Topbar & Cards (Clean dark mode without blurry dark halos) */
-  .portal-topbar, .module-card, .info-card, .stat-card, .content-card, .table-shell, .date-card,
+  /* Sticky Topbar with translucent dark blur */
+  .portal-topbar {
+    background: rgba(13, 30, 37, .85);
+    border-color: rgba(255, 255, 255, .14);
+    box-shadow: none;
+  }
+
+  /* Containers & Cards (Clean dark mode without blurry dark halos) */
+  .module-card, .info-card, .stat-card, .content-card, .table-shell, .date-card,
   .sc04-upload-card, .sc04-preview-card, .sc04-state-card, .sc04-decision-card, .sc04-review-card, .sc04-failure-card,
   .sc04-summary-card, .sc05-summary-card, .sc06-summary-card, .sc20-summary-card,
   .sc05-step-card, .sc06-case-card, .sc06-section-card, .sc06-progress-card, .sc06-form-actions,
