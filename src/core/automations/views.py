@@ -1480,6 +1480,7 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         "document": "client_document",
         "expires_on": "valid_until",
         "status": "status",
+        "contact": "responsible_name",
     }
     current_sort, query_params_formatted, sort_query_params = _extract_sort_and_query_params(
         request
@@ -1505,16 +1506,43 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
     certificates_paginator = Paginator(certificates, per_page=DEFAULT_PAGE_SIZE)
     certificates_page = certificates_paginator.get_page(request.GET.get("page", 1))
 
-    attempts_paginator = Paginator(
+    SC20_ATTEMPTS_SORT_FIELDS = {
+        "recipient": "recipient",
+        "channel": "communication__channel",
+        "status": "status",
+        "created_at": "created_at",
+    }
+    (
+        attempts_current_sort,
+        attempts_query_params,
+        attempts_sort_query_params,
+    ) = _extract_sort_and_query_params(request, sort_key="attempts_sort", page_key="attempts_page")
+    attempts_qs, attempts_valid_sort = _apply_sorting(
         CommunicationAttempt.objects.select_related("communication__certificate", "run").all(),
-        per_page=DEFAULT_PAGE_SIZE,
+        attempts_current_sort,
+        SC20_ATTEMPTS_SORT_FIELDS,
+        default_order=("-created_at",),
     )
+    attempts_paginator = Paginator(attempts_qs, per_page=DEFAULT_PAGE_SIZE)
     attempts_page = attempts_paginator.get_page(request.GET.get("attempts_page", 1))
 
-    runs_paginator = Paginator(
+    SC20_RUNS_SORT_FIELDS = {
+        "created_at": "created_at",
+        "trigger": "trigger",
+        "status": "status",
+    }
+    (
+        runs_current_sort,
+        runs_query_params,
+        runs_sort_query_params,
+    ) = _extract_sort_and_query_params(request, sort_key="runs_sort", page_key="runs_page")
+    runs_qs, runs_valid_sort = _apply_sorting(
         module.runs.select_related("triggered_by").all(),
-        per_page=DEFAULT_PAGE_SIZE,
+        runs_current_sort,
+        SC20_RUNS_SORT_FIELDS,
+        default_order=("-created_at",),
     )
+    runs_paginator = Paginator(runs_qs, per_page=DEFAULT_PAGE_SIZE)
     runs_page = runs_paginator.get_page(request.GET.get("runs_page", 1))
 
     return render(
@@ -1532,10 +1560,16 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "certificates_paginator": certificates_paginator,
             "attempts": attempts_page,
             "attempts_paginator": attempts_paginator,
+            "attempts_current_sort": attempts_valid_sort,
+            "attempts_sort_query_params": attempts_sort_query_params,
+            "attempts_query_params": attempts_query_params,
             "summary": summary,
             "form": form,
             "runs": runs_page,
             "runs_paginator": runs_paginator,
+            "runs_current_sort": runs_valid_sort,
+            "runs_sort_query_params": runs_sort_query_params,
+            "runs_query_params": runs_query_params,
         },
     )
 
