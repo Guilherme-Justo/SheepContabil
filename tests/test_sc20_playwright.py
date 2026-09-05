@@ -8,7 +8,7 @@ from urllib.parse import unquote
 import pytest
 from django.urls import reverse
 from django.utils import timezone
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 from core.automations.models import (
     AutomationModule,
@@ -110,11 +110,36 @@ def test_sc20_dispatch_flow_with_playwright(
         assert "https://wa.me/5561991365756" in pill_href
         assert "Beta" in unquote(pill_href)
 
+        # Testa a máscara de documento no formulário do SC-20
+        doc_input = page.locator('input[name="client_document"]')
+        assert doc_input.is_visible()
+        doc_input.fill("12345678000190")
+        assert doc_input.input_value() == "12.345.678/0001-90"
+
         # Testa a máscara de telefone em tempo real no Chromium
         phone_input = page.locator('input[name="contact_phone"]')
         assert phone_input.is_visible()
         phone_input.fill("+5561991365756")
         assert phone_input.input_value() == "+55 (61) 99136-5756"
+
+        # Testa a reatividade Alpine.js na migração de obrigatoriedade dos canais
+        email_req_asterisk = page.locator('label[for="id_contact_email"] span.text-carmim')
+        phone_req_asterisk = page.locator('label[for="id_contact_phone"] span.text-carmim')
+        channel_select = page.locator('select[name="preferred_channel"]')
+
+        # Estado inicial (Canal = E-mail): E-mail com asterisco, Telefone sem
+        expect(email_req_asterisk).to_be_visible()
+        expect(phone_req_asterisk).not_to_be_visible()
+
+        # Troca para WhatsApp: Telefone ganha asterisco, E-mail perde
+        channel_select.select_option("whatsapp")
+        expect(phone_req_asterisk).to_be_visible()
+        expect(email_req_asterisk).not_to_be_visible()
+
+        # Retorna para E-mail
+        channel_select.select_option("email")
+        expect(email_req_asterisk).to_be_visible()
+        expect(phone_req_asterisk).not_to_be_visible()
 
         # Salva screenshot do painel SC-20 antes do disparo
         if SCREENSHOT_DIR.exists():

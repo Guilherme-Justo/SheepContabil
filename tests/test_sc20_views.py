@@ -475,3 +475,138 @@ def test_sc20_filter_toolbar_alignment_structure(
     assert "Limpar" in html_filtered
     assert "Filtrar" in html_filtered
     assert '<div class="flex items-center gap-1.5 shrink-0">' in html_filtered
+
+
+def test_certificate_form_phone_validation() -> None:
+    from core.automations.forms import DigitalCertificateForm
+
+    # Telefone com 11 dígitos celulares válido
+    form = DigitalCertificateForm(
+        data={
+            "serial_number": "CERT-PHONE-01",
+            "client_name": "Empresa Tel 1",
+            "client_document": "12345678000190",
+            "responsible_name": "Gestor",
+            "contact_email": "tel1@example.test",
+            "contact_phone": "61991365756",
+            "preferred_channel": CommunicationChannel.WHATSAPP,
+            "valid_until": "2026-10-01",
+            "status": CertificateStatus.ACTIVE,
+        }
+    )
+    assert form.is_valid(), form.errors
+    assert form.cleaned_data["contact_phone"] == "+55 (61) 99136-5756"
+
+    # Telefone com DDI +55
+    form_ddi = DigitalCertificateForm(
+        data={
+            "serial_number": "CERT-PHONE-02",
+            "client_name": "Empresa Tel 2",
+            "client_document": "12345678000190",
+            "responsible_name": "Gestor",
+            "contact_email": "tel2@example.test",
+            "contact_phone": "+55 (61) 99136-5756",
+            "preferred_channel": CommunicationChannel.WHATSAPP,
+            "valid_until": "2026-10-01",
+            "status": CertificateStatus.ACTIVE,
+        }
+    )
+    assert form_ddi.is_valid(), form_ddi.errors
+    assert form_ddi.cleaned_data["contact_phone"] == "+55 (61) 99136-5756"
+
+    # Telefone com repetição total
+    form_rep = DigitalCertificateForm(
+        data={
+            "serial_number": "CERT-PHONE-03",
+            "client_name": "Empresa Tel 3",
+            "client_document": "12345678000190",
+            "responsible_name": "Gestor",
+            "contact_phone": "00000000000",
+            "preferred_channel": CommunicationChannel.WHATSAPP,
+            "valid_until": "2026-10-01",
+            "status": CertificateStatus.ACTIVE,
+        }
+    )
+    assert not form_rep.is_valid()
+    assert "contact_phone" in form_rep.errors
+
+    # Telefone com DDD inválido (ex: 00)
+    form_ddd = DigitalCertificateForm(
+        data={
+            "serial_number": "CERT-PHONE-04",
+            "client_name": "Empresa Tel 4",
+            "client_document": "12345678000190",
+            "responsible_name": "Gestor",
+            "contact_phone": "00991365756",
+            "preferred_channel": CommunicationChannel.WHATSAPP,
+            "valid_until": "2026-10-01",
+            "status": CertificateStatus.ACTIVE,
+        }
+    )
+    assert not form_ddd.is_valid()
+    assert "contact_phone" in form_ddd.errors
+
+
+def test_certificate_form_document_mask_and_email_normalization(
+    client: Client,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    client.force_login(processes_operator)
+    url = _module_url(modules)
+
+    resp = client.get(url)
+    assert resp.status_code == 200
+    html = resp.content.decode()
+    assert 'data-mask="document"' in html
+    assert 'id="sc20-certificate-form-card"' in html
+    assert "hx-post=" in html
+
+    # Submissão com e-mail em maiúsculas normalizado para minúsculas
+    resp_post = client.post(
+        url,
+        {
+            "action": "create_certificate",
+            "serial_number": "CERT-EMAIL-NORM",
+            "client_name": "Empresa Email Norm",
+            "client_document": "12.345.678/0001-90",
+            "responsible_name": "Responsável",
+            "contact_email": " UPPERCASE@EXAMPLE.TEST ",
+            "contact_phone": "",
+            "preferred_channel": CommunicationChannel.EMAIL,
+            "valid_until": (timezone.localdate() + timedelta(days=40)).isoformat(),
+            "status": CertificateStatus.ACTIVE,
+        },
+    )
+    assert resp_post.status_code == 302
+    cert = DigitalCertificate.objects.get(serial_number="CERT-EMAIL-NORM")
+    assert cert.contact_email == "uppercase@example.test"
+
+
+def test_create_certificate_with_htmx_returns_redirect_header(
+    client: Client,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    client.force_login(processes_operator)
+    url = _module_url(modules)
+
+    response = client.post(
+        url,
+        {
+            "action": "create_certificate",
+            "serial_number": "CERT-HTMX-01",
+            "client_name": "Empresa HTMX",
+            "client_document": "12.345.678/0001-90",
+            "responsible_name": "Responsável",
+            "contact_email": "htmx@example.test",
+            "contact_phone": "",
+            "preferred_channel": CommunicationChannel.EMAIL,
+            "valid_until": (timezone.localdate() + timedelta(days=40)).isoformat(),
+            "status": CertificateStatus.ACTIVE,
+        },
+        HTTP_HX_REQUEST="true",
+    )
+    assert response.status_code == 200
+    assert response.headers.get("HX-Redirect") == url
+    assert DigitalCertificate.objects.filter(serial_number="CERT-HTMX-01").exists()
