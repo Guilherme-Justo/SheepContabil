@@ -271,7 +271,7 @@
     padding: 0.85rem 1rem;
     background: white;
     border: 1px solid rgba(90, 112, 120, 0.16);
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+    box-shadow: none;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
@@ -1346,7 +1346,7 @@ body.mobile-menu-active {
   .toast-notification {
     background: rgba(13, 30, 37, 0.95);
     border-color: rgba(255, 255, 255, 0.15);
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+    box-shadow: none;
   }
   .toast-title { color: rgba(255, 255, 255, 0.6); }
   .toast-text { color: rgba(255, 255, 255, 0.92); }
