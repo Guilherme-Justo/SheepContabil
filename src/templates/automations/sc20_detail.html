@@ -286,9 +286,9 @@
                   <button type="submit" class="sc20-retry-button" aria-label="Tentar novamente o aviso para {{ attempt.recipient }}">Tentar novamente</button>
                 </form>
                 {% elif attempt.status == "failed" %}
-                <span class="text-xs text-grafite">Superado</span>
-                {% else %}
-                <span class="text-xs text-grafite">Concluído</span>
+                <span class="text-xs text-grafite" title="Tentativa anterior superada por reenvio posterior">Superado</span>
+                {% elif not attempt.is_whatsapp %}
+                <span class="text-xs text-grafite" aria-label="Nenhuma ação necessária">—</span>
                 {% endif %}
               </div>
             </td>

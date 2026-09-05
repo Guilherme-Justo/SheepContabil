@@ -177,6 +177,8 @@ def test_failed_attempt_can_be_retried_from_the_module_page(
     page = client.get(_module_url(modules)).content.decode()
     assert "Superado" in page
     assert "Tentar novamente" not in page
+    assert "Concluído" not in page
+    assert "—" in page
 
 
 def test_sc20_certificates_filters_and_pagination(
