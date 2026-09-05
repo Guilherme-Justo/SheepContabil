@@ -262,8 +262,50 @@ VALID_BRAZILIAN_DDDS: set[str] = {
     "99",
 }
 
+COUNTRY_PHONE_CHOICES: list[tuple[str, str]] = [
+    ("55", "🇧🇷 Brasil (+55)"),
+    ("1", "🇺🇸 Estados Unidos (+1)"),
+    ("351", "🇵🇹 Portugal (+351)"),
+    ("54", "🇦🇷 Argentina (+54)"),
+    ("598", "🇺🇾 Uruguai (+598)"),
+    ("595", "🇵🇾 Paraguai (+595)"),
+    ("56", "🇨🇱 Chile (+56)"),
+    ("34", "🇪🇸 Espanha (+34)"),
+    ("44", "🇬🇧 Reino Unido (+44)"),
+    ("39", "🇮🇹 Itália (+39)"),
+    ("49", "🇩🇪 Alemanha (+49)"),
+    ("33", "🇫🇷 França (+33)"),
+]
+
+VALID_COUNTRY_DDIS: set[str] = {code for code, _ in COUNTRY_PHONE_CHOICES}
+
 
 class DigitalCertificateForm(A11yFormMixin, forms.ModelForm):  # type: ignore[type-arg]
+    phone_country = forms.ChoiceField(
+        label="País (DDI)",
+        choices=COUNTRY_PHONE_CHOICES,
+        initial="55",
+        required=False,
+        widget=forms.Select(
+            attrs={
+                "aria-label": "Selecionar país e DDI do telefone",
+            }
+        ),
+    )
+
+    field_order = [
+        "serial_number",
+        "client_name",
+        "client_document",
+        "responsible_name",
+        "contact_email",
+        "phone_country",
+        "contact_phone",
+        "preferred_channel",
+        "valid_until",
+        "status",
+    ]
+
     class Meta:
         model = DigitalCertificate
         fields = (
@@ -310,7 +352,7 @@ class DigitalCertificateForm(A11yFormMixin, forms.ModelForm):  # type: ignore[ty
             ),
             "contact_phone": forms.TextInput(
                 attrs={
-                    "placeholder": "+55 (11) 99999-0000",
+                    "placeholder": "(11) 99999-0000",
                     "data-mask": "phone",
                     "inputmode": "tel",
                     "autocomplete": "tel",
@@ -324,6 +366,18 @@ class DigitalCertificateForm(A11yFormMixin, forms.ModelForm):  # type: ignore[ty
                 }
             ),
         }
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.contact_phone:
+            raw = self.instance.contact_phone.strip()
+            digits = re.sub(r"\D", "", raw)
+            matched_code = "55"
+            for code, _ in sorted(COUNTRY_PHONE_CHOICES, key=lambda c: len(c[0]), reverse=True):
+                if digits.startswith(code):
+                    matched_code = code
+                    break
+            self.fields["phone_country"].initial = matched_code
 
     def clean_serial_number(self) -> str:
         return str(self.cleaned_data["serial_number"]).strip().upper()
@@ -339,48 +393,74 @@ class DigitalCertificateForm(A11yFormMixin, forms.ModelForm):  # type: ignore[ty
         if not raw_phone:
             return ""
 
+        country = str(
+            self.cleaned_data.get("phone_country") or self.data.get("phone_country") or "55"
+        ).strip()
+
+        if country not in VALID_COUNTRY_DDIS:
+            raise forms.ValidationError("País de DDI selecionado é inválido.")
+
         digits = re.sub(r"\D", "", raw_phone)
-        if raw_phone.startswith("+") and not digits.startswith("55"):
-            raise forms.ValidationError("Para números com DDI, utilize o prefixo do Brasil (+55).")
+        if not digits:
+            raise forms.ValidationError("Informe um telefone válido.")
 
-        if len(digits) not in (10, 11, 12, 13):
-            raise forms.ValidationError(
-                "Informe um telefone válido com DDD (10 ou 11 dígitos, ou com DDI +55)."
-            )
+        if country == "55":
+            if len(digits) in (12, 13) and digits.startswith("55"):
+                digits = digits[2:]
 
-        if len(digits) in (12, 13):
-            if not digits.startswith("55"):
+            if raw_phone.startswith("+") and not raw_phone.startswith("+55"):
                 raise forms.ValidationError(
-                    "Para números com DDI, utilize o prefixo do Brasil (+55)."
+                    "O país selecionado é Brasil (+55). Para outro país, altere o seletor de DDI."
                 )
-            ddd = digits[2:4]
-            local = digits[4:]
-        else:
+
+            if len(digits) not in (10, 11):
+                raise forms.ValidationError(
+                    "Informe um telefone válido com DDD (10 ou 11 dígitos, ex.: (11) 99999-0000)."
+                )
+
             ddd = digits[:2]
             local = digits[2:]
 
-        if ddd not in VALID_BRAZILIAN_DDDS:
-            raise forms.ValidationError(f"O DDD '{ddd}' não é válido no Brasil.")
+            if ddd not in VALID_BRAZILIAN_DDDS:
+                raise forms.ValidationError(f"O DDD '{ddd}' não é válido no Brasil.")
 
-        if len(set(digits)) == 1:
+            if len(set(digits)) == 1:
+                raise forms.ValidationError(
+                    "Informe um telefone válido (todos os dígitos são repetidos)."
+                )
+
+            if len(set(local)) == 1:
+                raise forms.ValidationError("Informe um telefone válido (número local repetido).")
+
+            if len(local) == 9 and not local.startswith("9"):
+                raise forms.ValidationError(
+                    "Telefones celulares de 9 dígitos devem iniciar com o dígito 9."
+                )
+
+            if len(local) == 9:
+                formatted_local = f"{local[:5]}-{local[5:]}"
+            else:
+                formatted_local = f"{local[:4]}-{local[4:]}"
+
+            return f"+55 ({ddd}) {formatted_local}"
+
+        # Validação para outros países (E.164)
+        if digits.startswith(country) and len(digits) > len(country) + 5:
+            local_digits = digits[len(country) :]
+        else:
+            local_digits = digits
+
+        if not (6 <= len(local_digits) <= 14):
+            raise forms.ValidationError(
+                f"Informe um telefone internacional válido (+{country}) com 6 a 14 dígitos."
+            )
+
+        if len(set(local_digits)) == 1:
             raise forms.ValidationError(
                 "Informe um telefone válido (todos os dígitos são repetidos)."
             )
 
-        if len(set(local)) == 1:
-            raise forms.ValidationError("Informe um telefone válido (número local repetido).")
-
-        if len(local) == 9 and not local.startswith("9"):
-            raise forms.ValidationError(
-                "Telefones celulares de 9 dígitos devem iniciar com o dígito 9."
-            )
-
-        if len(local) == 9:
-            formatted_local = f"{local[:5]}-{local[5:]}"
-        else:
-            formatted_local = f"{local[:4]}-{local[4:]}"
-
-        return f"+55 ({ddd}) {formatted_local}"
+        return f"+{country} {local_digits}"
 
     def clean_contact_email(self) -> str:
         return str(self.cleaned_data.get("contact_email") or "").strip().lower()

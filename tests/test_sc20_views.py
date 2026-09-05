@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from uuid import uuid4
 
 import pytest
 from django.test import Client
@@ -629,3 +630,187 @@ def test_create_certificate_with_htmx_returns_redirect_header(
     assert response.status_code == 200
     assert response.headers.get("HX-Redirect") == url
     assert DigitalCertificate.objects.filter(serial_number="CERT-HTMX-01").exists()
+
+
+def test_certificate_form_country_ddi_selector_brazil_and_international() -> None:
+    from core.automations.forms import DigitalCertificateForm
+
+    # Brasil com número local de 11 dígitos
+    form_br = DigitalCertificateForm(
+        data={
+            "phone_country": "55",
+            "serial_number": "CERT-DDI-01",
+            "client_name": "Empresa DDI BR",
+            "client_document": "12345678000190",
+            "responsible_name": "Gestor",
+            "contact_phone": "(11) 98888-7777",
+            "preferred_channel": CommunicationChannel.WHATSAPP,
+            "valid_until": "2026-10-01",
+            "status": CertificateStatus.ACTIVE,
+        }
+    )
+    assert form_br.is_valid(), form_br.errors
+    assert form_br.cleaned_data["contact_phone"] == "+55 (11) 98888-7777"
+
+    # Brasil com número fixo de 10 dígitos
+    form_br_landline = DigitalCertificateForm(
+        data={
+            "phone_country": "55",
+            "serial_number": "CERT-DDI-02",
+            "client_name": "Empresa Fixo BR",
+            "client_document": "12345678000190",
+            "responsible_name": "Gestor",
+            "contact_phone": "1133334444",
+            "preferred_channel": CommunicationChannel.WHATSAPP,
+            "valid_until": "2026-10-01",
+            "status": CertificateStatus.ACTIVE,
+        }
+    )
+    assert form_br_landline.is_valid(), form_br_landline.errors
+    assert form_br_landline.cleaned_data["contact_phone"] == "+55 (11) 3333-4444"
+
+    # EUA (+1)
+    form_us = DigitalCertificateForm(
+        data={
+            "phone_country": "1",
+            "serial_number": "CERT-DDI-US",
+            "client_name": "Empresa DDI US",
+            "client_document": "12345678000190",
+            "responsible_name": "Gestor",
+            "contact_phone": "(202) 555-0199",
+            "preferred_channel": CommunicationChannel.WHATSAPP,
+            "valid_until": "2026-10-01",
+            "status": CertificateStatus.ACTIVE,
+        }
+    )
+    assert form_us.is_valid(), form_us.errors
+    assert form_us.cleaned_data["contact_phone"] == "+1 2025550199"
+
+    # Portugal (+351) sem duplicar código
+    form_pt = DigitalCertificateForm(
+        data={
+            "phone_country": "351",
+            "serial_number": "CERT-DDI-PT",
+            "client_name": "Empresa DDI PT",
+            "client_document": "12345678000190",
+            "responsible_name": "Gestor",
+            "contact_phone": "+351 912 345 678",
+            "preferred_channel": CommunicationChannel.WHATSAPP,
+            "valid_until": "2026-10-01",
+            "status": CertificateStatus.ACTIVE,
+        }
+    )
+    assert form_pt.is_valid(), form_pt.errors
+    assert form_pt.cleaned_data["contact_phone"] == "+351 912345678"
+
+
+def test_certificate_form_country_ddi_validation_errors() -> None:
+    from core.automations.forms import DigitalCertificateForm
+
+    # País inválido
+    form_invalid_country = DigitalCertificateForm(
+        data={
+            "phone_country": "999",
+            "serial_number": "CERT-ERR-01",
+            "client_name": "Empresa Erro País",
+            "client_document": "12345678000190",
+            "responsible_name": "Gestor",
+            "contact_phone": "11988887777",
+            "preferred_channel": CommunicationChannel.WHATSAPP,
+            "valid_until": "2026-10-01",
+            "status": CertificateStatus.ACTIVE,
+        }
+    )
+    assert not form_invalid_country.is_valid()
+    assert "contact_phone" in form_invalid_country.errors
+
+    # DDI incompatível (Brasil selecionado mas digitou +1)
+    form_mismatch = DigitalCertificateForm(
+        data={
+            "phone_country": "55",
+            "serial_number": "CERT-ERR-02",
+            "client_name": "Empresa Erro DDI",
+            "client_document": "12345678000190",
+            "responsible_name": "Gestor",
+            "contact_phone": "+1 (202) 555-0199",
+            "preferred_channel": CommunicationChannel.WHATSAPP,
+            "valid_until": "2026-10-01",
+            "status": CertificateStatus.ACTIVE,
+        }
+    )
+    assert not form_mismatch.is_valid()
+    assert "contact_phone" in form_mismatch.errors
+
+    # Número internacional curto demais
+    form_short = DigitalCertificateForm(
+        data={
+            "phone_country": "1",
+            "serial_number": "CERT-ERR-03",
+            "client_name": "Empresa Curto",
+            "client_document": "12345678000190",
+            "responsible_name": "Gestor",
+            "contact_phone": "12345",
+            "preferred_channel": CommunicationChannel.WHATSAPP,
+            "valid_until": "2026-10-01",
+            "status": CertificateStatus.ACTIVE,
+        }
+    )
+    assert not form_short.is_valid()
+    assert "contact_phone" in form_short.errors
+
+
+def test_certificate_form_initial_country_from_instance() -> None:
+    from core.automations.forms import DigitalCertificateForm
+
+    cert_pt = DigitalCertificate(
+        id=uuid4(),
+        serial_number="CERT-INST-PT",
+        client_name="Cliente Portugal",
+        client_document="12345678000190",
+        responsible_name="António",
+        contact_phone="+351 912345678",
+        valid_until=timezone.localdate() + timedelta(days=30),
+    )
+    form = DigitalCertificateForm(instance=cert_pt)
+    assert form.fields["phone_country"].initial == "351"
+
+    cert_br = DigitalCertificate(
+        id=uuid4(),
+        serial_number="CERT-INST-BR",
+        client_name="Cliente Brasil",
+        client_document="12345678000190",
+        responsible_name="Ana",
+        contact_phone="+55 (11) 98888-7777",
+        valid_until=timezone.localdate() + timedelta(days=30),
+    )
+    form_br = DigitalCertificateForm(instance=cert_br)
+    assert form_br.fields["phone_country"].initial == "55"
+
+
+def test_create_certificate_with_international_country_persists_e164(
+    client: Client,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    client.force_login(processes_operator)
+    url = _module_url(modules)
+
+    resp = client.post(
+        url,
+        {
+            "action": "create_certificate",
+            "phone_country": "351",
+            "serial_number": "CERT-INTL-POST",
+            "client_name": "Lisboa Digital Ltda",
+            "client_document": "12.345.678/0001-90",
+            "responsible_name": "Rui Silva",
+            "contact_email": "rui@lisboa.test",
+            "contact_phone": "912 345 678",
+            "preferred_channel": CommunicationChannel.WHATSAPP,
+            "valid_until": (timezone.localdate() + timedelta(days=25)).isoformat(),
+            "status": CertificateStatus.ACTIVE,
+        },
+    )
+    assert resp.status_code == 302
+    cert = DigitalCertificate.objects.get(serial_number="CERT-INTL-POST")
+    assert cert.contact_phone == "+351 912345678"
