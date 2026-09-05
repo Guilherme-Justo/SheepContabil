@@ -60,6 +60,8 @@ def test_sc20_page_exposes_operational_controls_and_summary(
     assert "Cliente da Interface" in html
     assert "Próximos do vencimento" in html
     assert "Histórico de avisos" in html
+    assert 'data-mask="phone"' in html
+    assert 'inputmode="tel"' in html
 
 
 def test_certificate_form_normalizes_identifier_and_document(

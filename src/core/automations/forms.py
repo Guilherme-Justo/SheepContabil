@@ -225,7 +225,14 @@ class DigitalCertificateForm(A11yFormMixin, forms.ModelForm):  # type: ignore[ty
         widgets = {
             "valid_until": forms.DateInput(attrs={"type": "date"}),
             "contact_email": forms.EmailInput(attrs={"placeholder": "contato@exemplo.test"}),
-            "contact_phone": forms.TextInput(attrs={"placeholder": "+55 11 99999-0000"}),
+            "contact_phone": forms.TextInput(
+                attrs={
+                    "placeholder": "+55 (11) 99999-0000",
+                    "data-mask": "phone",
+                    "inputmode": "tel",
+                    "autocomplete": "tel",
+                }
+            ),
         }
 
     def clean_serial_number(self) -> str:

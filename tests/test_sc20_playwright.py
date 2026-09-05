@@ -110,6 +110,12 @@ def test_sc20_dispatch_flow_with_playwright(
         assert "https://wa.me/5561991365756" in pill_href
         assert "Beta" in unquote(pill_href)
 
+        # Testa a máscara de telefone em tempo real no Chromium
+        phone_input = page.locator('input[name="contact_phone"]')
+        assert phone_input.is_visible()
+        phone_input.fill("+5561991365756")
+        assert phone_input.input_value() == "+55 (61) 99136-5756"
+
         # Salva screenshot do painel SC-20 antes do disparo
         if SCREENSHOT_DIR.exists():
             page.screenshot(

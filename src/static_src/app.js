@@ -131,6 +131,50 @@ const formatDocument = (value) => {
   return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
 };
 
+const formatPhone = (value) => {
+  if (!value) return "";
+  const raw = String(value);
+  const hasPlus = raw.startsWith("+");
+  const digits = raw.replace(/\D/g, "");
+
+  if (!digits) return hasPlus ? "+" : "";
+
+  const isDdi = hasPlus || (digits.startsWith("55") && digits.length > 11);
+
+  if (isDdi) {
+    const ddiDigits = digits.slice(0, 13);
+    if (ddiDigits.length <= 2) {
+      return `+${ddiDigits}`;
+    }
+    const ddd = ddiDigits.slice(2, 4);
+    if (ddiDigits.length <= 4) {
+      return `+55 (${ddd}${ddiDigits.length === 4 ? ") " : ""}`;
+    }
+    const rest = ddiDigits.slice(4);
+    if (rest.length <= 4) {
+      return `+55 (${ddd}) ${rest}`;
+    }
+    if (rest.length <= 8) {
+      return `+55 (${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+    }
+    return `+55 (${ddd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
+  }
+
+  const localDigits = digits.slice(0, 11);
+  if (localDigits.length <= 2) {
+    return localDigits.length === 2 ? `(${localDigits}) ` : `(${localDigits}`;
+  }
+  const ddd = localDigits.slice(0, 2);
+  const rest = localDigits.slice(2);
+  if (rest.length <= 4) {
+    return `(${ddd}) ${rest}`;
+  }
+  if (rest.length <= 8) {
+    return `(${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+  }
+  return `(${ddd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
+};
+
 document.addEventListener("input", (e) => {
   const target = e.target;
   if (!target || !target.matches) return;
@@ -142,6 +186,23 @@ document.addEventListener("input", (e) => {
     const start = target.selectionStart;
     const oldLength = target.value.length;
     const formatted = formatDocument(target.value);
+    if (target.value !== formatted) {
+      target.value = formatted;
+      if (start !== null) {
+        const newLength = formatted.length;
+        const newPos = Math.max(0, start + (newLength - oldLength));
+        target.setSelectionRange(newPos, newPos);
+      }
+    }
+  }
+
+  if (
+    target.matches('[data-mask="phone"]') ||
+    target.name === "contact_phone"
+  ) {
+    const start = target.selectionStart;
+    const oldLength = target.value.length;
+    const formatted = formatPhone(target.value);
     if (target.value !== formatted) {
       target.value = formatted;
       if (start !== null) {
@@ -221,6 +282,9 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll('[data-mask="document"], [data-sc06-answer="current_cnpj"], input[name="client_document"]').forEach((field) => {
     if (field.value) field.value = formatDocument(field.value);
   });
+  document.querySelectorAll('[data-mask="phone"], input[name="contact_phone"]').forEach((field) => {
+    if (field.value) field.value = formatPhone(field.value);
+  });
 });
 
 window.sc06BriefingForm = (config) => ({
@@ -237,6 +301,9 @@ window.sc06BriefingForm = (config) => ({
       this.syncFromDom(this.$root);
       this.$root.querySelectorAll('[data-mask="document"], [data-sc06-answer="current_cnpj"]').forEach((field) => {
         if (field.value) field.value = formatDocument(field.value);
+      });
+      this.$root.querySelectorAll('[data-mask="phone"], input[name="contact_phone"]').forEach((field) => {
+        if (field.value) field.value = formatPhone(field.value);
       });
       this.initialSnapshot = JSON.stringify(this.answers);
     });
