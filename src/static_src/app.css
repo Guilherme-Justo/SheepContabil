@@ -996,20 +996,27 @@ body.mobile-menu-active {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    box-shadow: none;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .sidebar-edge-handle:hover {
     background-color: #10505f;
     border-color: #1fa69a;
     color: #ffffff;
     transform: translate(50%, -50%) scale(1.15);
-    box-shadow: 0 4px 12px rgba(31, 166, 154, 0.35);
+    box-shadow: none;
   }
   .sidebar-edge-handle:focus-visible {
     outline: 2px solid #1fa69a;
     outline-offset: 2px;
+  }
+  .sidebar-edge-handle svg {
+    transform-origin: center;
+    transition: rotate 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* Anti-FOUC: Renderização estática instantânea no primeiro paint quando o sidebar estiver recolhido */
@@ -1030,7 +1037,7 @@ body.mobile-menu-active {
     margin-inline: auto !important;
   }
   html.sidebar-is-collapsed .sidebar-edge-handle svg {
-    transform: rotate(180deg) !important;
+    rotate: 180deg !important;
   }
   html.sidebar-is-collapsed .portal-sidebar .sidebar-label-container {
     display: none !important;
