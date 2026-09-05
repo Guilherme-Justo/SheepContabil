@@ -258,6 +258,40 @@ def test_execute_sc20_end_to_end_with_email_gateway(
     assert attempt.payload["synthetic"] is False
     assert attempt.provider_message_id.startswith("smtp-")
 
+    sent_email = mail.outbox[0]
+    assert "12.345.678/0001-90" in sent_email.body
+    assert len(sent_email.alternatives) == 1
+    assert "12.345.678/0001-90" in sent_email.alternatives[0][0]
+
+
+def test_execute_sc20_formats_cpf_and_cnpj_in_emails(
+    modules: dict[str, AutomationModule],
+) -> None:
+    cert_cnpj = _sample_certificate(serial="EMAIL-CNPJ", days=10)
+    cert_cnpj.client_document = "11222333000181"
+    cert_cnpj.save()
+
+    cert_cpf = _sample_certificate(serial="EMAIL-CPF", days=12, email="cpf@example.test")
+    cert_cpf.client_document = "12345678901"
+    cert_cpf.save()
+
+    gateway = DjangoEmailNotificationGateway(recipient_override="sandbox@sheepcontabil.local")
+    run = create_sc20_run(triggered_by=None, base_date=timezone.localdate())
+    result = execute_sc20(run.id, gateway=gateway)
+
+    assert result.sent == 2
+    assert len(mail.outbox) == 2
+
+    cnpj_email = mail.outbox[0]
+    assert "11.222.333/0001-81" in cnpj_email.body
+    assert len(cnpj_email.alternatives) == 1
+    assert "11.222.333/0001-81" in cnpj_email.alternatives[0][0]
+
+    cpf_email = mail.outbox[1]
+    assert "123.456.789-01" in cpf_email.body
+    assert len(cpf_email.alternatives) == 1
+    assert "123.456.789-01" in cpf_email.alternatives[0][0]
+
 
 def test_sc20_views_shows_email_guidance_when_backend_is_email(
     client: Client,

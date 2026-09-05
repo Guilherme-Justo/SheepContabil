@@ -264,7 +264,7 @@ def _deliver(
     days_remaining = (communication.certificate_valid_until - today).days
     extra_context = {
         "client_name": certificate.client_name,
-        "client_document": certificate.client_document,
+        "client_document": certificate.formatted_document,
         "responsible_name": certificate.responsible_name,
         "valid_until": communication.certificate_valid_until,
         "days_remaining": days_remaining,

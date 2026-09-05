@@ -19,6 +19,18 @@ if TYPE_CHECKING:
     from core.identity.models import User
 
 
+def format_cpf_cnpj(value: str | None) -> str:
+    """Formata string numérica com máscara canônica de CPF (11 dígitos) ou CNPJ (14 dígitos)."""
+    if not value:
+        return ""
+    digits = re.sub(r"\D", "", str(value))
+    if len(digits) == 11:
+        return f"{digits[:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:]}"
+    if len(digits) == 14:
+        return f"{digits[:2]}.{digits[2:5]}.{digits[5:8]}/{digits[8:12]}-{digits[12:]}"
+    return str(value)
+
+
 class AutomationNature(models.TextChoices):
     AI_AGENT = "ai_agent", "Agente de IA"
     RPA = "rpa", "RPA"
@@ -934,8 +946,12 @@ class DigitalCertificate(models.Model):
         return ""
 
     @property
+    def formatted_document(self) -> str:
+        return format_cpf_cnpj(self.client_document)
+
+    @property
     def document(self) -> str:
-        return self.client_document
+        return self.formatted_document
 
     @property
     def expires_on(self) -> date:
@@ -1009,7 +1025,7 @@ class DigitalCertificate(models.Model):
         lines.append("")
         lines.append("📋 *Dados do Certificado:*")
         lines.append(f"• Empresa: *{self.client_name}*")
-        lines.append(f"• Documento: {self.client_document}")
+        lines.append(f"• Documento: {self.formatted_document}")
         lines.append(f"• Validade: *{self.valid_until:%d/%m/%Y}*")
         lines.append(f"• Situação: {urgency_text}")
         if self.serial_number:
@@ -1410,12 +1426,7 @@ class SocietaryBriefing(models.Model):
 
     @property
     def formatted_client_document(self) -> str:
-        digits = re.sub(r"\D", "", str(self.client_document))
-        if len(digits) == 11:
-            return f"{digits[:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:]}"
-        if len(digits) == 14:
-            return f"{digits[:2]}.{digits[2:5]}.{digits[5:8]}/{digits[8:12]}-{digits[12:]}"
-        return self.client_document
+        return format_cpf_cnpj(self.client_document)
 
 
 class SC05ClientStatus(models.TextChoices):
