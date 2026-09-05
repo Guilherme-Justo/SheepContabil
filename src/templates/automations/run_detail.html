@@ -137,14 +137,14 @@
 
   <ol class="sc05-step-list mt-5">
     {% for step in sc05_steps %}
-    <li class="sc05-step-card">
+    <li class="sc05-step-card{% if step.is_timeout %} sc05-step-timeout{% endif %}">
       <header>
         <span class="sc05-step-number">{{ step.position|stringformat:"02d" }}</span>
         <div>
           <h3>{{ step.get_portal_display }}</h3>
           <p>{% if step.finished_at %}Confirmado em {{ step.finished_at|date:"d/m/Y H:i:s" }}{% else %}Aguardando confirmação do worker{% endif %}</p>
         </div>
-        <span class="status-badge status-{{ step.status_tone }}"><i></i>{{ step.get_status_display }}</span>
+        <span class="status-badge status-{{ step.status_tone }}"><i></i>{% if step.is_timeout %}⏳ {% endif %}{{ step.display_status_label }}</span>
       </header>
 
       <dl class="sc05-state-grid">
@@ -152,7 +152,7 @@
         <div><dt>Objetivo</dt><dd>{{ step.desired_state_label }}</dd></div>
         <div><dt>Última confirmação</dt><dd>{{ step.after_state_label }}</dd></div>
       </dl>
-      {% if step.error_message %}<p class="sc05-step-error" role="alert">{{ step.error_message }}</p>{% endif %}
+      {% if step.error_message %}<p class="sc05-step-error{% if step.is_timeout %} sc05-step-timeout{% endif %}" role="alert">{% if step.is_timeout %}⏳ Instabilidade transitória por tempo limite: {% endif %}{{ step.error_message }}</p>{% endif %}
 
       <details class="sc05-attempts">
         <summary>Ver tentativas e capturas</summary>
@@ -164,7 +164,7 @@
               <tr>
                 <td class="font-mono text-xs">{{ attempt.sequence|stringformat:"02d" }}</td>
                 <td>{{ attempt.get_operation_display }}</td>
-                <td><span class="status-badge status-{{ attempt.status_tone }}"><i></i>{{ attempt.get_status_display }}</span>{% if attempt.error_message %}<span class="mt-2 block max-w-md text-xs text-carmim">{{ attempt.error_message }}</span>{% endif %}</td>
+                <td><span class="status-badge status-{{ attempt.status_tone }}"><i></i>{% if attempt.is_timeout %}⏳ {% endif %}{{ attempt.display_status_label }}</span>{% if attempt.error_message %}<span class="mt-2 block max-w-md text-xs {% if attempt.is_timeout %}text-ambar dark:text-ambar-light{% else %}text-carmim{% endif %}">{% if attempt.is_timeout %}⏳ {% endif %}{{ attempt.error_message }}</span>{% endif %}</td>
                 <td class="font-mono text-xs">{{ attempt.created_at|date:"d/m/Y H:i:s" }}</td>
                 <td class="text-right">
                   {% for artifact in attempt.artifacts.all %}

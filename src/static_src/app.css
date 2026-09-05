@@ -476,6 +476,8 @@
   .sc05-state-grid dt { color: #5a7078; font-size: .6rem; text-transform: uppercase; letter-spacing: .08em; }
   .sc05-state-grid dd { margin-top: .35rem; color: #0b1a20; font-size: .7rem; font-weight: 600; line-height: 1.5; }
   .sc05-step-error { margin: 0 1rem 1rem; border-left: 3px solid #c4453d; border-radius: .55rem; background: rgba(196,69,61,.07); padding: .7rem .8rem; color: #91312c; font-size: .7rem; }
+  .sc05-step-error.sc05-step-timeout { border-left-color: #e8a33d; background: rgba(232,163,61,.1); color: #8a5913; }
+  .sc05-step-card.sc05-step-timeout { border-color: rgba(232,163,61,.35); box-shadow: 0 10px 30px rgba(232,163,61,.08); }
   .sc05-attempts { border-top: 1px solid rgba(90,112,120,.1); padding: .9rem 1rem 1rem; }
   .sc05-attempts summary { cursor: pointer; color: #10505f; font-size: .7rem; font-weight: 600; }
   .sc05-attempts .data-table { min-width: 45rem; }
@@ -1221,6 +1223,19 @@ body.mobile-menu-active {
   .sc05-state-grid div, .sc04-file-metadata div, .sc04-preview-surface {
     background: rgba(255,255,255,.05);
     border: 1px solid rgba(255,255,255,.15);
+  }
+  .sc05-step-error {
+    background: rgba(196,69,61,.18);
+    border-left-color: #ff8d85;
+    color: #ffd2cf;
+  }
+  .sc05-step-error.sc05-step-timeout {
+    background: rgba(232,163,61,.18);
+    border-left-color: #e8a33d;
+    color: #fbd38d;
+  }
+  .sc05-step-card.sc05-step-timeout {
+    border-color: rgba(232,163,61,.4);
   }
 
   /* SC-20 Specifics */

@@ -76,3 +76,24 @@ def test_toast_container_not_rendered_when_no_messages(administrator: User) -> N
     )
 
     assert 'id="toast-container"' not in rendered
+
+
+def test_htmx_timeout_and_dynamic_toast_in_compiled_bundle() -> None:
+    from pathlib import Path
+
+    app_js_path = Path("src/static_src/app.js")
+    assert app_js_path.exists()
+    content_js = app_js_path.read_text(encoding="utf-8")
+
+    assert "htmx:timeout" in content_js
+    assert "window.showToast" in content_js
+    assert "network-timeout" in content_js
+    assert "Instabilidade de rede" in content_js
+    assert "htmx:afterSwap" in content_js
+
+    app_css_path = Path("src/static_src/app.css")
+    assert app_css_path.exists()
+    content_css = app_css_path.read_text(encoding="utf-8")
+
+    assert ".sc05-step-card.sc05-step-timeout" in content_css
+    assert ".sc05-step-error.sc05-step-timeout" in content_css

@@ -1525,7 +1525,16 @@ class SC05PortalStep(models.Model):
         return f"{self.operation} · {self.get_portal_display()}"
 
     @property
+    def is_timeout(self) -> bool:
+        if not self.error_message:
+            return False
+        msg = self.error_message.lower()
+        return "tempo limite" in msg or "timeout" in msg or "demorou além do limite" in msg
+
+    @property
     def status_tone(self) -> str:
+        if self.is_timeout:
+            return "warning"
         if self.status in {SC05StepStatus.APPLIED, SC05StepStatus.UNCHANGED}:
             return "success"
         if self.status == SC05StepStatus.COMPENSATED:
@@ -1533,6 +1542,12 @@ class SC05PortalStep(models.Model):
         if self.status in {SC05StepStatus.FAILED, SC05StepStatus.COMPENSATION_FAILED}:
             return "danger"
         return "warning"
+
+    @property
+    def display_status_label(self) -> str:
+        if self.is_timeout:
+            return "Timeout"
+        return self.get_status_display()
 
     @property
     def before_state_label(self) -> str:
@@ -1650,12 +1665,27 @@ class SC05StepAttempt(models.Model):
         raise ValidationError("Tentativas do SC-05 são evidências append-only.")
 
     @property
+    def is_timeout(self) -> bool:
+        if not self.error_message:
+            return False
+        msg = self.error_message.lower()
+        return "tempo limite" in msg or "timeout" in msg or "demorou além do limite" in msg
+
+    @property
     def status_tone(self) -> str:
+        if self.is_timeout:
+            return "warning"
         if self.status == SC05AttemptStatus.SUCCEEDED:
             return "success"
         if self.status == SC05AttemptStatus.FAILED:
             return "danger"
         return "warning"
+
+    @property
+    def display_status_label(self) -> str:
+        if self.is_timeout:
+            return "Timeout"
+        return self.get_status_display()
 
 
 class SC05Artifact(models.Model):

@@ -10,14 +10,110 @@ const setSc04PollingError = (event, visible) => {
   if (message) message.hidden = !visible;
 };
 
+const getOrCreateToastContainer = () => {
+  let container = document.getElementById("toast-container");
+  if (!container) {
+    container = document.createElement("aside");
+    container.id = "toast-container";
+    container.className =
+      "fixed top-20 right-4 left-4 sm:left-auto sm:right-6 z-50 flex flex-col gap-2.5 pointer-events-none max-w-sm w-auto sm:w-full";
+    container.setAttribute("aria-label", "Notificações do sistema");
+    container.setAttribute("aria-live", "polite");
+    document.body.appendChild(container);
+  }
+  return container;
+};
+
+window.showToast = ({ title = "", message = "", type = "warning", duration = 5000 } = {}) => {
+  const container = getOrCreateToastContainer();
+  const toast = document.createElement("div");
+  toast.className = `pointer-events-auto toast-notification toast-${type}`;
+  toast.setAttribute("role", type === "error" ? "alert" : "status");
+  toast.dataset.toastDynamic = "true";
+  if (type === "warning") {
+    toast.dataset.toastCategory = "network-timeout";
+  }
+
+  const defaultTitle =
+    type === "warning" ? "Atenção" : type === "error" ? "Erro" : type === "success" ? "Sucesso" : "Notificação";
+
+  const iconSvg =
+    type === "warning"
+      ? '<svg class="h-5 w-5 text-ambar" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>'
+      : type === "error"
+      ? '<svg class="h-5 w-5 text-carmim" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>'
+      : type === "success"
+      ? '<svg class="h-5 w-5 text-turquesa" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>'
+      : '<svg class="h-5 w-5 text-turquesa" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+
+  toast.innerHTML = `
+    <span class="toast-icon shrink-0 mt-0.5" aria-hidden="true">${iconSvg}</span>
+    <div class="toast-content min-w-0 flex-1">
+      <p class="toast-title">${title || defaultTitle}</p>
+      <p class="toast-text">${message}</p>
+    </div>
+    <button type="button" class="toast-dismiss" aria-label="Dispensar notificação">
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  `;
+
+  let timer = null;
+  const dismiss = () => {
+    if (timer) clearTimeout(timer);
+    toast.style.transition = "opacity 0.2s ease, transform 0.2s ease";
+    toast.style.opacity = "0";
+    toast.style.transform = "scale(0.95)";
+    setTimeout(() => {
+      toast.remove();
+      if (container.children.length === 0) {
+        container.remove();
+      }
+    }, 200);
+  };
+
+  const startTimer = () => {
+    if (duration > 0) {
+      timer = setTimeout(dismiss, duration);
+    }
+  };
+
+  toast.querySelector(".toast-dismiss")?.addEventListener("click", dismiss);
+  toast.addEventListener("mouseenter", () => {
+    if (timer) clearTimeout(timer);
+  });
+  toast.addEventListener("mouseleave", startTimer);
+
+  container.appendChild(toast);
+  startTimer();
+  return toast;
+};
+
 document.body.addEventListener("htmx:responseError", (event) => {
   setSc04PollingError(event, true);
 });
 document.body.addEventListener("htmx:sendError", (event) => {
   setSc04PollingError(event, true);
 });
+document.body.addEventListener("htmx:timeout", (event) => {
+  setSc04PollingError(event, true);
+  window.showToast({
+    title: "Instabilidade de rede",
+    message: "O servidor demorou para responder. Tentando restabelecer sincronização...",
+    type: "warning",
+    duration: 5000,
+  });
+});
 document.body.addEventListener("htmx:afterSwap", (event) => {
   setSc04PollingError(event, false);
+  document.querySelectorAll('[data-toast-category="network-timeout"]').forEach((el) => {
+    el.remove();
+  });
+  const container = document.getElementById("toast-container");
+  if (container && container.children.length === 0) {
+    container.remove();
+  }
 });
 
 const formatDocument = (value) => {
