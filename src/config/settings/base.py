@@ -161,6 +161,7 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="SheepContabil <avisos@sh
 
 SC20_NOTIFICATION_BACKEND = env("SC20_NOTIFICATION_BACKEND", default="simulated")
 SC20_EMAIL_OVERRIDE_TO = env("SC20_EMAIL_OVERRIDE_TO", default="")
+SC20_WHATSAPP_OVERRIDE_TO = env("SC20_WHATSAPP_OVERRIDE_TO", default="")
 
 LOGGING = {
     "version": 1,

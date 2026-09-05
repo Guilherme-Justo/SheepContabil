@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import urllib.parse
 import uuid
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any
@@ -960,6 +961,75 @@ class DigitalCertificate(models.Model):
             return "danger"
         return "neutral"
 
+    @property
+    def has_whatsapp(self) -> bool:
+        return bool(self.contact_phone and self.contact_phone.strip())
+
+    def whatsapp_url(self, *, override_phone: str | None = None) -> str:
+        configured_override = getattr(settings, "SC20_WHATSAPP_OVERRIDE_TO", "")
+        phone_to_use = (
+            override_phone
+            if override_phone is not None
+            else configured_override
+        ).strip()
+
+        override_active = bool(phone_to_use)
+        target_phone = phone_to_use if override_active else self.contact_phone
+        digits = re.sub(r"\D", "", target_phone)
+        if not digits:
+            return ""
+        if len(digits) in (10, 11):
+            digits = f"55{digits}"
+
+        days = self.days_remaining
+        if days < 0:
+            urgency_text = f"*EXPIRADO há {self.days_remaining_abs} dia(s)*"
+        elif days == 0:
+            urgency_text = "*VENCE HOJE*"
+        elif days <= 15:
+            urgency_text = f"*Vencimento Crítico (restam {days} dias)*"
+        elif days <= 30:
+            urgency_text = f"*Atenção ao Vencimento (restam {days} dias)*"
+        else:
+            urgency_text = f"*Aviso Preventivo (restam {days} dias)*"
+
+        lines: list[str] = []
+        if override_active:
+            lines.append("[AMBIENTE DE TESTE SHEEPCONTABIL]")
+            original = self.contact_phone or "Não informado"
+            lines.append(f"Aviso de teste redirecionado. Destinatário original: {original}")
+            lines.append("----------------------------------------\n")
+
+        lines.append("🔔 *SheepContabil · Monitoramento de Certificados Digitais*")
+        lines.append("")
+        contact = self.contact_name or self.client_name
+        lines.append(f"Olá, *{contact}*,")
+        lines.append(
+            f"Informamos que o certificado digital de *{self.client_name}* "
+            "está próximo da data de expiração."
+        )
+        lines.append("")
+        lines.append("📋 *Dados do Certificado:*")
+        lines.append(f"• Empresa: *{self.client_name}*")
+        lines.append(f"• Documento: {self.client_document}")
+        lines.append(f"• Validade: *{self.valid_until:%d/%m/%Y}*")
+        lines.append(f"• Situação: {urgency_text}")
+        if self.serial_number:
+            lines.append(f"• Identificador: {self.serial_number}")
+        lines.append("")
+        lines.append("💡 *Orientação para Renovação:*")
+        lines.append(
+            "Recomendamos iniciar com antecedência o processo de renovação junto à "
+            "Autoridade Certificadora (AC) para evitar interrupções no faturamento (NF-e) "
+            "e no cumprimento de obrigações acessórias."
+        )
+        lines.append("")
+        lines.append("_SheepContabil Gestão & Automações · SC-20_")
+
+        message = "\n".join(lines)
+        return f"https://wa.me/{digits}?text={urllib.parse.quote_plus(message)}"
+
+
 
 class CertificateCommunication(models.Model):
     """Logical, deduplicated notification for one certificate expiration."""
@@ -1097,6 +1167,17 @@ class CommunicationAttempt(models.Model):
         if self.status == CommunicationStatus.FAILED:
             return "danger"
         return "warning"
+
+    @property
+    def is_whatsapp(self) -> bool:
+        return self.channel == CommunicationChannel.WHATSAPP
+
+    @property
+    def whatsapp_url(self) -> str:
+        cert = getattr(self.communication, "certificate", None)
+        if cert is not None:
+            return str(cert.whatsapp_url())
+        return ""
 
 
 class BriefingTemplate(models.Model):

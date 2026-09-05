@@ -162,9 +162,22 @@
             <td><span class="status-badge status-{{ certificate.status_tone }}"><i></i>{{ certificate.get_status_display }}</span></td>
             <td>
               <span class="block text-tinta">{{ certificate.contact_name }}</span>
-              <span class="mt-1 block text-xs">
-                {{ certificate.get_preferred_channel_display }} ·
-                {% if certificate.preferred_channel == "email" %}{{ certificate.contact_email }}{% else %}{{ certificate.contact_phone }}{% endif %}
+              <span class="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                <span>
+                  {{ certificate.get_preferred_channel_display }} ·
+                  {% if certificate.preferred_channel == "email" %}{{ certificate.contact_email }}{% else %}{{ certificate.contact_phone }}{% endif %}
+                </span>
+                {% if certificate.has_whatsapp %}
+                  <a
+                    href="{{ certificate.whatsapp_url }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="sc20-whatsapp-pill"
+                    title="Abrir mensagem no WhatsApp Web"
+                  >
+                    <span aria-hidden="true">💬</span> WhatsApp
+                  </a>
+                {% endif %}
               </span>
             </td>
           </tr>
@@ -253,18 +266,31 @@
             </td>
             <td class="font-mono text-xs">{{ attempt.created_at|date:"d/m/Y H:i" }}</td>
             <td class="text-right">
-              {% if attempt.status == "failed" and attempt.communication.status == "failed" %}
-              <form method="post" class="inline-block">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="retry">
-                <input type="hidden" name="attempt_id" value="{{ attempt.id }}">
-                <button type="submit" class="sc20-retry-button" aria-label="Tentar novamente o aviso para {{ attempt.recipient }}">Tentar novamente</button>
-              </form>
-              {% elif attempt.status == "failed" %}
-              <span class="text-xs text-grafite">Superado</span>
-              {% else %}
-              <span class="text-xs text-grafite">Concluído</span>
-              {% endif %}
+              <div class="flex items-center justify-end gap-2">
+                {% if attempt.is_whatsapp and attempt.whatsapp_url %}
+                  <a
+                    href="{{ attempt.whatsapp_url }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="sc20-whatsapp-link"
+                    title="Abrir mensagem pré-formatada no WhatsApp Web"
+                  >
+                    <span aria-hidden="true">💬</span> WhatsApp
+                  </a>
+                {% endif %}
+                {% if attempt.status == "failed" and attempt.communication.status == "failed" %}
+                <form method="post" class="inline-block">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="retry">
+                  <input type="hidden" name="attempt_id" value="{{ attempt.id }}">
+                  <button type="submit" class="sc20-retry-button" aria-label="Tentar novamente o aviso para {{ attempt.recipient }}">Tentar novamente</button>
+                </form>
+                {% elif attempt.status == "failed" %}
+                <span class="text-xs text-grafite">Superado</span>
+                {% else %}
+                <span class="text-xs text-grafite">Concluído</span>
+                {% endif %}
+              </div>
             </td>
           </tr>
           {% empty %}

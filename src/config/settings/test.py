@@ -13,3 +13,4 @@ STORAGES = {
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 SC20_NOTIFICATION_BACKEND = "simulated"
 SC20_EMAIL_OVERRIDE_TO = ""
+SC20_WHATSAPP_OVERRIDE_TO = ""

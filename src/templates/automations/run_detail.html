@@ -66,15 +66,32 @@
           <td><strong>{{ attempt.certificate.client_name }}</strong></td>
           <td>{{ attempt.recipient }}</td>
           <td class="font-mono text-xs">#{{ attempt.sequence }}</td>
+          <td><span class="status-badge status-{{ attempt.status_tone }}"><i></i>{{ attempt.get_status_display }}</span></td>
           <td>
-            {% if attempt.error_message %}
-              {{ attempt.error_message }}
-            {% elif attempt.payload.backend == "email" %}
-              E-mail enviado via Gmail SMTP.
-            {% else %}
-              Entrega simulada registrada.
-            {% endif %}
+            <div class="flex flex-wrap items-center gap-2">
+              <span>
+                {% if attempt.error_message %}
+                  {{ attempt.error_message }}
+                {% elif attempt.payload.backend == "email" %}
+                  E-mail enviado via Gmail SMTP.
+                {% else %}
+                  Entrega simulada registrada.
+                {% endif %}
+              </span>
+              {% if attempt.is_whatsapp and attempt.whatsapp_url %}
+                <a
+                  href="{{ attempt.whatsapp_url }}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="sc20-whatsapp-pill"
+                  title="Abrir no WhatsApp Web"
+                >
+                  <span aria-hidden="true">💬</span> WhatsApp
+                </a>
+              {% endif %}
+            </div>
           </td>
+        </tr>
         {% empty %}<tr><td colspan="5" class="py-10 text-center text-grafite">Esta execução não criou nova tentativa; os avisos elegíveis já estavam registrados.</td></tr>{% endfor %}
       </tbody>
     </table>

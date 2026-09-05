@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import date, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from django.db import transaction
 from django.db.models import Max
@@ -296,6 +296,22 @@ def _deliver(
     status = CommunicationStatus.SENT if delivery.delivered else CommunicationStatus.FAILED
     finished_at = timezone.now()
     is_synthetic = isinstance(gateway, SimulatedNotificationGateway)
+    if is_synthetic:
+        backend = "simulated"
+    elif communication.channel == "email":
+        backend = "email"
+    else:
+        backend = "whatsapp"
+
+    attempt_payload: dict[str, Any] = {
+        "subject": message.subject,
+        "body": message.body,
+        "synthetic": is_synthetic,
+        "backend": backend,
+    }
+    if communication.channel == "whatsapp":
+        attempt_payload["whatsapp_url"] = certificate.whatsapp_url()
+
     CommunicationAttempt.objects.create(
         communication=communication,
         run=run,
@@ -304,12 +320,7 @@ def _deliver(
         recipient=message.recipient,
         provider_message_id=delivery.provider_message_id,
         error_message=delivery.error_message,
-        payload={
-            "subject": message.subject,
-            "body": message.body,
-            "synthetic": is_synthetic,
-            "backend": "simulated" if is_synthetic else "email",
-        },
+        payload=attempt_payload,
         finished_at=finished_at,
     )
     communication.status = status
