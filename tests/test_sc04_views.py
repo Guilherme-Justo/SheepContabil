@@ -383,7 +383,7 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     page1 = resp_p1.content.decode()
     assert "Mostrando" in page1
     assert "1</strong> a" in page1
-    assert "7</strong> de" in page1
+    assert "5</strong> de" in page1
     assert "15</strong> arquivos" in page1
     assert ">1</strong> de" in page1
     assert "page=2" in page1
@@ -398,8 +398,8 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     )
     assert resp_p2.status_code == 200
     page2 = resp_p2.content.decode()
-    assert "8</strong> a" in page2
-    assert "14</strong> de" in page2
+    assert "6</strong> a" in page2
+    assert "10</strong> de" in page2
     assert ">2</strong> de" in page2
     assert "page=1" in page2
     assert 'aria-label="Primeira página"' in page2  # active link to page 1
@@ -412,7 +412,8 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     )
     assert resp_p3.status_code == 200
     page3 = resp_p3.content.decode()
-    assert "15</strong> a" in page3
+    assert "11</strong> a" in page3
+    assert "15</strong> de" in page3
     assert 'aria-label="Primeira página"' in page3  # active link to page 1
 
     # Queue fragment on last page (Page 3) - isolated from other paginators
@@ -422,7 +423,8 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     )
     assert resp_frag_p3.status_code == 200
     frag_p3 = resp_frag_p3.content.decode()
-    assert "15</strong> a" in frag_p3
+    assert "11</strong> a" in frag_p3
+    assert "15</strong> de" in frag_p3
     assert 'aria-label="Primeira página"' in frag_p3  # active link to page 1
     assert 'aria-label="Última página"' not in frag_p3  # disabled span on last page
 
@@ -433,7 +435,8 @@ def test_sc04_queue_is_paginated_and_preserves_filters(
     )
     assert resp_fragment.status_code == 200
     frag = resp_fragment.content.decode()
-    assert "8</strong> a" in frag
+    assert "6</strong> a" in frag
+    assert "10</strong> de" in frag
     assert "q=paginated" in frag
     assert "page=2" in frag
     assert 'aria-label="Primeira página"' in frag
