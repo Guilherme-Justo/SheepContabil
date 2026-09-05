@@ -64,4 +64,3 @@ def test_sidebar_branding_and_floating_edge_handle(
     # 4. Topo do sidebar limpo (sem botão duplicado no cabeçalho para desktop)
     before_header = html.split('class="sidebar-header"')[0]
     assert '<button type="button" @click="toggleSidebar()"' not in before_header
-

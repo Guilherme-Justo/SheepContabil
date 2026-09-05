@@ -38,6 +38,7 @@ pytestmark = pytest.mark.django_db
 # 1. Unit Tests: _extract_page_size & _build_per_page_query_params
 # ==============================================================================
 
+
 def test_extract_page_size_valid_choices() -> None:
     rf = RequestFactory()
     for choice in PAGE_SIZE_CHOICES:
@@ -113,6 +114,7 @@ def test_build_per_page_query_params_custom_keys() -> None:
 # 2. Integration Tests: Dashboard Pagination
 # ==============================================================================
 
+
 def test_dashboard_pagination_dynamic_page_size(
     client: Client,
     administrator: User,
@@ -139,7 +141,7 @@ def test_dashboard_pagination_dynamic_page_size(
     assert len(resp.context["page_obj"]) == 7
     assert resp.context["paginator"].num_pages == 2
     html = resp.content.decode()
-    assert '<select' in html
+    assert "<select" in html
     assert 'name="per_page"' in html
     assert '<option value="7" selected>7</option>' in html
 
@@ -200,6 +202,7 @@ def test_dashboard_pagination_preserves_filters_and_sort(
 # 3. Integration Tests: SC-05 Multi-Table Independent Pagination
 # ==============================================================================
 
+
 def test_sc05_multi_table_independent_pagination(
     client: Client,
     administrator: User,
@@ -248,6 +251,7 @@ def test_sc05_multi_table_independent_pagination(
 # 4. Integration Tests: SC-20 Three-Table Independent Pagination
 # ==============================================================================
 
+
 def test_sc20_independent_pagination(
     client: Client,
     administrator: User,
@@ -286,6 +290,7 @@ def test_sc20_independent_pagination(
 # ==============================================================================
 # 5. Integration Tests: SC-06 Pagination
 # ==============================================================================
+
 
 def test_sc06_pagination(
     client: Client,

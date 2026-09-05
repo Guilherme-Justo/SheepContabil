@@ -280,4 +280,3 @@ def test_500_preview_renders_with_proper_context(
     assert "Não foi possível concluir esta solicitação" in html
     assert "Tentar novamente" in html
     assert "Voltar ao portal principal" in html
-

@@ -173,9 +173,7 @@ class DjangoEmailNotificationGateway:
                 error_message=f"O servidor de e-mail recusou o destinatário {destination_email}.",
             )
         except Exception as exc:
-            logger.exception(
-                "Erro ao disparar e-mail SC-20 via Django Email Backend: %s", exc
-            )
+            logger.exception("Erro ao disparar e-mail SC-20 via Django Email Backend: %s", exc)
             return DeliveryResult(
                 delivered=False,
                 error_message=f"Erro de entrega via SMTP: {exc}",

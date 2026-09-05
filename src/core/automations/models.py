@@ -968,9 +968,7 @@ class DigitalCertificate(models.Model):
     def whatsapp_url(self, *, override_phone: str | None = None) -> str:
         configured_override = getattr(settings, "SC20_WHATSAPP_OVERRIDE_TO", "")
         phone_to_use = (
-            override_phone
-            if override_phone is not None
-            else configured_override
+            override_phone if override_phone is not None else configured_override
         ).strip()
 
         override_active = bool(phone_to_use)
@@ -1028,7 +1026,6 @@ class DigitalCertificate(models.Model):
 
         message = "\n".join(lines)
         return f"https://wa.me/{digits}?text={urllib.parse.quote_plus(message)}"
-
 
 
 class CertificateCommunication(models.Model):
