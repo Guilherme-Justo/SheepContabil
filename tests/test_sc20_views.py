@@ -203,18 +203,18 @@ def test_sc20_certificates_filters_and_pagination(
     client.force_login(processes_operator)
     url = _module_url(modules)
 
-    # 1. Sem filtros: 7 itens na página 1, 2 páginas no total
+    # 1. Sem filtros: 5 itens na página 1, 2 páginas no total
     response = client.get(url)
     assert response.status_code == 200
     assert response.context["certificates_paginator"].num_pages == 2
-    assert len(response.context["certificates"]) == 7
+    assert len(response.context["certificates"]) == 5
     assert 'id="sc20-certificates-region"' in response.content.decode()
     assert "Limpar" not in response.content.decode()
 
-    # 2. Página 2: 3 itens restantes
+    # 2. Página 2: 5 itens restantes
     response_p2 = client.get(f"{url}?page=2")
     assert response_p2.status_code == 200
-    assert len(response_p2.context["certificates"]) == 3
+    assert len(response_p2.context["certificates"]) == 5
 
     # 3. Filtrar por busca textual de nome único
     response_search = client.get(f"{url}?q=Exclusivo")

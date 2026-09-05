@@ -544,7 +544,7 @@ def test_sc05_clients_table_sorting_filtering_pagination_and_isolation(
     assert 'name="clients_q"' in html
     assert 'name="clients_status"' in html
     clients_page_1 = list(resp.context["clients"])
-    assert len(clients_page_1) == 7
+    assert len(clients_page_1) == 5
     assert clients_page_1[0].name == "Alfa Sistemas"
     assert resp.context["summary"]["total"] == 8
     assert resp.context["summary"]["active"] == 5
@@ -555,8 +555,8 @@ def test_sc05_clients_table_sorting_filtering_pagination_and_isolation(
     resp_p2 = client.get(f"{url}?clients_page=2")
     assert resp_p2.status_code == 200
     clients_page_2 = list(resp_p2.context["clients"])
-    assert len(clients_page_2) == 1
-    assert clients_page_2[0].name == "Zeta Logística"
+    assert len(clients_page_2) == 3
+    assert clients_page_2[-1].name == "Zeta Logística"
 
     # 3. Ordenação por nome DESC: Zeta Logística primeiro
     resp_desc = client.get(f"{url}?clients_sort=-name")
