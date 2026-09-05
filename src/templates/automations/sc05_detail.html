@@ -102,6 +102,12 @@
         {% if page_obj.number and page_obj.number > 1 %}
           <input type="hidden" name="page" value="{{ page_obj.number }}">
         {% endif %}
+        {% if clients_paginator.per_page %}
+          <input type="hidden" name="clients_per_page" value="{{ clients_paginator.per_page }}">
+        {% endif %}
+        {% if paginator.per_page %}
+          <input type="hidden" name="per_page" value="{{ paginator.per_page }}">
+        {% endif %}
 
         <div class="flex items-center gap-1.5 shrink-0">
           <button
@@ -165,7 +171,7 @@
       </table>
     </div>
 
-    {% include "components/pagination.html" with page_obj=clients_page_obj paginator=clients_paginator query_params=clients_query_params page_param="clients_page" item_label="clientes" nav_label="Navegação dos clientes do fluxo" target_id="sc05-clients-region" %}
+    {% include "components/pagination.html" with page_obj=clients_page_obj paginator=clients_paginator query_params=clients_query_params page_param="clients_page" per_page_param="clients_per_page" per_page_query_params=clients_per_page_query_params item_label="clientes" nav_label="Navegação dos clientes do fluxo" target_id="sc05-clients-region" %}
   </div>
 </section>
 
@@ -218,6 +224,12 @@
         {% endif %}
         {% if clients_page_obj.number and clients_page_obj.number > 1 %}
           <input type="hidden" name="clients_page" value="{{ clients_page_obj.number }}">
+        {% endif %}
+        {% if clients_paginator.per_page %}
+          <input type="hidden" name="clients_per_page" value="{{ clients_paginator.per_page }}">
+        {% endif %}
+        {% if paginator.per_page %}
+          <input type="hidden" name="per_page" value="{{ paginator.per_page }}">
         {% endif %}
 
         <div class="flex items-center gap-1.5 shrink-0">
@@ -282,7 +294,7 @@
       </table>
     </div>
 
-    {% include "components/pagination.html" with page_obj=page_obj paginator=paginator query_params=query_params item_label="operações" nav_label="Navegação das operações" target_id="sc05-operations-region" %}
+    {% include "components/pagination.html" with page_obj=page_obj paginator=paginator query_params=query_params per_page_query_params=per_page_query_params item_label="operações" nav_label="Navegação das operações" target_id="sc05-operations-region" %}
   </div>
 </section>
 {% endblock %}

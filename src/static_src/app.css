@@ -63,6 +63,13 @@
   .portal-sidebar.is-collapsed {
     padding-inline: .55rem !important;
   }
+  .portal-sidebar.is-collapsed .sidebar-header {
+    justify-content: center !important;
+  }
+  .portal-sidebar.is-collapsed .brand-logo-icon {
+    display: block !important;
+    margin-inline: auto !important;
+  }
   .portal-sidebar.is-collapsed .sidebar-link {
     justify-content: center !important;
     padding: .55rem .25rem !important;
@@ -264,7 +271,7 @@
     padding: 0.85rem 1rem;
     background: white;
     border: 1px solid rgba(90, 112, 120, 0.16);
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+    box-shadow: none;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
@@ -469,6 +476,8 @@
   .sc05-state-grid dt { color: #5a7078; font-size: .6rem; text-transform: uppercase; letter-spacing: .08em; }
   .sc05-state-grid dd { margin-top: .35rem; color: #0b1a20; font-size: .7rem; font-weight: 600; line-height: 1.5; }
   .sc05-step-error { margin: 0 1rem 1rem; border-left: 3px solid #c4453d; border-radius: .55rem; background: rgba(196,69,61,.07); padding: .7rem .8rem; color: #91312c; font-size: .7rem; }
+  .sc05-step-error.sc05-step-timeout { border-left-color: #e8a33d; background: rgba(232,163,61,.1); color: #8a5913; }
+  .sc05-step-card.sc05-step-timeout { border-color: rgba(232,163,61,.35); box-shadow: 0 10px 30px rgba(232,163,61,.08); }
   .sc05-attempts { border-top: 1px solid rgba(90,112,120,.1); padding: .9rem 1rem 1rem; }
   .sc05-attempts summary { cursor: pointer; color: #10505f; font-size: .7rem; font-weight: 600; }
   .sc05-attempts .data-table { min-width: 45rem; }
@@ -907,6 +916,10 @@
    Navegação Responsiva Mobile / Zoom Elevado (< 1024px)
    ========================================================================== */
 @media (max-width: 1023px) {
+  .portal-sidebar-wrapper {
+    display: contents;
+  }
+
   .portal-sidebar {
     position: fixed !important;
     top: 0 !important;
@@ -950,16 +963,61 @@ body.mobile-menu-active {
 }
 
 @media (min-width: 1024px) {
-  .portal-sidebar {
+  .portal-sidebar-wrapper {
     position: sticky; top: 0; z-index: 40;
     height: 100vh; max-height: 100vh; min-height: 0; align-self: start;
+    display: flex; flex-direction: column;
+  }
+  .portal-sidebar {
+    position: relative; top: auto; z-index: auto;
+    height: 100%; max-height: 100%; min-height: 0; align-self: auto;
     padding: 2.25rem 1.4rem;
     overflow-y: auto; overscroll-behavior: contain;
     scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
   }
   .portal-sidebar::-webkit-scrollbar { width: 6px; }
   .portal-sidebar::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,.15); border-radius: 999px; }
   .portal-sidebar::-webkit-scrollbar-track { background: transparent; }
+
+  /* Floating Edge Handle */
+  .sidebar-edge-handle {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translate(50%, -50%);
+    z-index: 50;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 9999px;
+    background-color: #0b1a20;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none;
+    cursor: pointer;
+    transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .sidebar-edge-handle:hover {
+    background-color: #10505f;
+    border-color: #1fa69a;
+    color: #ffffff;
+    transform: translate(50%, -50%) scale(1.15);
+    box-shadow: none;
+  }
+  .sidebar-edge-handle:focus-visible {
+    outline: 2px solid #1fa69a;
+    outline-offset: 2px;
+  }
+  .sidebar-edge-handle svg {
+    transform-origin: center;
+    transition: rotate 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 
   /* Anti-FOUC: Renderização estática instantânea no primeiro paint quando o sidebar estiver recolhido */
   html.sidebar-is-collapsed .portal-layout {
@@ -968,11 +1026,18 @@ body.mobile-menu-active {
   html.sidebar-is-collapsed .portal-sidebar {
     padding-inline: .55rem !important;
   }
+  html.sidebar-is-collapsed .portal-sidebar .sidebar-header {
+    justify-content: center !important;
+  }
   html.sidebar-is-collapsed .portal-sidebar .brand-logo-full {
     display: none !important;
   }
   html.sidebar-is-collapsed .portal-sidebar .brand-logo-icon {
     display: block !important;
+    margin-inline: auto !important;
+  }
+  html.sidebar-is-collapsed .sidebar-edge-handle svg {
+    rotate: 180deg !important;
   }
   html.sidebar-is-collapsed .portal-sidebar .sidebar-label-container {
     display: none !important;
@@ -1166,6 +1231,19 @@ body.mobile-menu-active {
     background: rgba(255,255,255,.05);
     border: 1px solid rgba(255,255,255,.15);
   }
+  .sc05-step-error {
+    background: rgba(196,69,61,.18);
+    border-left-color: #ff8d85;
+    color: #ffd2cf;
+  }
+  .sc05-step-error.sc05-step-timeout {
+    background: rgba(232,163,61,.18);
+    border-left-color: #e8a33d;
+    color: #fbd38d;
+  }
+  .sc05-step-card.sc05-step-timeout {
+    border-color: rgba(232,163,61,.4);
+  }
 
   /* SC-20 Specifics */
   .sc20-days { color: rgba(255,255,255,.75); }
@@ -1275,7 +1353,7 @@ body.mobile-menu-active {
   .toast-notification {
     background: rgba(13, 30, 37, 0.95);
     border-color: rgba(255, 255, 255, 0.15);
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+    box-shadow: none;
   }
   .toast-title { color: rgba(255, 255, 255, 0.6); }
   .toast-text { color: rgba(255, 255, 255, 0.92); }
@@ -1508,6 +1586,66 @@ input[type="checkbox"][aria-invalid="true"],
   pointer-events: none;
   transition: opacity .15s ease;
 }
+
+/* SC-20 WhatsApp Integration */
+.sc20-whatsapp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1rem;
+  color: #15803d;
+  background-color: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.sc20-whatsapp-pill:hover {
+  background-color: rgba(34, 197, 94, 0.22);
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #166534;
+}
+
+.dark .sc20-whatsapp-pill {
+  color: #4ade80;
+  background-color: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.dark .sc20-whatsapp-pill:hover {
+  background-color: rgba(34, 197, 94, 0.28);
+  border-color: rgba(34, 197, 94, 0.6);
+  color: #86efac;
+}
+
+.sc20-whatsapp-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #15803d;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.sc20-whatsapp-link:hover {
+  text-decoration: underline;
+  color: #166534;
+}
+
+.dark .sc20-whatsapp-link {
+  color: #4ade80;
+}
+
+.dark .sc20-whatsapp-link:hover {
+  color: #86efac;
+}
+
 
 
 

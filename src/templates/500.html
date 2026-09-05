@@ -1,10 +1,128 @@
 {% extends "base.html" %}
-{% block title %}Falha inesperada · SheepContabil{% endblock %}
+
+{% block title %}Falha Inesperada (500) · SheepContabil{% endblock %}
+
 {% block content %}
-<section class="empty-state mx-auto mt-16 max-w-2xl">
-  <p class="font-mono text-sm text-carmim">500</p>
-  <h1 class="mt-3 font-display text-3xl font-semibold">Não foi possível concluir esta solicitação</h1>
-  <p class="mt-3 text-sm leading-6 text-grafite">A falha foi registrada para diagnóstico. Tente novamente em alguns instantes.</p>
-  <a href="{% url 'automations:dashboard' %}" class="primary-button mt-7 inline-block">Voltar ao portal</a>
-</section>
+<nav class="breadcrumbs" aria-label="Navegação estrutural">
+  <a href="{% url 'automations:dashboard' %}">Automações</a><span aria-hidden="true">/</span>
+  <strong>Erro 500</strong>
+</nav>
+
+<div class="mx-auto mt-8 max-w-3xl">
+  <article class="content-card p-8 sm:p-10 shadow-lg border border-grafite/15 dark:border-white/15">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="font-mono text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-carmim/10 text-carmim border border-carmim/20">
+        Status 500
+      </span>
+      <span class="soft-badge">Falha Interna do Servidor</span>
+    </div>
+
+    <h1 class="mt-5 font-display text-3xl font-semibold tracking-tight">
+      Não foi possível concluir esta solicitação
+    </h1>
+
+    <p class="mt-3 text-base leading-7 text-grafite dark:text-white/80">
+      Ocorreu uma instabilidade inesperada ao processar sua requisição. A ocorrência foi registrada nos logs operacionais para rastreabilidade e auditoria.
+    </p>
+
+    <div class="mt-6 rounded-xl border border-grafite/20 bg-nevoa/60 p-6 dark:border-white/10 dark:bg-white/5">
+      <div class="flex items-start gap-3">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-carmim/10 text-carmim dark:bg-carmim/20 dark:text-carmim font-bold text-sm" aria-hidden="true">
+          ⚠️
+        </span>
+        <div class="text-xs leading-6 text-grafite dark:text-white/80">
+          <p class="font-semibold text-tinta dark:text-white">Diagnóstico e Integridade Transacional</p>
+          <p class="mt-1">
+            Todas as operações da SheepContabil utilizam transações atômicas e políticas de idempotência. Os dados já gravados permanecem íntegros.
+          </p>
+          <p class="mt-2 text-grafite/80 dark:text-white/60">
+            Se esta operação envolver um serviço externo (como S3, portais de RPA ou emissão de notas), o sistema pode ter sofrido uma lentidão momentânea.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-8 flex flex-wrap items-center gap-4">
+      <button
+        type="button"
+        onclick="window.location.reload()"
+        class="primary-button inline-flex items-center gap-2 cursor-pointer"
+      >
+        <span aria-hidden="true">↻</span>
+        Tentar novamente
+      </button>
+      <a
+        href="{% url 'automations:dashboard' %}"
+        class="sc06-save-button dark:bg-white/10 dark:text-white dark:border-white/20 hover:dark:bg-white/15"
+      >
+        Voltar ao portal principal
+      </a>
+    </div>
+
+    <div class="mt-8 border-t border-grafite/10 pt-4 dark:border-white/10">
+      <p class="text-xs text-grafite dark:text-white/60">
+        A falha persiste? Entre em contato com a equipe de suporte ou com o administrador da plataforma informando o horário aproximado da tentativa.
+      </p>
+    </div>
+  </article>
+</div>
 {% endblock %}
+
+{% block anonymous_content %}
+<div class="mx-auto mt-8 max-w-3xl">
+  <article class="content-card p-8 sm:p-10 shadow-lg border border-grafite/15 dark:border-white/15">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="font-mono text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-carmim/10 text-carmim border border-carmim/20">
+        Status 500
+      </span>
+      <span class="soft-badge">Falha Interna do Servidor</span>
+    </div>
+
+    <h1 class="mt-5 font-display text-3xl font-semibold tracking-tight">
+      Não foi possível concluir esta solicitação
+    </h1>
+
+    <p class="mt-3 text-base leading-7 text-grafite dark:text-white/80">
+      Ocorreu uma instabilidade inesperada ao processar sua requisição. A ocorrência foi registrada nos logs operacionais para rastreabilidade e auditoria.
+    </p>
+
+    <div class="mt-6 rounded-xl border border-grafite/20 bg-nevoa/60 p-6 dark:border-white/10 dark:bg-white/5">
+      <div class="flex items-start gap-3">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-carmim/10 text-carmim dark:bg-carmim/20 dark:text-carmim font-bold text-sm" aria-hidden="true">
+          ⚠️
+        </span>
+        <div class="text-xs leading-6 text-grafite dark:text-white/80">
+          <p class="font-semibold text-tinta dark:text-white">Diagnóstico e Integridade</p>
+          <p class="mt-1">
+            Todas as operações utilizam transações atômicas e políticas de idempotência. Os dados já gravados permanecem íntegros.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-8 flex flex-wrap items-center gap-4">
+      <button
+        type="button"
+        onclick="window.location.reload()"
+        class="primary-button inline-flex items-center gap-2 cursor-pointer"
+      >
+        <span aria-hidden="true">↻</span>
+        Tentar novamente
+      </button>
+      <a
+        href="{% url 'identity:login' %}"
+        class="sc06-save-button dark:bg-white/10 dark:text-white dark:border-white/20 hover:dark:bg-white/15"
+      >
+        Ir para o login
+      </a>
+    </div>
+
+    <div class="mt-8 border-t border-grafite/10 pt-4 dark:border-white/10">
+      <p class="text-xs text-grafite dark:text-white/60">
+        A falha persiste? Entre em contato com o suporte informando o horário aproximado da tentativa.
+      </p>
+    </div>
+  </article>
+</div>
+{% endblock %}
+

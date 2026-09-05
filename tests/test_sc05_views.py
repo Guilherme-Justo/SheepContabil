@@ -20,6 +20,7 @@ from core.automations.models import (
     SC05ClientStatus,
     SC05Scenario,
     SC05StepAttempt,
+    SC05StepStatus,
 )
 from core.automations.sc05.contracts import StoredScreenshot
 from core.automations.sc05.services import create_sc05_run
@@ -613,3 +614,81 @@ def test_sc05_clients_table_sorting_filtering_pagination_and_isolation(
     assert '<input type="hidden" name="sort" value="created_at">' in html_comb
     assert '<input type="hidden" name="clients_q" value="Alfa">' in html_comb
     assert '<input type="hidden" name="clients_sort" value="name">' in html_comb
+
+
+def test_sc05_step_timeout_visual_resilience_and_badges(
+    client: Client,
+    modules: dict[str, AutomationModule],
+    technology_operator: User,
+) -> None:
+    sc05_client = SC05Client.objects.create(
+        external_reference="timeout-client",
+        name="Omega Timeout Sistemas",
+        document="55555555000155",
+    )
+    run = create_sc05_run(
+        module=modules["SC-05"],
+        client=sc05_client,
+        action=SC05Action.BLOCK,
+        scenario=SC05Scenario.HAPPY_PATH,
+        triggered_by=technology_operator,
+        request_key=uuid4(),
+    )
+    AutomationRun.objects.filter(pk=run.pk).update(
+        status=RunStatus.PARTIALLY_FAILED,
+        error_message="Falha por timeout transitório na etapa 2.",
+        finished_at=timezone.now(),
+    )
+    SC05Client.objects.filter(pk=sc05_client.pk).update(status=SC05ClientStatus.PARTIAL)
+
+    steps = list(run.sc05_operation.steps.order_by("position"))
+    step_timeout = steps[1]
+    step_timeout.status = SC05StepStatus.FAILED
+    step_timeout.error_code = "PORTAL_TIMEOUT"
+    step_timeout.error_message = (
+        "O portal demorou além do limite tolerado de 15 segundos para responder."
+    )
+    step_timeout.save()
+
+    attempt_timeout = SC05StepAttempt.objects.create(
+        step=step_timeout,
+        sequence=1,
+        operation=SC05AttemptOperation.APPLY,
+        status=SC05AttemptStatus.FAILED,
+        finished_at=timezone.now(),
+        error_code="PORTAL_TIMEOUT",
+        error_message="Tempo limite excedido na requisição ao portal.",
+    )
+
+    # 1. Propriedades semânticas de timeout em models
+    assert step_timeout.is_timeout is True
+    assert step_timeout.status_tone == "warning"
+    assert step_timeout.display_status_label == "Timeout"
+
+    assert attempt_timeout.is_timeout is True
+    assert attempt_timeout.status_tone == "warning"
+    assert attempt_timeout.display_status_label == "Timeout"
+
+    # 2. Renderização visual no run_detail
+    client.force_login(technology_operator)
+    url = reverse("automations:run-detail", kwargs={"run_id": run.id})
+    resp = client.get(url)
+    assert resp.status_code == 200
+    html = resp.content.decode("utf-8")
+
+    assert "status-badge status-warning" in html
+    assert "⏳ Timeout" in html
+    assert "sc05-step-card sc05-step-timeout" in html
+    assert "sc05-step-error sc05-step-timeout" in html
+    assert "⏳ Instabilidade transitória por tempo limite: O portal demorou além do limite" in html
+    assert "Retomar pendências" in html
+
+    # 3. Transição de retorno após saneamento/retomada (badge verde Aplicado)
+    step_timeout.status = SC05StepStatus.APPLIED
+    step_timeout.error_code = ""
+    step_timeout.error_message = ""
+    step_timeout.save()
+
+    assert step_timeout.is_timeout is False
+    assert step_timeout.status_tone == "success"
+    assert step_timeout.display_status_label == "Aplicado"

@@ -209,3 +209,74 @@ def test_dashboard_runs_sorting_and_whitelist_security(
     resp_invalid = client.get(f"{url}?sort=malicious_field")
     assert resp_invalid.status_code == 200
     assert resp_invalid.context["current_sort"] == ""
+
+
+def test_404_page_for_administrator_omits_switch_user_button(
+    client: Client,
+    administrator: User,
+) -> None:
+    client.force_login(administrator)
+    response = client.get("/rota-inexistente-xyz/")
+
+    assert response.status_code == 404
+    html = response.content.decode()
+    assert "Página ou módulo não localizado" in html
+    assert "Ir para o painel principal" in html
+    assert "Trocar de usuário" not in html
+
+
+def test_404_page_for_operator_includes_switch_user_button(
+    client: Client,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    client.force_login(processes_operator)
+    response = client.get(
+        reverse("automations:module-detail", kwargs={"slug": modules["SC-04"].slug})
+    )
+
+    assert response.status_code == 404
+    html = response.content.decode()
+    assert "Página ou módulo não localizado" in html
+    assert "Ir para o painel principal" in html
+    assert "Trocar de usuário" in html
+
+
+def test_404_page_for_anonymous_shows_login_button(client: Client) -> None:
+    response = client.get("/rota-inexistente-xyz/")
+
+    assert response.status_code == 404
+    html = response.content.decode()
+    assert "Página ou módulo não localizado" in html
+    assert "Fazer login" in html
+    assert "Trocar de usuário" not in html
+
+
+def test_403_preview_renders_with_proper_context(
+    client: Client,
+    administrator: User,
+) -> None:
+    client.force_login(administrator)
+    response = client.get(reverse("preview-403"))
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "Status 403" in html
+    assert "Acesso não autorizado" in html
+    assert "Ir para o painel principal" in html
+    assert "Trocar de usuário" not in html
+
+
+def test_500_preview_renders_with_proper_context(
+    client: Client,
+    administrator: User,
+) -> None:
+    client.force_login(administrator)
+    response = client.get(reverse("preview-500"))
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "Status 500" in html
+    assert "Não foi possível concluir esta solicitação" in html
+    assert "Tentar novamente" in html
+    assert "Voltar ao portal principal" in html

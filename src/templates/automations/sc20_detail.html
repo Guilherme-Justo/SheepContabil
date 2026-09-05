@@ -55,7 +55,18 @@
 
 <div class="sc20-guidance mt-6" role="note">
   <span class="sc20-guidance-icon" aria-hidden="true">i</span>
-  <p><strong>Ambiente de demonstração.</strong> Os avisos são simulados e registrados no histórico abaixo. Certificados revogados ou substituídos permanecem visíveis, mas não recebem novos avisos.</p>
+  {% if notification_backend == "email" %}
+    <p>
+      <strong>Envio real de e-mails ativado (Gmail SMTP).</strong>
+      {% if email_override_to %}
+        Sandbox de segurança ativo: todos os avisos disparados são redirecionados para <code>{{ email_override_to }}</code> com assunto identificado.
+      {% else %}
+        Os avisos são disparados diretamente para os e-mails cadastrados em cada certificado.
+      {% endif %}
+    </p>
+  {% else %}
+    <p><strong>Ambiente de demonstração.</strong> Os avisos são simulados e registrados no histórico abaixo. Certificados revogados ou substituídos permanecem visíveis, mas não recebem novos avisos.</p>
+  {% endif %}
 </div>
 
 <section class="mt-10 grid gap-7 2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start">
@@ -90,6 +101,9 @@
         </div>
         {% if current_sort %}
           <input type="hidden" name="sort" value="{{ current_sort }}">
+        {% endif %}
+        {% if certificates_paginator.per_page %}
+          <input type="hidden" name="per_page" value="{{ certificates_paginator.per_page }}">
         {% endif %}
         <div class="flex items-center gap-1.5 shrink-0">
           <button
@@ -148,9 +162,22 @@
             <td><span class="status-badge status-{{ certificate.status_tone }}"><i></i>{{ certificate.get_status_display }}</span></td>
             <td>
               <span class="block text-tinta">{{ certificate.contact_name }}</span>
-              <span class="mt-1 block text-xs">
-                {{ certificate.get_preferred_channel_display }} ·
-                {% if certificate.preferred_channel == "email" %}{{ certificate.contact_email }}{% else %}{{ certificate.contact_phone }}{% endif %}
+              <span class="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                <span>
+                  {{ certificate.get_preferred_channel_display }} ·
+                  {% if certificate.preferred_channel == "email" %}{{ certificate.contact_email }}{% else %}{{ certificate.contact_phone }}{% endif %}
+                </span>
+                {% if certificate.has_whatsapp %}
+                  <a
+                    href="{{ certificate.whatsapp_url }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="sc20-whatsapp-pill"
+                    title="Abrir mensagem no WhatsApp Web"
+                  >
+                    <span aria-hidden="true">💬</span> WhatsApp
+                  </a>
+                {% endif %}
               </span>
             </td>
           </tr>
@@ -169,15 +196,46 @@
       </table>
     </div>
 
-    {% include "components/pagination.html" with page_obj=certificates paginator=certificates_paginator query_params=query_params item_label="certificados" nav_label="Navegação dos certificados digitais" target_id="sc20-certificates-region" %}
+    {% include "components/pagination.html" with page_obj=certificates paginator=certificates_paginator query_params=query_params per_page_query_params=per_page_query_params item_label="certificados" nav_label="Navegação dos certificados digitais" target_id="sc20-certificates-region" %}
   </div>
 
-  <aside class="sc20-form-card" aria-labelledby="certificate-form-title">
+  <aside
+    id="sc20-certificate-form-card"
+    class="sc20-form-card"
+    aria-labelledby="certificate-form-title"
+    x-data="{
+      preferredChannel: '{{ form.preferred_channel.value|default:'email' }}',
+      onChannelChange(newVal) {
+        this.preferredChannel = newVal;
+        if (newVal === 'email') {
+          const phoneErr = document.getElementById('id_contact_phone_errors');
+          if (phoneErr) phoneErr.remove();
+          const phoneInput = document.getElementById('id_contact_phone');
+          if (phoneInput) phoneInput.removeAttribute('aria-invalid');
+        } else if (newVal === 'whatsapp') {
+          const emailErr = document.getElementById('id_contact_email_errors');
+          if (emailErr) emailErr.remove();
+          const emailInput = document.getElementById('id_contact_email');
+          if (emailInput) emailInput.removeAttribute('aria-invalid');
+        }
+      }
+    }"
+  >
     <p class="eyebrow">Novo acompanhamento</p>
     <h2 id="certificate-form-title" class="mt-3 font-display text-xl font-semibold">Cadastrar certificado</h2>
     <p class="mt-2 text-sm leading-6 text-grafite">Informe apenas dados sintéticos neste ambiente demonstrativo.</p>
 
-    <form method="post" class="mt-6 space-y-5" novalidate>
+    <form
+      id="sc20-certificate-form"
+      action="{% url 'automations:module-detail' module.slug %}"
+      method="post"
+      class="mt-6 space-y-5"
+      novalidate
+      hx-post="{% url 'automations:module-detail' module.slug %}"
+      hx-target="#sc20-certificate-form-card"
+      hx-select="#sc20-certificate-form-card"
+      hx-swap="outerHTML"
+    >
       {% csrf_token %}
       <input type="hidden" name="action" value="create_certificate">
 
@@ -188,7 +246,14 @@
       {% for field in form %}
       <div>
         <label for="{{ field.id_for_label }}" class="form-label">
-          {{ field.label }}{% if field.field.required %}<span class="text-carmim" aria-hidden="true"> *</span><span class="sr-only"> (obrigatório)</span>{% endif %}
+          {{ field.label }}
+          {% if field.field.required %}
+            <span class="text-carmim" aria-hidden="true"> *</span><span class="sr-only"> (obrigatório)</span>
+          {% elif field.name == 'contact_email' %}
+            <span class="text-carmim" aria-hidden="true" x-show="preferredChannel === 'email'" x-cloak> *</span><span class="sr-only" x-show="preferredChannel === 'email'"> (obrigatório)</span>
+          {% elif field.name == 'contact_phone' %}
+            <span class="text-carmim" aria-hidden="true" x-show="preferredChannel === 'whatsapp'" x-cloak> *</span><span class="sr-only" x-show="preferredChannel === 'whatsapp'"> (obrigatório)</span>
+          {% endif %}
         </label>
         {{ field }}
         {% if field.help_text %}<p id="{{ field.id_for_label }}_helptext" class="form-help">{{ field.help_text|safe }}</p>{% endif %}
@@ -239,18 +304,31 @@
             </td>
             <td class="font-mono text-xs">{{ attempt.created_at|date:"d/m/Y H:i" }}</td>
             <td class="text-right">
-              {% if attempt.status == "failed" and attempt.communication.status == "failed" %}
-              <form method="post" class="inline-block">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="retry">
-                <input type="hidden" name="attempt_id" value="{{ attempt.id }}">
-                <button type="submit" class="sc20-retry-button" aria-label="Tentar novamente o aviso para {{ attempt.recipient }}">Tentar novamente</button>
-              </form>
-              {% elif attempt.status == "failed" %}
-              <span class="text-xs text-grafite">Superado</span>
-              {% else %}
-              <span class="text-xs text-grafite">Concluído</span>
-              {% endif %}
+              <div class="flex items-center justify-end gap-2">
+                {% if attempt.is_whatsapp and attempt.whatsapp_url %}
+                  <a
+                    href="{{ attempt.whatsapp_url }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="sc20-whatsapp-link"
+                    title="Abrir mensagem pré-formatada no WhatsApp Web"
+                  >
+                    <span aria-hidden="true">💬</span> WhatsApp
+                  </a>
+                {% endif %}
+                {% if attempt.status == "failed" and attempt.communication.status == "failed" %}
+                <form method="post" class="inline-block">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="retry">
+                  <input type="hidden" name="attempt_id" value="{{ attempt.id }}">
+                  <button type="submit" class="sc20-retry-button" aria-label="Tentar novamente o aviso para {{ attempt.recipient }}">Tentar novamente</button>
+                </form>
+                {% elif attempt.status == "failed" %}
+                <span class="text-xs text-grafite" title="Tentativa anterior superada por reenvio posterior">Superado</span>
+                {% elif not attempt.is_whatsapp %}
+                <span class="text-xs text-grafite" aria-label="Nenhuma ação necessária">—</span>
+                {% endif %}
+              </div>
             </td>
           </tr>
           {% empty %}
@@ -260,7 +338,7 @@
       </table>
     </div>
 
-    {% include "components/pagination.html" with page_obj=attempts paginator=attempts_paginator item_label="avisos" nav_label="Navegação dos avisos" target_id="sc20-attempts-region" page_param="attempts_page" query_params=attempts_query_params %}
+    {% include "components/pagination.html" with page_obj=attempts paginator=attempts_paginator item_label="avisos" nav_label="Navegação dos avisos" target_id="sc20-attempts-region" page_param="attempts_page" query_params=attempts_query_params per_page_param="attempts_per_page" per_page_query_params=attempts_per_page_query_params %}
   </div>
 </section>
 
@@ -297,7 +375,7 @@
       </table>
     </div>
 
-    {% include "components/pagination.html" with page_obj=runs paginator=runs_paginator item_label="execuções" nav_label="Navegação das execuções do módulo" target_id="sc20-runs-region" page_param="runs_page" query_params=runs_query_params %}
+    {% include "components/pagination.html" with page_obj=runs paginator=runs_paginator item_label="execuções" nav_label="Navegação das execuções do módulo" target_id="sc20-runs-region" page_param="runs_page" query_params=runs_query_params per_page_param="runs_per_page" per_page_query_params=runs_per_page_query_params %}
   </div>
 </section>
 {% endblock %}

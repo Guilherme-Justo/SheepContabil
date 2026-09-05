@@ -192,6 +192,77 @@ class SC04QueueFilterForm(A11yFormMixin, forms.Form):
     )
 
 
+VALID_BRAZILIAN_DDDS: set[str] = {
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "21",
+    "22",
+    "24",
+    "27",
+    "28",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "37",
+    "38",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49",
+    "51",
+    "53",
+    "54",
+    "55",
+    "61",
+    "62",
+    "63",
+    "64",
+    "65",
+    "66",
+    "67",
+    "68",
+    "69",
+    "71",
+    "73",
+    "74",
+    "75",
+    "77",
+    "79",
+    "81",
+    "82",
+    "83",
+    "84",
+    "85",
+    "86",
+    "87",
+    "88",
+    "89",
+    "91",
+    "92",
+    "93",
+    "94",
+    "95",
+    "96",
+    "97",
+    "98",
+    "99",
+}
+
+
 class DigitalCertificateForm(A11yFormMixin, forms.ModelForm):  # type: ignore[type-arg]
     class Meta:
         model = DigitalCertificate
@@ -224,8 +295,34 @@ class DigitalCertificateForm(A11yFormMixin, forms.ModelForm):  # type: ignore[ty
         }
         widgets = {
             "valid_until": forms.DateInput(attrs={"type": "date"}),
-            "contact_email": forms.EmailInput(attrs={"placeholder": "contato@exemplo.test"}),
-            "contact_phone": forms.TextInput(attrs={"placeholder": "+55 11 99999-0000"}),
+            "client_document": forms.TextInput(
+                attrs={
+                    "placeholder": "000.000.000-00 ou 00.000.000/0000-00",
+                    "data-mask": "document",
+                    "inputmode": "numeric",
+                }
+            ),
+            "contact_email": forms.EmailInput(
+                attrs={
+                    "placeholder": "contato@exemplo.test",
+                    ":aria-required": "preferredChannel === 'email'",
+                }
+            ),
+            "contact_phone": forms.TextInput(
+                attrs={
+                    "placeholder": "+55 (11) 99999-0000",
+                    "data-mask": "phone",
+                    "inputmode": "tel",
+                    "autocomplete": "tel",
+                    ":aria-required": "preferredChannel === 'whatsapp'",
+                }
+            ),
+            "preferred_channel": forms.Select(
+                attrs={
+                    "@change": "onChannelChange($event.target.value)",
+                    "x-model": "preferredChannel",
+                }
+            ),
         }
 
     def clean_serial_number(self) -> str:
@@ -236,6 +333,57 @@ class DigitalCertificateForm(A11yFormMixin, forms.ModelForm):  # type: ignore[ty
         if len(document) not in {11, 14}:
             raise forms.ValidationError("Informe um CPF ou CNPJ sintético com 11 ou 14 dígitos.")
         return document
+
+    def clean_contact_phone(self) -> str:
+        raw_phone = str(self.cleaned_data.get("contact_phone") or "").strip()
+        if not raw_phone:
+            return ""
+
+        digits = re.sub(r"\D", "", raw_phone)
+        if raw_phone.startswith("+") and not digits.startswith("55"):
+            raise forms.ValidationError("Para números com DDI, utilize o prefixo do Brasil (+55).")
+
+        if len(digits) not in (10, 11, 12, 13):
+            raise forms.ValidationError(
+                "Informe um telefone válido com DDD (10 ou 11 dígitos, ou com DDI +55)."
+            )
+
+        if len(digits) in (12, 13):
+            if not digits.startswith("55"):
+                raise forms.ValidationError(
+                    "Para números com DDI, utilize o prefixo do Brasil (+55)."
+                )
+            ddd = digits[2:4]
+            local = digits[4:]
+        else:
+            ddd = digits[:2]
+            local = digits[2:]
+
+        if ddd not in VALID_BRAZILIAN_DDDS:
+            raise forms.ValidationError(f"O DDD '{ddd}' não é válido no Brasil.")
+
+        if len(set(digits)) == 1:
+            raise forms.ValidationError(
+                "Informe um telefone válido (todos os dígitos são repetidos)."
+            )
+
+        if len(set(local)) == 1:
+            raise forms.ValidationError("Informe um telefone válido (número local repetido).")
+
+        if len(local) == 9 and not local.startswith("9"):
+            raise forms.ValidationError(
+                "Telefones celulares de 9 dígitos devem iniciar com o dígito 9."
+            )
+
+        if len(local) == 9:
+            formatted_local = f"{local[:5]}-{local[5:]}"
+        else:
+            formatted_local = f"{local[:4]}-{local[4:]}"
+
+        return f"+55 ({ddd}) {formatted_local}"
+
+    def clean_contact_email(self) -> str:
+        return str(self.cleaned_data.get("contact_email") or "").strip().lower()
 
     def clean(self) -> dict[str, Any]:
         cleaned_data = super().clean() or {}
