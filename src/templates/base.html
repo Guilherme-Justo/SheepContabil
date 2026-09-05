@@ -394,7 +394,22 @@
       </div>
     </div>
   {% else %}
-    {% block public_content %}{% endblock %}
+    {% block public_content %}
+      <header class="border-b border-grafite/15 bg-white/70 backdrop-blur-xs px-6 py-4 dark:border-white/10 dark:bg-tinta/80">
+        <div class="mx-auto flex max-w-5xl items-center justify-between">
+          <a href="{% url 'identity:login' %}" class="flex items-center gap-2.5">
+            <img src="{% static 'brand/logo-light.png' %}" alt="SheepContabil" class="h-9 w-auto dark:hidden">
+            <img src="{% static 'brand/logo-dark.png' %}" alt="SheepContabil" class="hidden h-9 w-auto dark:block">
+          </a>
+          <a href="{% url 'identity:login' %}" class="primary-button text-xs py-1.5 px-3">
+            Fazer login
+          </a>
+        </div>
+      </header>
+      <main id="main-content" tabindex="-1" class="px-5 py-8 sm:px-8 lg:px-12 lg:py-10">
+        {% block anonymous_content %}{% endblock %}
+      </main>
+    {% endblock %}
   {% endif %}
 </body>
 </html>

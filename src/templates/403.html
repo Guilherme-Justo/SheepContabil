@@ -1,28 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}Página não encontrada (404) · SheepContabil{% endblock %}
+{% block title %}Acesso Negado (403) · SheepContabil{% endblock %}
 
 {% block content %}
 <nav class="breadcrumbs" aria-label="Navegação estrutural">
   <a href="{% url 'automations:dashboard' %}">Automações</a><span aria-hidden="true">/</span>
-  <strong>Erro 404</strong>
+  <strong>Erro 403</strong>
 </nav>
 
 <div class="mx-auto mt-8 max-w-3xl">
   <article class="content-card p-8 sm:p-10 shadow-lg border border-grafite/15 dark:border-white/15">
     <div class="flex flex-wrap items-center gap-3">
       <span class="font-mono text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-carmim/10 text-carmim border border-carmim/20">
-        Status 404
+        Status 403
       </span>
-      <span class="soft-badge">Recurso Indisponível</span>
+      <span class="soft-badge">Acesso Negado</span>
     </div>
 
     <h1 class="mt-5 font-display text-3xl font-semibold tracking-tight">
-      Página ou módulo não localizado
+      Acesso não autorizado
     </h1>
 
     <p class="mt-3 text-base leading-7 text-grafite dark:text-white/80">
-      O endereço requisitado não existe, foi modificado ou você não possui permissão de acesso para esta rotina técnica.
+      Você não possui as permissões necessárias para acessar este módulo, recurso ou operação técnica do sistema.
     </p>
 
     {% if request.user.is_authenticated %}
@@ -41,7 +41,7 @@
 
       <div class="mt-4 border-t border-grafite/15 pt-4 text-xs leading-6 text-grafite dark:border-white/10 dark:text-white/80">
         {% if request.user.is_business_administrator %}
-          <p>Seu perfil possui privilégios de Administrador. Se o erro ocorreu ao tentar acessar um caso ou automação, verifique se o identificador ou parâmetro de consulta é válido.</p>
+          <p>Seu perfil possui privilégios de Administrador corporativo. Se esta ação foi bloqueada, certifique-se de que a operação requisitada é permitida para seu nível de autenticação ou contate o suporte de infraestrutura.</p>
         {% else %}
           <p>
             No portal SheepContabil, o acesso a cada módulo é rigorosamente restrito à área de atuação do operador:
@@ -57,7 +57,7 @@
             {% endfor %}
           </div>
           <p class="mt-3 text-xs text-grafite/90 dark:text-white/60">
-            Tentativas de acessar módulos pertencentes a outras áreas (como Fiscal, Tecnologia ou Societário) são interceptadas para assegurar conformidade e rastreabilidade da operação.
+            Tentativas de acessar rotinas pertencentes a outras áreas (como Fiscal, Tecnologia ou Societário) são interceptadas para assegurar conformidade e rastreabilidade da operação.
           </p>
         {% endif %}
       </div>
@@ -100,17 +100,17 @@
   <article class="content-card p-8 sm:p-10 shadow-lg border border-grafite/15 dark:border-white/15">
     <div class="flex flex-wrap items-center gap-3">
       <span class="font-mono text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-carmim/10 text-carmim border border-carmim/20">
-        Status 404
+        Status 403
       </span>
-      <span class="soft-badge">Recurso Indisponível</span>
+      <span class="soft-badge">Acesso Negado</span>
     </div>
 
     <h1 class="mt-5 font-display text-3xl font-semibold tracking-tight">
-      Página ou módulo não localizado
+      Acesso não autorizado
     </h1>
 
     <p class="mt-3 text-base leading-7 text-grafite dark:text-white/80">
-      O endereço requisitado não existe, foi modificado ou você não possui permissão de acesso para esta rotina técnica.
+      Você não possui autorização para acessar este recurso. Por favor, autentique-se com uma conta autorizada.
     </p>
 
     <div class="mt-8 flex flex-wrap items-center gap-4">
@@ -121,11 +121,10 @@
 
     <div class="mt-8 border-t border-grafite/10 pt-4 dark:border-white/10">
       <p class="text-xs text-grafite dark:text-white/60">
-        Dúvidas ou necessidade de acesso a rotinas corporativas? Efetue o login com suas credenciais operacionais.
+        Dúvidas ou necessidade de acesso? Contate a liderança operacional ou o administrador do sistema.
       </p>
     </div>
   </article>
 </div>
 {% endblock %}
-
 

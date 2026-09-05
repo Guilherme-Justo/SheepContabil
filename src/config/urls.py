@@ -13,7 +13,9 @@ urlpatterns = [
     path("", include("core.automations.urls")),
 ]
 
-if settings.DEBUG:
+if settings.DEBUG or getattr(settings, "ENABLE_ERROR_PREVIEWS", False):
     urlpatterns += [
+        path("403/", TemplateView.as_view(template_name="403.html"), name="preview-403"),
         path("404/", TemplateView.as_view(template_name="404.html"), name="preview-404"),
+        path("500/", TemplateView.as_view(template_name="500.html"), name="preview-500"),
     ]
