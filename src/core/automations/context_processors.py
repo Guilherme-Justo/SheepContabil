@@ -2,8 +2,8 @@ from django.http import HttpRequest
 
 from core.automations.models import AutomationModule
 
-PAGE_SIZE_CHOICES: tuple[int, ...] = (5, 7, 15, 25, 50)
-DEFAULT_PAGE_SIZE: int = 7
+PAGE_SIZE_CHOICES: tuple[int, ...] = (5, 10, 15, 20, 25, 50)
+DEFAULT_PAGE_SIZE: int = 5
 
 
 def module_navigation(request: HttpRequest) -> dict[str, object]:

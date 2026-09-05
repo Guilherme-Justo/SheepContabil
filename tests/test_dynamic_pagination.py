@@ -39,6 +39,12 @@ pytestmark = pytest.mark.django_db
 # ==============================================================================
 
 
+def test_page_size_choices_are_all_multiples_of_five() -> None:
+    assert len(PAGE_SIZE_CHOICES) >= 4
+    assert all(choice % 5 == 0 for choice in PAGE_SIZE_CHOICES)
+    assert DEFAULT_PAGE_SIZE % 5 == 0
+
+
 def test_extract_page_size_valid_choices() -> None:
     rf = RequestFactory()
     for choice in PAGE_SIZE_CHOICES:
@@ -60,6 +66,7 @@ def test_extract_page_size_default_when_missing() -> None:
         "-1",
         "1",
         "6",
+        "7",
         "8",
         "100",
         "999999",
@@ -135,23 +142,25 @@ def test_dashboard_pagination_dynamic_page_size(
 
     url = reverse("automations:dashboard")
 
-    # Default per_page = 7 -> 2 páginas (7 na primeira, 5 na segunda)
+    # Default per_page = 5 -> 3 páginas (5 na primeira, 5 na segunda, 2 na terceira)
     resp = client.get(url)
     assert resp.status_code == 200
-    assert len(resp.context["page_obj"]) == 7
-    assert resp.context["paginator"].num_pages == 2
+    assert len(resp.context["page_obj"]) == 5
+    assert resp.context["paginator"].num_pages == 3
+    assert resp.context["paginator"].per_page == 5
+    assert resp.context["paginator"].count == 12
     html = resp.content.decode()
     assert "<select" in html
     assert 'name="per_page"' in html
-    assert '<option value="7" selected>7</option>' in html
+    assert '<option value="5" selected>5</option>' in html
 
-    # per_page = 5 -> 3 páginas (5 na primeira, 5 na segunda, 2 na terceira)
-    resp_5 = client.get(f"{url}?per_page=5")
-    assert resp_5.status_code == 200
-    assert len(resp_5.context["page_obj"]) == 5
-    assert resp_5.context["paginator"].num_pages == 3
-    html_5 = resp_5.content.decode()
-    assert '<option value="5" selected>5</option>' in html_5
+    # per_page = 10 -> 2 páginas (10 na primeira, 2 na segunda)
+    resp_10 = client.get(f"{url}?per_page=10")
+    assert resp_10.status_code == 200
+    assert len(resp_10.context["page_obj"]) == 10
+    assert resp_10.context["paginator"].num_pages == 2
+    html_10 = resp_10.content.decode()
+    assert '<option value="10" selected>10</option>' in html_10
 
     # per_page = 15 -> 1 página contendo todas as 12 execuções
     resp_15 = client.get(f"{url}?per_page=15")
@@ -161,12 +170,12 @@ def test_dashboard_pagination_dynamic_page_size(
     html_15 = resp_15.content.decode()
     assert '<option value="15" selected>15</option>' in html_15
 
-    # Ataque DoS de memória: per_page=999999 -> fallback seguro para 7
+    # Ataque DoS de memória: per_page=999999 -> fallback seguro para 5
     resp_dos = client.get(f"{url}?per_page=999999")
     assert resp_dos.status_code == 200
-    assert len(resp_dos.context["page_obj"]) == 7
-    assert resp_dos.context["paginator"].num_pages == 2
-    assert resp_dos.context["paginator"].per_page == 7
+    assert len(resp_dos.context["page_obj"]) == 5
+    assert resp_dos.context["paginator"].num_pages == 3
+    assert resp_dos.context["paginator"].per_page == 5
 
 
 def test_dashboard_pagination_preserves_filters_and_sort(

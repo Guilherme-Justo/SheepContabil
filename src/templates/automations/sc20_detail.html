@@ -137,7 +137,7 @@
             {% include "components/sortable_th.html" with field="client" label="Cliente" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
             {% include "components/sortable_th.html" with field="document" label="Documento" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
             {% include "components/sortable_th.html" with field="expires_on" label="Validade" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
-            <th scope="col">Prazo</th>
+            {% include "components/sortable_th.html" with field="days_remaining" label="Prazo" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
             {% include "components/sortable_th.html" with field="status" label="Estado" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
             {% include "components/sortable_th.html" with field="contact" label="Contato" current_sort=current_sort sort_query_params=sort_query_params target_id="sc20-certificates-region" %}
           </tr>

@@ -203,18 +203,18 @@ def test_sc20_certificates_filters_and_pagination(
     client.force_login(processes_operator)
     url = _module_url(modules)
 
-    # 1. Sem filtros: 7 itens na página 1, 2 páginas no total
+    # 1. Sem filtros: 5 itens na página 1, 2 páginas no total
     response = client.get(url)
     assert response.status_code == 200
     assert response.context["certificates_paginator"].num_pages == 2
-    assert len(response.context["certificates"]) == 7
+    assert len(response.context["certificates"]) == 5
     assert 'id="sc20-certificates-region"' in response.content.decode()
     assert "Limpar" not in response.content.decode()
 
-    # 2. Página 2: 3 itens restantes
+    # 2. Página 2: 5 itens restantes
     response_p2 = client.get(f"{url}?page=2")
     assert response_p2.status_code == 200
-    assert len(response_p2.context["certificates"]) == 3
+    assert len(response_p2.context["certificates"]) == 5
 
     # 3. Filtrar por busca textual de nome único
     response_search = client.get(f"{url}?q=Exclusivo")
@@ -304,7 +304,26 @@ def test_sc20_certificates_sorting_and_whitelist_security(
     assert pos_c_zeta != -1 and pos_c_alpha != -1
     assert pos_c_zeta < pos_c_alpha
 
-    # 5. Whitelist fallback: campo inválido não quebra a página
+    # 5. Sort por prazo (days_remaining) ASC e DESC
+    resp_days_asc = client.get(f"{url}?sort=days_remaining")
+    assert resp_days_asc.status_code == 200
+    html_d_asc = resp_days_asc.content.decode()
+    assert 'aria-sort="ascending"' in html_d_asc
+    pos_d_alpha = html_d_asc.find("Alpha Tecnologia")
+    pos_d_zeta = html_d_asc.find("Zeta Transportes")
+    assert pos_d_alpha != -1 and pos_d_zeta != -1
+    assert pos_d_alpha < pos_d_zeta
+
+    resp_days_desc = client.get(f"{url}?sort=-days_remaining")
+    assert resp_days_desc.status_code == 200
+    html_d_desc = resp_days_desc.content.decode()
+    assert 'aria-sort="descending"' in html_d_desc
+    pos_d_alpha = html_d_desc.find("Alpha Tecnologia")
+    pos_d_zeta = html_d_desc.find("Zeta Transportes")
+    assert pos_d_zeta != -1 and pos_d_alpha != -1
+    assert pos_d_zeta < pos_d_alpha
+
+    # 6. Whitelist fallback: campo inválido não quebra a página
     resp_invalid = client.get(f"{url}?sort=invalid_column")
     assert resp_invalid.status_code == 200
     assert resp_invalid.context["current_sort"] == ""

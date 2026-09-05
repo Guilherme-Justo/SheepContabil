@@ -184,3 +184,19 @@ def test_run_detail_page_renders_whatsapp_link_for_whatsapp_attempt(
     # Na tabela de tentativas da execução deve haver o botão de WhatsApp
     assert "https://wa.me/5511999992002" in html
     assert "sc20-whatsapp-pill" in html
+
+
+def test_certificate_whatsapp_url_formats_unformatted_document() -> None:
+    cert = _cert_whatsapp(serial="WPP-DOC-FMT", phone="+55 11 99999-1111", days=10)
+    cert.client_document = "11222333000181"
+    cert.save()
+
+    url = cert.whatsapp_url()
+    decoded = urllib.parse.unquote_plus(url)
+    assert "• Documento: 11.222.333/0001-81" in decoded
+
+    cert.client_document = "12345678901"
+    cert.save()
+    url_cpf = cert.whatsapp_url()
+    decoded_cpf = urllib.parse.unquote_plus(url_cpf)
+    assert "• Documento: 123.456.789-01" in decoded_cpf

@@ -37,8 +37,9 @@
           {% endfor %}
         {% else %}
           <option value="5" {% if paginator.per_page == 5 %}selected{% endif %}>5</option>
-          <option value="7" {% if paginator.per_page == 7 %}selected{% endif %}>7</option>
+          <option value="10" {% if paginator.per_page == 10 %}selected{% endif %}>10</option>
           <option value="15" {% if paginator.per_page == 15 %}selected{% endif %}>15</option>
+          <option value="20" {% if paginator.per_page == 20 %}selected{% endif %}>20</option>
           <option value="25" {% if paginator.per_page == 25 %}selected{% endif %}>25</option>
           <option value="50" {% if paginator.per_page == 50 %}selected{% endif %}>50</option>
         {% endif %}

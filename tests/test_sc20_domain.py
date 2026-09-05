@@ -281,3 +281,26 @@ def test_monthly_dispatch_waits_until_eight_oclock_in_sao_paulo(
 
     assert not AutomationRun.objects.exists()
     assert dispatched == []
+
+
+def test_certificate_formatted_document_cpf_and_cnpj() -> None:
+    cnpj_cert = _certificate(serial="CNPJ-01", valid_until=date(2026, 12, 31))
+    cnpj_cert.client_document = "11222333000181"
+    assert cnpj_cert.formatted_document == "11.222.333/0001-81"
+    assert cnpj_cert.document == "11.222.333/0001-81"
+
+    cpf_cert = _certificate(serial="CPF-01", valid_until=date(2026, 12, 31))
+    cpf_cert.client_document = "12345678901"
+    assert cpf_cert.formatted_document == "123.456.789-01"
+    assert cpf_cert.document == "123.456.789-01"
+
+
+def test_format_cpf_cnpj_helper() -> None:
+    from core.automations.models import format_cpf_cnpj
+
+    assert format_cpf_cnpj("") == ""
+    assert format_cpf_cnpj(None) == ""
+    assert format_cpf_cnpj("11222333000181") == "11.222.333/0001-81"
+    assert format_cpf_cnpj("12345678901") == "123.456.789-01"
+    assert format_cpf_cnpj("11.222.333/0001-81") == "11.222.333/0001-81"
+    assert format_cpf_cnpj("12345") == "12345"
