@@ -989,10 +989,11 @@ class DigitalCertificate(models.Model):
 
         override_active = bool(phone_to_use)
         target_phone = phone_to_use if override_active else self.contact_phone
+        has_explicit_plus = target_phone.strip().startswith("+")
         digits = re.sub(r"\D", "", target_phone)
         if not digits:
             return ""
-        if len(digits) in (10, 11):
+        if not has_explicit_plus and len(digits) in (10, 11):
             digits = f"55{digits}"
 
         days = self.days_remaining

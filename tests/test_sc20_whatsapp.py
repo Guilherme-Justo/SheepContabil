@@ -200,3 +200,13 @@ def test_certificate_whatsapp_url_formats_unformatted_document() -> None:
     url_cpf = cert.whatsapp_url()
     decoded_cpf = urllib.parse.unquote_plus(url_cpf)
     assert "• Documento: 123.456.789-01" in decoded_cpf
+
+
+def test_certificate_whatsapp_url_international_numbers() -> None:
+    cert_us = _cert_whatsapp(serial="WPP-US", phone="+1 202 555-0199", days=10)
+    url_us = cert_us.whatsapp_url()
+    assert url_us.startswith("https://wa.me/12025550199?text=")
+
+    cert_pt = _cert_whatsapp(serial="WPP-PT", phone="+351 912 345 678", days=10)
+    url_pt = cert_pt.whatsapp_url()
+    assert url_pt.startswith("https://wa.me/351912345678?text=")

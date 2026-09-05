@@ -205,11 +205,27 @@
     aria-labelledby="certificate-form-title"
     x-data="{
       preferredChannel: '{{ form.preferred_channel.value|default:'email' }}',
+      phoneCountry: '{{ form.phone_country.value|default:'55' }}',
+      get phonePlaceholder() {
+        if (this.phoneCountry === '55') return '(11) 99999-0000';
+        if (this.phoneCountry === '1') return '(555) 000-0000';
+        if (this.phoneCountry === '351') return '912 345 678';
+        return 'Número de telefone';
+      },
+      onCountryChange(newVal) {
+        this.phoneCountry = newVal;
+        const phoneInput = document.getElementById('id_contact_phone');
+        if (phoneInput && window.formatPhone) {
+          phoneInput.value = window.formatPhone(phoneInput.value, newVal);
+        }
+      },
       onChannelChange(newVal) {
         this.preferredChannel = newVal;
         if (newVal === 'email') {
           const phoneErr = document.getElementById('id_contact_phone_errors');
           if (phoneErr) phoneErr.remove();
+          const phoneCountryErr = document.getElementById('id_phone_country_errors');
+          if (phoneCountryErr) phoneCountryErr.remove();
           const phoneInput = document.getElementById('id_contact_phone');
           if (phoneInput) phoneInput.removeAttribute('aria-invalid');
         } else if (newVal === 'whatsapp') {
@@ -244,6 +260,51 @@
       {% endif %}
 
       {% for field in form %}
+      {% if field.name == 'phone_country' %}
+        {# Renderizado em conjunto com o contact_phone abaixo #}
+      {% elif field.name == 'contact_phone' %}
+      <div>
+        <label for="{{ field.id_for_label }}" class="form-label">
+          {{ field.label }}
+          <span class="text-carmim" aria-hidden="true" x-show="preferredChannel === 'whatsapp'" x-cloak> *</span><span class="sr-only" x-show="preferredChannel === 'whatsapp'"> (obrigatório)</span>
+        </label>
+        <div class="sc20-phone-group">
+          <div class="relative shrink-0">
+            <label for="{{ form.phone_country.id_for_label }}" class="sr-only">{{ form.phone_country.label }}</label>
+            <select
+              id="{{ form.phone_country.id_for_label }}"
+              name="phone_country"
+              x-model="phoneCountry"
+              @change="onCountryChange($event.target.value)"
+              class="sc20-phone-select"
+              aria-label="Selecionar país e DDI do telefone"
+            >
+              {% for val, text in form.phone_country.field.choices %}
+                <option value="{{ val }}" {% if form.phone_country.value == val %}selected{% endif %}>{{ text }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="relative flex-1 min-w-0">
+            <input
+              type="tel"
+              id="{{ field.id_for_label }}"
+              name="{{ field.name }}"
+              value="{{ field.value|default:'' }}"
+              data-mask="phone"
+              :placeholder="phonePlaceholder"
+              class="sc20-phone-input"
+              autocomplete="tel"
+              inputmode="tel"
+              :aria-required="preferredChannel === 'whatsapp'"
+              {% if field.errors %}aria-invalid="true" aria-describedby="{{ field.id_for_label }}_errors"{% endif %}
+            >
+          </div>
+        </div>
+        {% if field.help_text %}<p id="{{ field.id_for_label }}_helptext" class="form-help">{{ field.help_text|safe }}</p>{% endif %}
+        {% if field.errors %}<p id="{{ field.id_for_label }}_errors" class="field-error" role="alert">{{ field.errors.0 }}</p>{% endif %}
+        {% if form.phone_country.errors %}<p id="{{ form.phone_country.id_for_label }}_errors" class="field-error" role="alert">{{ form.phone_country.errors.0 }}</p>{% endif %}
+      </div>
+      {% else %}
       <div>
         <label for="{{ field.id_for_label }}" class="form-label">
           {{ field.label }}
@@ -251,14 +312,13 @@
             <span class="text-carmim" aria-hidden="true"> *</span><span class="sr-only"> (obrigatório)</span>
           {% elif field.name == 'contact_email' %}
             <span class="text-carmim" aria-hidden="true" x-show="preferredChannel === 'email'" x-cloak> *</span><span class="sr-only" x-show="preferredChannel === 'email'"> (obrigatório)</span>
-          {% elif field.name == 'contact_phone' %}
-            <span class="text-carmim" aria-hidden="true" x-show="preferredChannel === 'whatsapp'" x-cloak> *</span><span class="sr-only" x-show="preferredChannel === 'whatsapp'"> (obrigatório)</span>
           {% endif %}
         </label>
         {{ field }}
         {% if field.help_text %}<p id="{{ field.id_for_label }}_helptext" class="form-help">{{ field.help_text|safe }}</p>{% endif %}
         {% if field.errors %}<p id="{{ field.id_for_label }}_errors" class="field-error" role="alert">{{ field.errors.0 }}</p>{% endif %}
       </div>
+      {% endif %}
       {% endfor %}
 
       <button type="submit" class="primary-button w-full">Cadastrar certificado</button>

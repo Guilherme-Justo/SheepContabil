@@ -384,6 +384,34 @@
   .sc20-retry-button:hover { border-color: rgba(196,69,61,.45); background: rgba(196,69,61,.12); }
   .sc20-certificates-table { min-width: 58rem; }
   .sc20-attempts-table { min-width: 50rem; }
+  .sc20-phone-group {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+  }
+  .sc20-phone-group .sc20-phone-select {
+    width: auto !important;
+    min-width: 8.5rem;
+    max-width: 11.5rem;
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-right: none !important;
+    font-size: .8rem;
+    padding-left: .65rem;
+    padding-right: 1.5rem;
+    cursor: pointer;
+  }
+  .sc20-phone-group .sc20-phone-input {
+    flex: 1 1 0%;
+    min-width: 0;
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+  }
+  .sc20-phone-group .sc20-phone-select:focus,
+  .sc20-phone-group .sc20-phone-input:focus {
+    position: relative;
+    z-index: 2;
+  }
 
   .sc05-action-panel {
     display: flex; flex-direction: column; justify-content: space-between; border-radius: 1.2rem;
