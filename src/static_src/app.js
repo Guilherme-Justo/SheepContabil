@@ -114,6 +114,15 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
   if (container && container.children.length === 0) {
     container.remove();
   }
+  const root = event.detail?.target || document;
+  if (root.querySelectorAll) {
+    root.querySelectorAll('[data-mask="document"], [data-sc06-answer="current_cnpj"], input[name="client_document"]').forEach((field) => {
+      if (field.value) field.value = formatDocument(field.value);
+    });
+    root.querySelectorAll('[data-mask="phone"], input[name="contact_phone"]').forEach((field) => {
+      if (field.value) field.value = formatPhone(field.value);
+    });
+  }
 });
 
 const formatDocument = (value) => {

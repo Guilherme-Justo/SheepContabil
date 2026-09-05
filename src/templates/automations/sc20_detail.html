@@ -199,12 +199,43 @@
     {% include "components/pagination.html" with page_obj=certificates paginator=certificates_paginator query_params=query_params per_page_query_params=per_page_query_params item_label="certificados" nav_label="Navegação dos certificados digitais" target_id="sc20-certificates-region" %}
   </div>
 
-  <aside class="sc20-form-card" aria-labelledby="certificate-form-title">
+  <aside
+    id="sc20-certificate-form-card"
+    class="sc20-form-card"
+    aria-labelledby="certificate-form-title"
+    x-data="{
+      preferredChannel: '{{ form.preferred_channel.value|default:'email' }}',
+      onChannelChange(newVal) {
+        this.preferredChannel = newVal;
+        if (newVal === 'email') {
+          const phoneErr = document.getElementById('id_contact_phone_errors');
+          if (phoneErr) phoneErr.remove();
+          const phoneInput = document.getElementById('id_contact_phone');
+          if (phoneInput) phoneInput.removeAttribute('aria-invalid');
+        } else if (newVal === 'whatsapp') {
+          const emailErr = document.getElementById('id_contact_email_errors');
+          if (emailErr) emailErr.remove();
+          const emailInput = document.getElementById('id_contact_email');
+          if (emailInput) emailInput.removeAttribute('aria-invalid');
+        }
+      }
+    }"
+  >
     <p class="eyebrow">Novo acompanhamento</p>
     <h2 id="certificate-form-title" class="mt-3 font-display text-xl font-semibold">Cadastrar certificado</h2>
     <p class="mt-2 text-sm leading-6 text-grafite">Informe apenas dados sintéticos neste ambiente demonstrativo.</p>
 
-    <form method="post" class="mt-6 space-y-5" novalidate>
+    <form
+      id="sc20-certificate-form"
+      action="{% url 'automations:module-detail' module.slug %}"
+      method="post"
+      class="mt-6 space-y-5"
+      novalidate
+      hx-post="{% url 'automations:module-detail' module.slug %}"
+      hx-target="#sc20-certificate-form-card"
+      hx-select="#sc20-certificate-form-card"
+      hx-swap="outerHTML"
+    >
       {% csrf_token %}
       <input type="hidden" name="action" value="create_certificate">
 
@@ -215,7 +246,14 @@
       {% for field in form %}
       <div>
         <label for="{{ field.id_for_label }}" class="form-label">
-          {{ field.label }}{% if field.field.required %}<span class="text-carmim" aria-hidden="true"> *</span><span class="sr-only"> (obrigatório)</span>{% endif %}
+          {{ field.label }}
+          {% if field.field.required %}
+            <span class="text-carmim" aria-hidden="true"> *</span><span class="sr-only"> (obrigatório)</span>
+          {% elif field.name == 'contact_email' %}
+            <span class="text-carmim" aria-hidden="true" x-show="preferredChannel === 'email'" x-cloak> *</span><span class="sr-only" x-show="preferredChannel === 'email'"> (obrigatório)</span>
+          {% elif field.name == 'contact_phone' %}
+            <span class="text-carmim" aria-hidden="true" x-show="preferredChannel === 'whatsapp'" x-cloak> *</span><span class="sr-only" x-show="preferredChannel === 'whatsapp'"> (obrigatório)</span>
+          {% endif %}
         </label>
         {{ field }}
         {% if field.help_text %}<p id="{{ field.id_for_label }}_helptext" class="form-help">{{ field.help_text|safe }}</p>{% endif %}

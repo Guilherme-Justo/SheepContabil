@@ -1478,6 +1478,12 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
                     request,
                     f"Certificado sintético de {certificate.client_name} cadastrado.",
                 )
+                if request.headers.get("HX-Request"):
+                    response = HttpResponse(status=200)
+                    response["HX-Redirect"] = reverse(
+                        "automations:module-detail", kwargs={"slug": module.slug}
+                    )
+                    return response
                 return redirect("automations:module-detail", slug=module.slug)
         elif action == "execute":
             run = create_sc20_run(
