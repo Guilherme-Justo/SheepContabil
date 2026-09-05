@@ -116,11 +116,27 @@ def test_sc20_dispatch_flow_with_playwright(
         doc_input.fill("12345678000190")
         assert doc_input.input_value() == "12.345.678/0001-90"
 
-        # Testa a máscara de telefone em tempo real no Chromium
+        # Testa o seletor de país e a máscara de telefone dinâmica em tempo real no Chromium
+        country_select = page.locator('select[name="phone_country"]')
+        assert country_select.is_visible()
+        assert country_select.input_value() == "55"
+
         phone_input = page.locator('input[name="contact_phone"]')
         assert phone_input.is_visible()
-        phone_input.fill("+5561991365756")
-        assert phone_input.input_value() == "+55 (61) 99136-5756"
+        phone_input.fill("61991365756")
+        assert phone_input.input_value() == "(61) 99136-5756"
+
+        # Troca de país para Portugal (+351) e valida troca de placeholder e máscara livre
+        country_select.select_option("351")
+        assert phone_input.get_attribute("placeholder") == "912 345 678"
+        phone_input.fill("912345678")
+        assert phone_input.input_value() == "912345678"
+
+        # Retorna para Brasil (+55)
+        country_select.select_option("55")
+        assert phone_input.get_attribute("placeholder") == "(11) 99999-0000"
+        phone_input.fill("61991365756")
+        assert phone_input.input_value() == "(61) 99136-5756"
 
         # Testa a reatividade Alpine.js na migração de obrigatoriedade dos canais
         email_req_asterisk = page.locator('label[for="id_contact_email"] span.text-carmim')
