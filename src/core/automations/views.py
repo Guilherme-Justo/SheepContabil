@@ -1551,6 +1551,8 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         "client": "client_name",
         "document": "client_document",
         "expires_on": "valid_until",
+        "days_remaining": "valid_until",
+        "deadline": "valid_until",
         "status": "status",
         "contact": "responsible_name",
     }
