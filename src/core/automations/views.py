@@ -26,6 +26,7 @@ from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from core.automations.context_processors import DEFAULT_PAGE_SIZE, PAGE_SIZE_CHOICES
 from core.automations.forms import (
     BriefingStartForm,
     DashboardRunFilterForm,
@@ -96,7 +97,37 @@ from core.automations.sc20.services import create_sc20_run
 from core.automations.tasks import run_sc04_task, run_sc05_task, run_sc20_task
 from core.identity.models import User
 
-DEFAULT_PAGE_SIZE = 7
+
+def _extract_page_size(
+    request: HttpRequest,
+    param_name: str = "per_page",
+    default: int = DEFAULT_PAGE_SIZE,
+) -> int:
+    """Safely extracts and validates a per-page items limit from request.GET.
+
+    Enforces a strict whitelist to protect against memory exhaust / DoS attacks.
+    Falls back gracefully to `default` if absent or not in `PAGE_SIZE_CHOICES`.
+    """
+    raw_val = request.GET.get(param_name, "")
+    try:
+        val = int(raw_val)
+        return val if val in PAGE_SIZE_CHOICES else default
+    except (ValueError, TypeError):
+        return default
+
+
+def _build_per_page_query_params(
+    request: HttpRequest,
+    page_key: str = "page",
+    per_page_key: str = "per_page",
+) -> str:
+    """Build query string preserving all filters and sort params, excluding page
+    and per_page keys.
+    """
+    q_dict = request.GET.copy()
+    q_dict.pop(page_key, None)
+    q_dict.pop(per_page_key, None)
+    return f"&{q_dict.urlencode()}" if q_dict else ""
 
 
 def _extract_sort_and_query_params(
@@ -204,9 +235,13 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         default_order="-created_at",
     )
 
-    paginator = Paginator(runs, per_page=DEFAULT_PAGE_SIZE)
+    per_page = _extract_page_size(request, "per_page")
+    paginator = Paginator(runs, per_page=per_page)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
+    per_page_query_params = _build_per_page_query_params(
+        request, page_key="page", per_page_key="per_page"
+    )
 
     return render(
         request,
@@ -219,6 +254,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "filter_form": filter_form,
             "has_active_filters": has_active_filters,
             "query_params": query_params,
+            "per_page_query_params": per_page_query_params,
             "current_sort": valid_sort,
             "sort_query_params": sort_query_params,
         },
@@ -522,9 +558,13 @@ def _sc04_dashboard_context(
         request
     )
     queue, valid_sort = _sc04_queue_queryset(module, filter_form, sort_param=current_sort)
-    paginator = Paginator(queue, per_page=DEFAULT_PAGE_SIZE)
+    queue_per_page = _extract_page_size(request, "per_page")
+    paginator = Paginator(queue, per_page=queue_per_page)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
+    per_page_query_params = _build_per_page_query_params(
+        request, page_key="page", per_page_key="per_page"
+    )
     queue_rows = []
     document_ids = [item.intake.document_id for item in page_obj.object_list]
     intakes_by_doc: dict[UUID, list[DocumentIntake]] = defaultdict(list)
@@ -607,11 +647,16 @@ def _sc04_dashboard_context(
     queue_refresh_url = reverse("automations:sc04-queue-fragment")
     if query:
         queue_refresh_url = f"{queue_refresh_url}?{query}"
+    runs_per_page = _extract_page_size(request, "runs_per_page")
     runs_paginator = Paginator(
-        module.runs.select_related("triggered_by").all(), per_page=DEFAULT_PAGE_SIZE
+        module.runs.select_related("triggered_by").all(), per_page=runs_per_page
     )
     runs_page_number = request.GET.get("runs_page", 1)
     runs_page_obj = runs_paginator.get_page(runs_page_number)
+    _, runs_query_params, _ = _extract_sort_and_query_params(request, page_key="runs_page")
+    runs_per_page_query_params = _build_per_page_query_params(
+        request, page_key="runs_page", per_page_key="runs_per_page"
+    )
     return {
         "module": module,
         "upload_form": upload_form or SC04UploadForm(),
@@ -624,6 +669,7 @@ def _sc04_dashboard_context(
         "is_paginated": page_obj.has_other_pages(),
         "filter_querystring": filter_querystring,
         "query_params": query_params_formatted,
+        "per_page_query_params": per_page_query_params,
         "current_sort": valid_sort,
         "sort_query_params": sort_query_params,
         "queue_refresh_url": queue_refresh_url,
@@ -633,6 +679,8 @@ def _sc04_dashboard_context(
         "runs": runs_page_obj,
         "runs_page_obj": runs_page_obj,
         "runs_paginator": runs_paginator,
+        "runs_query_params": runs_query_params,
+        "runs_per_page_query_params": runs_per_page_query_params,
     }
 
 
@@ -910,9 +958,13 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
     clients_clear_qs = clients_clear_dict.urlencode()
     clients_clear_query_params = f"?{clients_clear_qs}" if clients_clear_qs else ""
 
-    clients_paginator = Paginator(filtered_clients, per_page=DEFAULT_PAGE_SIZE)
+    clients_per_page = _extract_page_size(request, "clients_per_page")
+    clients_paginator = Paginator(filtered_clients, per_page=clients_per_page)
     clients_page_number = request.GET.get("clients_page", 1)
     clients_page_obj = clients_paginator.get_page(clients_page_number)
+    clients_per_page_query_params = _build_per_page_query_params(
+        request, page_key="clients_page", per_page_key="clients_per_page"
+    )
 
     filter_form = SC05OperationFilterForm(request.GET if request.GET else None)
     operations = (
@@ -973,9 +1025,13 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
     operations_clear_qs = operations_clear_dict.urlencode()
     operations_clear_query_params = f"?{operations_clear_qs}" if operations_clear_qs else ""
 
-    paginator = Paginator(operations, per_page=DEFAULT_PAGE_SIZE)
+    operations_per_page = _extract_page_size(request, "per_page")
+    paginator = Paginator(operations, per_page=operations_per_page)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
+    per_page_query_params = _build_per_page_query_params(
+        request, page_key="page", per_page_key="per_page"
+    )
 
     summary = {
         "total": clients.count(),
@@ -992,6 +1048,8 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "filter_form": filter_form,
             "has_active_filters": has_active_filters,
             "query_params": query_params_formatted,
+            "per_page": operations_per_page,
+            "per_page_query_params": per_page_query_params,
             "current_sort": valid_sort,
             "sort_query_params": sort_query_params,
             "filter_querystring": filter_querystring,
@@ -999,6 +1057,8 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "clients_filter_form": clients_filter_form,
             "has_active_client_filters": has_active_client_filters,
             "clients_query_params": clients_query_params_formatted,
+            "clients_per_page": clients_per_page,
+            "clients_per_page_query_params": clients_per_page_query_params,
             "clients_current_sort": valid_clients_sort,
             "clients_sort_query_params": clients_sort_query_params,
             "clients_clear_query_params": clients_clear_query_params,
@@ -1337,9 +1397,13 @@ def _sc06_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             filtered_briefings = filtered_briefings.filter(status=status)
             has_active_filters = True
 
-    paginator = Paginator(filtered_briefings, per_page=DEFAULT_PAGE_SIZE)
+    per_page = _extract_page_size(request, "per_page")
+    paginator = Paginator(filtered_briefings, per_page=per_page)
     page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
+    per_page_query_params = _build_per_page_query_params(
+        request, page_key="page", per_page_key="per_page"
+    )
 
     query_dict = request.GET.copy()
     query_dict.pop("page", None)
@@ -1363,6 +1427,7 @@ def _sc06_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "filter_form": filter_form,
             "has_active_filters": has_active_filters,
             "query_params": query_params,
+            "per_page_query_params": per_page_query_params,
         },
     )
 
@@ -1503,8 +1568,12 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         )
     )
 
-    certificates_paginator = Paginator(certificates, per_page=DEFAULT_PAGE_SIZE)
+    certificates_per_page = _extract_page_size(request, "per_page")
+    certificates_paginator = Paginator(certificates, per_page=certificates_per_page)
     certificates_page = certificates_paginator.get_page(request.GET.get("page", 1))
+    per_page_query_params = _build_per_page_query_params(
+        request, page_key="page", per_page_key="per_page"
+    )
 
     SC20_ATTEMPTS_SORT_FIELDS = {
         "recipient": "recipient",
@@ -1523,8 +1592,12 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         SC20_ATTEMPTS_SORT_FIELDS,
         default_order=("-created_at",),
     )
-    attempts_paginator = Paginator(attempts_qs, per_page=DEFAULT_PAGE_SIZE)
+    attempts_per_page = _extract_page_size(request, "attempts_per_page")
+    attempts_paginator = Paginator(attempts_qs, per_page=attempts_per_page)
     attempts_page = attempts_paginator.get_page(request.GET.get("attempts_page", 1))
+    attempts_per_page_query_params = _build_per_page_query_params(
+        request, page_key="attempts_page", per_page_key="attempts_per_page"
+    )
 
     SC20_RUNS_SORT_FIELDS = {
         "created_at": "created_at",
@@ -1542,8 +1615,12 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
         SC20_RUNS_SORT_FIELDS,
         default_order=("-created_at",),
     )
-    runs_paginator = Paginator(runs_qs, per_page=DEFAULT_PAGE_SIZE)
+    runs_per_page = _extract_page_size(request, "runs_per_page")
+    runs_paginator = Paginator(runs_qs, per_page=runs_per_page)
     runs_page = runs_paginator.get_page(request.GET.get("runs_page", 1))
+    runs_per_page_query_params = _build_per_page_query_params(
+        request, page_key="runs_page", per_page_key="runs_per_page"
+    )
 
     return render(
         request,
@@ -1553,6 +1630,7 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "filter_form": filter_form,
             "has_active_filters": has_active_filters,
             "query_params": query_params_formatted,
+            "per_page_query_params": per_page_query_params,
             "current_sort": valid_sort,
             "sort_query_params": sort_query_params,
             "filter_querystring": filter_querystring,
@@ -1563,6 +1641,7 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "attempts_current_sort": attempts_valid_sort,
             "attempts_sort_query_params": attempts_sort_query_params,
             "attempts_query_params": attempts_query_params,
+            "attempts_per_page_query_params": attempts_per_page_query_params,
             "summary": summary,
             "form": form,
             "runs": runs_page,
@@ -1570,6 +1649,7 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "runs_current_sort": runs_valid_sort,
             "runs_sort_query_params": runs_sort_query_params,
             "runs_query_params": runs_query_params,
+            "runs_per_page_query_params": runs_per_page_query_params,
         },
     )
 

@@ -140,6 +140,9 @@
         {% if current_sort %}
           <input type="hidden" name="sort" value="{{ current_sort }}">
         {% endif %}
+        {% if paginator.per_page %}
+          <input type="hidden" name="per_page" value="{{ paginator.per_page }}">
+        {% endif %}
         <div class="flex items-center gap-1.5 shrink-0">
           <button
             type="submit"
@@ -193,7 +196,7 @@
       </table>
     </div>
 
-    {% include "components/pagination.html" with page_obj=runs_page_obj paginator=runs_paginator item_label="execuções" nav_label="Navegação das execuções do módulo" target_id="sc04-runs-region" page_param="runs_page" %}
+    {% include "components/pagination.html" with page_obj=runs_page_obj paginator=runs_paginator item_label="execuções" nav_label="Navegação das execuções do módulo" target_id="sc04-runs-region" page_param="runs_page" per_page_param="runs_per_page" query_params=runs_query_params per_page_query_params=runs_per_page_query_params %}
   </div>
 </section>
 {% endblock %}

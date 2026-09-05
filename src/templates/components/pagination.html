@@ -1,12 +1,52 @@
-{% if paginator.num_pages > 1 %}
+{% if paginator.count > 0 %}
 <nav
-  class="mt-6 flex flex-col items-center justify-between gap-3 border-t border-grafite/15 p-4 text-sm text-grafite sm:flex-row dark:border-white/10"
+  class="mt-6 flex flex-col items-center justify-between gap-4 border-t border-grafite/15 p-4 text-sm text-grafite sm:flex-row dark:border-white/10"
   aria-label="{{ nav_label|default:'Navegação de páginas' }}"
 >
-  <p class="text-xs">
-    Mostrando <strong class="text-tinta dark:text-white">{{ page_obj.start_index }}</strong> a <strong class="text-tinta dark:text-white">{{ page_obj.end_index }}</strong> de <strong class="text-tinta dark:text-white">{{ paginator.count }}</strong> {{ item_label|default:"itens" }}
-    · Página <strong class="text-tinta dark:text-white">{{ page_obj.number }}</strong> de <strong class="text-tinta dark:text-white">{{ paginator.num_pages }}</strong>
-  </p>
+  <div class="flex flex-wrap items-center justify-center gap-3 text-xs sm:justify-start">
+    <p>
+      Mostrando <strong class="text-tinta dark:text-white">{{ page_obj.start_index }}</strong> a <strong class="text-tinta dark:text-white">{{ page_obj.end_index }}</strong> de <strong class="text-tinta dark:text-white">{{ paginator.count }}</strong> {{ item_label|default:"itens" }}
+      {% if paginator.num_pages > 1 %}
+        · Página <strong class="text-tinta dark:text-white">{{ page_obj.number }}</strong> de <strong class="text-tinta dark:text-white">{{ paginator.num_pages }}</strong>
+      {% endif %}
+    </p>
+
+    <div class="flex items-center gap-1.5 border-l border-grafite/20 pl-3 dark:border-white/15">
+      <label for="per-page-{{ per_page_param|default:'per_page' }}{% if target_id %}-{{ target_id }}{% endif %}" class="text-grafite dark:text-white/70">
+        Itens por página:
+      </label>
+      <select
+        id="per-page-{{ per_page_param|default:'per_page' }}{% if target_id %}-{{ target_id }}{% endif %}"
+        name="{{ per_page_param|default:'per_page' }}"
+        aria-label="Itens por página"
+        {% if target_id %}
+          hx-get="?{{ page_param|default:'page' }}=1{{ per_page_query_params }}"
+          hx-target="#{{ target_id }}"
+          hx-select="#{{ target_id }}"
+          hx-swap="outerHTML show:#{{ target_id }}:top"
+          hx-push-url="true"
+          hx-trigger="change"
+        {% else %}
+          onchange="window.location.href='?{{ page_param|default:'page' }}=1{{ per_page_query_params }}&amp;{{ per_page_param|default:'per_page' }}=' + this.value;"
+        {% endif %}
+        class="form-input text-xs py-1 px-2 rounded-lg border border-grafite/25 bg-white text-tinta dark:border-white/15 dark:bg-[#091216] dark:text-white cursor-pointer font-semibold shadow-2xs"
+      >
+        {% if page_size_choices %}
+          {% for choice in page_size_choices %}
+            <option value="{{ choice }}" {% if paginator.per_page == choice %}selected{% endif %}>{{ choice }}</option>
+          {% endfor %}
+        {% else %}
+          <option value="5" {% if paginator.per_page == 5 %}selected{% endif %}>5</option>
+          <option value="7" {% if paginator.per_page == 7 %}selected{% endif %}>7</option>
+          <option value="15" {% if paginator.per_page == 15 %}selected{% endif %}>15</option>
+          <option value="25" {% if paginator.per_page == 25 %}selected{% endif %}>25</option>
+          <option value="50" {% if paginator.per_page == 50 %}selected{% endif %}>50</option>
+        {% endif %}
+      </select>
+    </div>
+  </div>
+
+  {% if paginator.num_pages > 1 %}
   <div class="flex flex-wrap items-center justify-center gap-1.5 sm:flex-nowrap">
     {% if page_obj.has_previous %}
       <a
@@ -110,5 +150,6 @@
       </span>
     {% endif %}
   </div>
+  {% endif %}
 </nav>
 {% endif %}

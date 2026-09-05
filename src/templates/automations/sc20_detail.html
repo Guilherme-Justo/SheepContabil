@@ -91,6 +91,9 @@
         {% if current_sort %}
           <input type="hidden" name="sort" value="{{ current_sort }}">
         {% endif %}
+        {% if certificates_paginator.per_page %}
+          <input type="hidden" name="per_page" value="{{ certificates_paginator.per_page }}">
+        {% endif %}
         <div class="flex items-center gap-1.5 shrink-0">
           <button
             type="submit"
@@ -169,7 +172,7 @@
       </table>
     </div>
 
-    {% include "components/pagination.html" with page_obj=certificates paginator=certificates_paginator query_params=query_params item_label="certificados" nav_label="Navegação dos certificados digitais" target_id="sc20-certificates-region" %}
+    {% include "components/pagination.html" with page_obj=certificates paginator=certificates_paginator query_params=query_params per_page_query_params=per_page_query_params item_label="certificados" nav_label="Navegação dos certificados digitais" target_id="sc20-certificates-region" %}
   </div>
 
   <aside class="sc20-form-card" aria-labelledby="certificate-form-title">
@@ -260,7 +263,7 @@
       </table>
     </div>
 
-    {% include "components/pagination.html" with page_obj=attempts paginator=attempts_paginator item_label="avisos" nav_label="Navegação dos avisos" target_id="sc20-attempts-region" page_param="attempts_page" query_params=attempts_query_params %}
+    {% include "components/pagination.html" with page_obj=attempts paginator=attempts_paginator item_label="avisos" nav_label="Navegação dos avisos" target_id="sc20-attempts-region" page_param="attempts_page" query_params=attempts_query_params per_page_param="attempts_per_page" per_page_query_params=attempts_per_page_query_params %}
   </div>
 </section>
 
@@ -297,7 +300,7 @@
       </table>
     </div>
 
-    {% include "components/pagination.html" with page_obj=runs paginator=runs_paginator item_label="execuções" nav_label="Navegação das execuções do módulo" target_id="sc20-runs-region" page_param="runs_page" query_params=runs_query_params %}
+    {% include "components/pagination.html" with page_obj=runs paginator=runs_paginator item_label="execuções" nav_label="Navegação das execuções do módulo" target_id="sc20-runs-region" page_param="runs_page" query_params=runs_query_params per_page_param="runs_per_page" per_page_query_params=runs_per_page_query_params %}
   </div>
 </section>
 {% endblock %}

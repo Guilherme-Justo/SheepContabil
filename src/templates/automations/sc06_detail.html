@@ -102,6 +102,9 @@
       >
         <div class="min-w-44">{{ filter_form.q }}</div>
         <div class="min-w-36">{{ filter_form.status }}</div>
+        {% if paginator.per_page %}
+          <input type="hidden" name="per_page" value="{{ paginator.per_page }}">
+        {% endif %}
         <div class="flex items-center gap-1.5 shrink-0">
           <button
             type="submit"
@@ -173,7 +176,7 @@
       {% endfor %}
     </div>
 
-    {% include "components/pagination.html" with page_obj=page_obj paginator=paginator query_params=query_params item_label="casos" nav_label="Navegação dos casos societários" target_id="sc06-cases-region" %}
+    {% include "components/pagination.html" with page_obj=page_obj paginator=paginator query_params=query_params per_page_query_params=per_page_query_params item_label="casos" nav_label="Navegação dos casos societários" target_id="sc06-cases-region" %}
   </div>
 </section>
 {% endblock %}
