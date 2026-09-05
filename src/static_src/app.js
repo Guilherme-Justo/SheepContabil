@@ -120,7 +120,9 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
       if (field.value) field.value = formatDocument(field.value);
     });
     root.querySelectorAll('[data-mask="phone"], input[name="contact_phone"]').forEach((field) => {
-      if (field.value) field.value = formatPhone(field.value);
+      const countrySelect = field.form?.querySelector('select[name="phone_country"]') || document.getElementById("id_phone_country");
+      const country = countrySelect ? countrySelect.value : "55";
+      if (field.value) field.value = formatPhone(field.value, country);
     });
   }
 });
@@ -140,7 +142,7 @@ const formatDocument = (value) => {
   return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
 };
 
-const formatPhone = (value) => {
+const formatPhone = (value, country = "55") => {
   if (!value) return "";
   const raw = String(value);
   const hasPlus = raw.startsWith("+");
@@ -148,41 +150,31 @@ const formatPhone = (value) => {
 
   if (!digits) return hasPlus ? "+" : "";
 
-  const isDdi = hasPlus || (digits.startsWith("55") && digits.length > 11);
-
-  if (isDdi) {
-    const ddiDigits = digits.slice(0, 13);
-    if (ddiDigits.length <= 2) {
-      return `+${ddiDigits}`;
+  if (country === "55") {
+    const cleanDigits = (digits.startsWith("55") && digits.length > 11) ? digits.slice(2) : digits;
+    const localDigits = cleanDigits.slice(0, 11);
+    if (localDigits.length <= 2) {
+      return localDigits.length === 2 ? `(${localDigits}) ` : `(${localDigits}`;
     }
-    const ddd = ddiDigits.slice(2, 4);
-    if (ddiDigits.length <= 4) {
-      return `+55 (${ddd}${ddiDigits.length === 4 ? ") " : ""}`;
-    }
-    const rest = ddiDigits.slice(4);
+    const ddd = localDigits.slice(0, 2);
+    const rest = localDigits.slice(2);
     if (rest.length <= 4) {
-      return `+55 (${ddd}) ${rest}`;
+      return `(${ddd}) ${rest}`;
     }
     if (rest.length <= 8) {
-      return `+55 (${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+      return `(${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
     }
-    return `+55 (${ddd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
+    return `(${ddd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
   }
 
-  const localDigits = digits.slice(0, 11);
-  if (localDigits.length <= 2) {
-    return localDigits.length === 2 ? `(${localDigits}) ` : `(${localDigits}`;
+  let cleanDigits = digits;
+  if (cleanDigits.startsWith(country) && cleanDigits.length > country.length + 5) {
+    cleanDigits = cleanDigits.slice(country.length);
   }
-  const ddd = localDigits.slice(0, 2);
-  const rest = localDigits.slice(2);
-  if (rest.length <= 4) {
-    return `(${ddd}) ${rest}`;
-  }
-  if (rest.length <= 8) {
-    return `(${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
-  }
-  return `(${ddd}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
+  return cleanDigits.slice(0, 14);
 };
+
+window.formatPhone = formatPhone;
 
 document.addEventListener("input", (e) => {
   const target = e.target;
@@ -211,7 +203,9 @@ document.addEventListener("input", (e) => {
   ) {
     const start = target.selectionStart;
     const oldLength = target.value.length;
-    const formatted = formatPhone(target.value);
+    const countrySelect = target.form?.querySelector('select[name="phone_country"]') || document.getElementById("id_phone_country");
+    const country = countrySelect ? countrySelect.value : "55";
+    const formatted = formatPhone(target.value, country);
     if (target.value !== formatted) {
       target.value = formatted;
       if (start !== null) {
@@ -292,7 +286,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (field.value) field.value = formatDocument(field.value);
   });
   document.querySelectorAll('[data-mask="phone"], input[name="contact_phone"]').forEach((field) => {
-    if (field.value) field.value = formatPhone(field.value);
+    const countrySelect = field.form?.querySelector('select[name="phone_country"]') || document.getElementById("id_phone_country");
+    const country = countrySelect ? countrySelect.value : "55";
+    if (field.value) field.value = formatPhone(field.value, country);
   });
 });
 

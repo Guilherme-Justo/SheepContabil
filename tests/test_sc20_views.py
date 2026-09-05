@@ -581,6 +581,10 @@ def test_certificate_form_document_mask_and_email_normalization(
     assert 'data-mask="document"' in html
     assert 'id="sc20-certificate-form-card"' in html
     assert "hx-post=" in html
+    assert 'name="phone_country"' in html
+    assert "sc20-phone-group" in html
+    assert "Brasil (+55)" in html
+    assert "Portugal (+351)" in html
 
     # Submissão com e-mail em maiúsculas normalizado para minúsculas
     resp_post = client.post(
