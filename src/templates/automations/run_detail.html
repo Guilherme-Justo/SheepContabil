@@ -66,9 +66,15 @@
           <td><strong>{{ attempt.certificate.client_name }}</strong></td>
           <td>{{ attempt.recipient }}</td>
           <td class="font-mono text-xs">#{{ attempt.sequence }}</td>
-          <td><span class="status-badge status-{{ attempt.status_tone }}"><i></i>{{ attempt.get_status_display }}</span></td>
-          <td>{{ attempt.error_message|default:"Entrega simulada registrada." }}</td>
-        </tr>
+          <td>
+            {% if attempt.error_message %}
+              {{ attempt.error_message }}
+            {% elif attempt.payload.backend == "email" %}
+              E-mail enviado via Gmail SMTP.
+            {% else %}
+              Entrega simulada registrada.
+            {% endif %}
+          </td>
         {% empty %}<tr><td colspan="5" class="py-10 text-center text-grafite">Esta execução não criou nova tentativa; os avisos elegíveis já estavam registrados.</td></tr>{% endfor %}
       </tbody>
     </table>

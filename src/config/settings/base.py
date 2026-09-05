@@ -149,6 +149,19 @@ SC05_SIMULATOR_PASSWORD = env("SC05_SIMULATOR_PASSWORD", default="")
 SC05_SIMULATOR_READY_FILE = env("SC05_SIMULATOR_READY_FILE", default="")
 SC05_RPA_TIMEOUT_MS = env.int("SC05_RPA_TIMEOUT_MS", default=10_000)
 
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = env("EMAIL_HOST", default="smtp.gmail.com")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="SheepContabil <avisos@sheepcontabil.local>")
+
+SC20_NOTIFICATION_BACKEND = env("SC20_NOTIFICATION_BACKEND", default="simulated")
+SC20_EMAIL_OVERRIDE_TO = env("SC20_EMAIL_OVERRIDE_TO", default="")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

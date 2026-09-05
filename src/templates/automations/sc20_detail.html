@@ -55,7 +55,18 @@
 
 <div class="sc20-guidance mt-6" role="note">
   <span class="sc20-guidance-icon" aria-hidden="true">i</span>
-  <p><strong>Ambiente de demonstração.</strong> Os avisos são simulados e registrados no histórico abaixo. Certificados revogados ou substituídos permanecem visíveis, mas não recebem novos avisos.</p>
+  {% if notification_backend == "email" %}
+    <p>
+      <strong>Envio real de e-mails ativado (Gmail SMTP).</strong>
+      {% if email_override_to %}
+        Sandbox de segurança ativo: todos os avisos disparados são redirecionados para <code>{{ email_override_to }}</code> com assunto identificado.
+      {% else %}
+        Os avisos são disparados diretamente para os e-mails cadastrados em cada certificado.
+      {% endif %}
+    </p>
+  {% else %}
+    <p><strong>Ambiente de demonstração.</strong> Os avisos são simulados e registrados no histórico abaixo. Certificados revogados ou substituídos permanecem visíveis, mas não recebem novos avisos.</p>
+  {% endif %}
 </div>
 
 <section class="mt-10 grid gap-7 2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start">

@@ -25,6 +25,7 @@ from core.automations.sc20.gateways import (
     NotificationGateway,
     NotificationMessage,
     SimulatedNotificationGateway,
+    get_sc20_gateway,
 )
 
 if TYPE_CHECKING:
@@ -118,7 +119,7 @@ def execute_sc20(
     gateway: NotificationGateway | None = None,
     policy: SC20Policy | None = None,
 ) -> SC20ExecutionResult:
-    selected_gateway = gateway or SimulatedNotificationGateway()
+    selected_gateway = gateway or get_sc20_gateway()
     selected_policy = policy or SC20Policy()
     run, should_execute = _start_run(run_id)
     if not should_execute:
@@ -258,15 +259,29 @@ def _deliver(
         f"{communication.certificate_id}:{communication.certificate_valid_until}:"
         f"{communication.channel}:{communication.policy_key}:{next_sequence}"
     )
+    certificate = communication.certificate
+    today = timezone.localdate()
+    days_remaining = (communication.certificate_valid_until - today).days
+    extra_context = {
+        "client_name": certificate.client_name,
+        "client_document": certificate.client_document,
+        "responsible_name": certificate.responsible_name,
+        "valid_until": communication.certificate_valid_until,
+        "days_remaining": days_remaining,
+        "serial_number": certificate.serial_number,
+        "channel": communication.channel,
+        "run_id": str(run.id),
+    }
     message = NotificationMessage(
         recipient=communication.recipient,
         channel=communication.channel,
         subject="Certificado digital próximo do vencimento",
         body=(
-            f"O certificado de {communication.certificate.client_name} vence em "
+            f"O certificado de {certificate.client_name} vence em "
             f"{communication.certificate_valid_until:%d/%m/%Y}."
         ),
         idempotency_key=key,
+        extra_context=extra_context,
     )
     try:
         delivery = gateway.send(message)
@@ -274,12 +289,13 @@ def _deliver(
         delivery = DeliveryResult(
             delivered=False,
             error_message=(
-                "O canal simulado ficou indisponível durante o envio; "
+                "O canal de notificação ficou indisponível durante o envio; "
                 "uma nova tentativa pode ser feita."
             ),
         )
     status = CommunicationStatus.SENT if delivery.delivered else CommunicationStatus.FAILED
     finished_at = timezone.now()
+    is_synthetic = isinstance(gateway, SimulatedNotificationGateway)
     CommunicationAttempt.objects.create(
         communication=communication,
         run=run,
@@ -288,7 +304,12 @@ def _deliver(
         recipient=message.recipient,
         provider_message_id=delivery.provider_message_id,
         error_message=delivery.error_message,
-        payload={"subject": message.subject, "body": message.body, "synthetic": True},
+        payload={
+            "subject": message.subject,
+            "body": message.body,
+            "synthetic": is_synthetic,
+            "backend": "simulated" if is_synthetic else "email",
+        },
         finished_at=finished_at,
     )
     communication.status = status

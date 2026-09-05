@@ -7,6 +7,7 @@ from typing import Any, cast
 from urllib.parse import urlencode
 from uuid import UUID
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -1650,6 +1651,8 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             "runs_sort_query_params": runs_sort_query_params,
             "runs_query_params": runs_query_params,
             "runs_per_page_query_params": runs_per_page_query_params,
+            "notification_backend": getattr(settings, "SC20_NOTIFICATION_BACKEND", "simulated"),
+            "email_override_to": getattr(settings, "SC20_EMAIL_OVERRIDE_TO", ""),
         },
     )
 

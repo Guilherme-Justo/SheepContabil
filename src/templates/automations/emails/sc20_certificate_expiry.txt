@@ -1,0 +1,30 @@
+{% if override_applied %}[AMBIENTE DE HOMOLOGAÇÃO / TESTE SHEEPCONTABIL]
+Aviso redirecionado para esta caixa de teste segura. Destinatário original: {{ original_recipient }}
+--------------------------------------------------------------------------------
+{% endif %}
+SheepContabil · Monitoramento de Certificados Digitais (SC-20)
+================================================================================
+
+Olá, {{ responsible_name|default:client_name }},
+
+Informamos que o certificado digital de sua titularidade está próximo da data de vencimento.
+
+DADOS DO CERTIFICADO:
+--------------------------------------------------------------------------------
+Empresa / Cliente : {{ client_name }}
+CPF / CNPJ        : {{ client_document }}
+Data de Validade  : {{ valid_until|date:"d/m/Y" }}
+Dias Restantes    : {{ days_remaining }} dia(s)
+Responsável       : {{ responsible_name|default:"Não informado" }}
+{% if serial_number %}Identificador     : {{ serial_number }}{% endif %}
+
+ORIENTAÇÃO PARA RENOVAÇÃO:
+Para evitar a paralisação de emissão de NF-e, consultas no e-CAC e cumprimento
+de obrigações fiscais e societárias, inicie com antecedência a renovação junto
+à Autoridade Certificadora (AC) de sua preferência.
+
+Acesse o painel: {{ site_url|default:'http://localhost:8000' }}/automacoes/sc20/
+
+--------------------------------------------------------------------------------
+SheepContabil · Gestão Contábil, Fiscal & Societária Automatizada
+{% if run_id %}ID da Execução: {{ run_id }}{% endif %}

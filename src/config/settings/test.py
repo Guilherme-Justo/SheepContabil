@@ -10,3 +10,6 @@ STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.InMemoryStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
+EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+SC20_NOTIFICATION_BACKEND = "simulated"
+SC20_EMAIL_OVERRIDE_TO = ""
