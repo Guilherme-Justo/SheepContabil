@@ -36,3 +36,32 @@ def test_authenticated_page_contains_responsive_hamburger_and_drawer(
 
     # Tecla Escape configurada para fechar drawer
     assert '@keydown.escape.window="closeMobileMenu()"' in html
+
+
+def test_sidebar_branding_and_floating_edge_handle(
+    client: Client,
+    administrator: User,
+) -> None:
+    client.force_login(administrator)
+    response = client.get(reverse("automations:dashboard"))
+
+    assert response.status_code == 200
+    html = response.content.decode()
+
+    # 1. Wrapper estrutural do sidebar
+    assert "portal-sidebar-wrapper" in html
+
+    # 2. Branding com symbol-dark.png para estado colapsado e logo-dark.png para expandido
+    assert "brand/logo-dark.png" in html
+    assert "brand/symbol-dark.png" in html
+
+    # 3. Floating Edge Handle na borda direita do sidebar
+    assert "sidebar-edge-handle" in html
+    assert '@click="toggleSidebar()"' in html
+    assert ':aria-expanded="!sidebarCollapsed"' in html
+    assert "sidebarCollapsed ? 'rotate-180' : ''" in html
+
+    # 4. Topo do sidebar limpo (sem botão duplicado no cabeçalho para desktop)
+    before_header = html.split('class="sidebar-header"')[0]
+    assert '<button type="button" @click="toggleSidebar()"' not in before_header
+

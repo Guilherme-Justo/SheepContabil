@@ -63,6 +63,13 @@
   .portal-sidebar.is-collapsed {
     padding-inline: .55rem !important;
   }
+  .portal-sidebar.is-collapsed .sidebar-header {
+    justify-content: center !important;
+  }
+  .portal-sidebar.is-collapsed .brand-logo-icon {
+    display: block !important;
+    margin-inline: auto !important;
+  }
   .portal-sidebar.is-collapsed .sidebar-link {
     justify-content: center !important;
     padding: .55rem .25rem !important;
@@ -907,6 +914,10 @@
    Navegação Responsiva Mobile / Zoom Elevado (< 1024px)
    ========================================================================== */
 @media (max-width: 1023px) {
+  .portal-sidebar-wrapper {
+    display: contents;
+  }
+
   .portal-sidebar {
     position: fixed !important;
     top: 0 !important;
@@ -950,16 +961,54 @@ body.mobile-menu-active {
 }
 
 @media (min-width: 1024px) {
-  .portal-sidebar {
+  .portal-sidebar-wrapper {
     position: sticky; top: 0; z-index: 40;
     height: 100vh; max-height: 100vh; min-height: 0; align-self: start;
+    display: flex; flex-direction: column;
+  }
+  .portal-sidebar {
+    position: relative; top: auto; z-index: auto;
+    height: 100%; max-height: 100%; min-height: 0; align-self: auto;
     padding: 2.25rem 1.4rem;
     overflow-y: auto; overscroll-behavior: contain;
     scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
   }
   .portal-sidebar::-webkit-scrollbar { width: 6px; }
   .portal-sidebar::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,.15); border-radius: 999px; }
   .portal-sidebar::-webkit-scrollbar-track { background: transparent; }
+
+  /* Floating Edge Handle */
+  .sidebar-edge-handle {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translate(50%, -50%);
+    z-index: 50;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 9999px;
+    background-color: #0b1a20;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .sidebar-edge-handle:hover {
+    background-color: #10505f;
+    border-color: #1fa69a;
+    color: #ffffff;
+    transform: translate(50%, -50%) scale(1.15);
+    box-shadow: 0 4px 12px rgba(31, 166, 154, 0.35);
+  }
+  .sidebar-edge-handle:focus-visible {
+    outline: 2px solid #1fa69a;
+    outline-offset: 2px;
+  }
 
   /* Anti-FOUC: Renderização estática instantânea no primeiro paint quando o sidebar estiver recolhido */
   html.sidebar-is-collapsed .portal-layout {
@@ -968,11 +1017,18 @@ body.mobile-menu-active {
   html.sidebar-is-collapsed .portal-sidebar {
     padding-inline: .55rem !important;
   }
+  html.sidebar-is-collapsed .portal-sidebar .sidebar-header {
+    justify-content: center !important;
+  }
   html.sidebar-is-collapsed .portal-sidebar .brand-logo-full {
     display: none !important;
   }
   html.sidebar-is-collapsed .portal-sidebar .brand-logo-icon {
     display: block !important;
+    margin-inline: auto !important;
+  }
+  html.sidebar-is-collapsed .sidebar-edge-handle svg {
+    transform: rotate(180deg) !important;
   }
   html.sidebar-is-collapsed .portal-sidebar .sidebar-label-container {
     display: none !important;
