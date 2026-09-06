@@ -305,3 +305,45 @@ def test_communication_attempt_formatted_recipient_property(
         payload={"synthetic": True},
     )
     assert attempt_email.formatted_recipient == "contato@empresa.example.test"
+
+
+def test_sc20_page_renders_dual_contacts_and_preferred_pill(
+    client: Client,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    DigitalCertificate.objects.create(
+        serial_number="DUAL-EMAIL-PREF",
+        client_name="Cliente Dual Email Pref",
+        client_document="12345678000101",
+        responsible_name="Responsável 1",
+        contact_email="dual_email@empresa.example.test",
+        contact_phone="+55 11 91111-2222",
+        preferred_channel=CommunicationChannel.EMAIL,
+        valid_until=timezone.localdate() + timedelta(days=15),
+        status=CertificateStatus.ACTIVE,
+    )
+    DigitalCertificate.objects.create(
+        serial_number="DUAL-WPP-PREF",
+        client_name="Cliente Dual WhatsApp Pref",
+        client_document="12345678000102",
+        responsible_name="Responsável 2",
+        contact_email="dual_wpp@empresa.example.test",
+        contact_phone="+55 11 93333-4444",
+        preferred_channel=CommunicationChannel.WHATSAPP,
+        valid_until=timezone.localdate() + timedelta(days=15),
+        status=CertificateStatus.ACTIVE,
+    )
+
+    client.force_login(processes_operator)
+    url = reverse("automations:module-detail", kwargs={"slug": modules["SC-20"].slug})
+    response = client.get(url)
+    assert response.status_code == 200
+    html = response.content.decode()
+
+    assert "dual_email@empresa.example.test" in html
+    assert "+55 (11) 91111-2222" in html
+    assert "dual_wpp@empresa.example.test" in html
+    assert "+55 (11) 93333-4444" in html
+    assert "Preferencial" in html
+    assert "sc20-pref-pill" in html

@@ -59,6 +59,7 @@ def test_sc20_dispatch_flow_with_playwright(
         client_name="Beta Distribuidora S/A",
         client_document="44555666000199",
         responsible_name="Clara Operações",
+        contact_email="clara@beta.example.test",
         contact_phone="+55 11 98888-7777",
         preferred_channel=CommunicationChannel.WHATSAPP,
         valid_until=today + timedelta(days=20),
@@ -116,6 +117,8 @@ def test_sc20_dispatch_flow_with_playwright(
         assert whatsapp_pill.is_visible()
         assert whatsapp_pill.locator("svg").is_visible()
         assert "+55 (11) 98888-7777" in page.content()
+        assert "clara@beta.example.test" in page.content()
+        assert page.locator(".sc20-pref-pill").first.is_visible()
         assert page.locator(".sc20-wpp-icon svg").first.is_visible()
         assert "💬" not in page.content()
         pill_href = whatsapp_pill.get_attribute("href") or ""
