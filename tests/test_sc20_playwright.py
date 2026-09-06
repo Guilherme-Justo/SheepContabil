@@ -118,7 +118,8 @@ def test_sc20_dispatch_flow_with_playwright(
         assert whatsapp_pill.locator("svg").is_visible()
         assert "+55 (11) 98888-7777" in page.content()
         assert "clara@beta.example.test" in page.content()
-        assert page.locator(".sc20-pref-pill").first.is_visible()
+        assert page.locator(".sc20-pref-star").first.is_visible()
+        assert page.locator(".sc20-pref-star svg").first.is_visible()
         assert page.locator(".sc20-wpp-icon svg").first.is_visible()
         assert "💬" not in page.content()
         pill_href = whatsapp_pill.get_attribute("href") or ""
