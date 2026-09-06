@@ -1042,7 +1042,7 @@ class DigitalCertificate(models.Model):
         lines.append("_SheepContabil Gestão & Automações · SC-20_")
 
         message = "\n".join(lines)
-        return f"https://wa.me/{digits}?text={urllib.parse.quote_plus(message)}"
+        return f"https://api.whatsapp.com/send?phone={digits}&text={urllib.parse.quote(message)}"
 
 
 class CertificateCommunication(models.Model):

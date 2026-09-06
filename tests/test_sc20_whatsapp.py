@@ -66,12 +66,15 @@ def test_certificate_whatsapp_url_normalization_and_message_content() -> None:
     url = cert.whatsapp_url()
 
     # Normalizou 11 dígitos acrescentando DDI 55
-    assert url.startswith("https://wa.me/5511988887777?text=")
+    assert url.startswith("https://api.whatsapp.com/send?phone=5511988887777&text=")
 
-    # Decodifica o texto para validar conteúdo
-    encoded_text = url.split("?text=")[1]
-    decoded = urllib.parse.unquote_plus(encoded_text)
+    # Decodifica o texto para validar conteúdo e emojis
+    encoded_text = url.split("&text=")[1]
+    decoded = urllib.parse.unquote(encoded_text)
 
+    assert "🔔" in decoded
+    assert "📋" in decoded
+    assert "💡" in decoded
     assert "SheepContabil" in decoded
     assert "Ana Paula" in decoded
     assert "Aurora Serviços Fictícios" in decoded
@@ -88,10 +91,10 @@ def test_certificate_whatsapp_url_sandbox_override() -> None:
         url = cert.whatsapp_url()
 
     # Destinatário do link foi redirecionado para o número do sandbox
-    assert url.startswith("https://wa.me/5521977776666?text=")
+    assert url.startswith("https://api.whatsapp.com/send?phone=5521977776666&text=")
 
-    encoded_text = url.split("?text=")[1]
-    decoded = urllib.parse.unquote_plus(encoded_text)
+    encoded_text = url.split("&text=")[1]
+    decoded = urllib.parse.unquote(encoded_text)
 
     assert "AMBIENTE DE TESTE SHEEPCONTABIL" in decoded
     assert "Destinatário original: +55 11 99999-2002" in decoded
@@ -124,7 +127,7 @@ def test_communication_attempt_whatsapp_properties(
     )
 
     assert attempt.is_whatsapp is True
-    assert attempt.whatsapp_url.startswith("https://wa.me/5511999998888")
+    assert attempt.whatsapp_url.startswith("https://api.whatsapp.com/send?phone=5511999998888")
 
 
 def test_sc20_page_renders_whatsapp_button(
@@ -143,7 +146,7 @@ def test_sc20_page_renders_whatsapp_button(
 
     # O botão de WhatsApp deve estar presente na tabela de certificados
     assert "sc20-whatsapp-pill" in html
-    assert "https://wa.me/5511999992002" in html
+    assert "https://api.whatsapp.com/send?phone=5511999992002" in html
     assert 'target="_blank"' in html
 
 
@@ -182,7 +185,7 @@ def test_run_detail_page_renders_whatsapp_link_for_whatsapp_attempt(
     html = response.content.decode()
 
     # Na tabela de tentativas da execução deve haver o botão de WhatsApp
-    assert "https://wa.me/5511999992002" in html
+    assert "https://api.whatsapp.com/send?phone=5511999992002" in html
     assert "sc20-whatsapp-pill" in html
 
 
@@ -205,8 +208,8 @@ def test_certificate_whatsapp_url_formats_unformatted_document() -> None:
 def test_certificate_whatsapp_url_international_numbers() -> None:
     cert_us = _cert_whatsapp(serial="WPP-US", phone="+1 202 555-0199", days=10)
     url_us = cert_us.whatsapp_url()
-    assert url_us.startswith("https://wa.me/12025550199?text=")
+    assert url_us.startswith("https://api.whatsapp.com/send?phone=12025550199&text=")
 
     cert_pt = _cert_whatsapp(serial="WPP-PT", phone="+351 912 345 678", days=10)
     url_pt = cert_pt.whatsapp_url()
-    assert url_pt.startswith("https://wa.me/351912345678?text=")
+    assert url_pt.startswith("https://api.whatsapp.com/send?phone=351912345678&text=")
