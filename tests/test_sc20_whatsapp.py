@@ -347,6 +347,11 @@ def test_sc20_page_renders_dual_contacts_and_preferred_pill(
     assert "+55 (11) 93333-4444" in html
     assert "Preferencial" in html
     assert "sc20-pref-pill" in html
+    assert "sc20-email-pill" in html
+    assert "sc20-email-icon" in html
+    assert "mailto:dual_email@empresa.example.test?" in html
+    assert "mailto:dual_wpp@empresa.example.test?" in html
+    assert "sc20-whatsapp-pill" in html
 
 
 def test_certificate_has_email_flag_and_mailto_url() -> None:
@@ -426,4 +431,3 @@ def test_communication_attempt_mailto_url(
     assert attempt.is_whatsapp is False
     assert attempt.mailto_url.startswith("mailto:carlos@beta.example.test?")
     assert "Empresa%20Beta%20Ltda" in attempt.mailto_url
-
