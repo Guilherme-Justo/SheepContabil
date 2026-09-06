@@ -64,7 +64,14 @@
         {% for attempt in attempts %}
         <tr>
           <td><strong>{{ attempt.certificate.client_name }}</strong></td>
-          <td>{{ attempt.recipient }}</td>
+          <td>
+            <span class="inline-flex items-center gap-1.5">
+              {% if attempt.is_whatsapp %}
+                <span class="sc20-wpp-icon" aria-hidden="true">{% include "components/icons/whatsapp.html" with class="h-3.5 w-3.5 fill-current" %}</span>
+              {% endif %}
+              <span>{{ attempt.formatted_recipient }}</span>
+            </span>
+          </td>
           <td class="font-mono text-xs">#{{ attempt.sequence }}</td>
           <td><span class="status-badge status-{{ attempt.status_tone }}"><i></i>{{ attempt.get_status_display }}</span></td>
           <td>
@@ -86,7 +93,7 @@
                   class="sc20-whatsapp-pill"
                   title="Abrir no WhatsApp Web"
                 >
-                  <span aria-hidden="true">💬</span> WhatsApp
+                  {% include "components/icons/whatsapp.html" with class="h-3.5 w-3.5 fill-current shrink-0" %} WhatsApp
                 </a>
               {% endif %}
             </div>

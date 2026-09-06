@@ -164,8 +164,14 @@
               <span class="block text-tinta">{{ certificate.contact_name }}</span>
               <span class="mt-1 flex flex-wrap items-center gap-2 text-xs">
                 <span>
-                  {{ certificate.get_preferred_channel_display }} ·
-                  {% if certificate.preferred_channel == "email" %}{{ certificate.contact_email }}{% else %}{{ certificate.contact_phone }}{% endif %}
+                  {% if certificate.preferred_channel == "email" %}
+                    <span>{{ certificate.get_preferred_channel_display }} · {{ certificate.contact_email }}</span>
+                  {% else %}
+                    <span class="inline-flex items-center gap-1">
+                      <span class="sc20-wpp-icon" aria-hidden="true">{% include "components/icons/whatsapp.html" with class="h-3.5 w-3.5 fill-current" %}</span>
+                      <span>{{ certificate.get_preferred_channel_display }} · {{ certificate.formatted_phone }}</span>
+                    </span>
+                  {% endif %}
                 </span>
                 {% if certificate.has_whatsapp %}
                   <a
@@ -175,7 +181,7 @@
                     class="sc20-whatsapp-pill"
                     title="Abrir mensagem no WhatsApp Web"
                   >
-                    <span aria-hidden="true">💬</span> WhatsApp
+                    {% include "components/icons/whatsapp.html" with class="h-3.5 w-3.5 fill-current shrink-0" %} WhatsApp
                   </a>
                 {% endif %}
               </span>
@@ -354,10 +360,17 @@
           {% for attempt in attempts %}
           <tr>
             <td>
-              <strong>{{ attempt.recipient }}</strong>
+              <strong>{{ attempt.formatted_recipient }}</strong>
               {% if attempt.certificate %}<span class="mt-1 block text-xs">{{ attempt.certificate.client_name }}</span>{% endif %}
             </td>
-            <td>{{ attempt.get_channel_display }}</td>
+            <td>
+              <span class="inline-flex items-center gap-1.5">
+                {% if attempt.is_whatsapp %}
+                  <span class="sc20-wpp-icon" aria-hidden="true">{% include "components/icons/whatsapp.html" with class="h-3.5 w-3.5 fill-current" %}</span>
+                {% endif %}
+                <span>{{ attempt.get_channel_display }}</span>
+              </span>
+            </td>
             <td>
               <span class="status-badge status-{{ attempt.status_tone }}"><i></i>{{ attempt.get_status_display }}</span>
               {% if attempt.error_message %}<span class="mt-2 block max-w-sm text-xs leading-5 text-carmim">{{ attempt.error_message }}</span>{% endif %}
@@ -373,7 +386,7 @@
                     class="sc20-whatsapp-link"
                     title="Abrir mensagem pré-formatada no WhatsApp Web"
                   >
-                    <span aria-hidden="true">💬</span> WhatsApp
+                    {% include "components/icons/whatsapp.html" with class="h-3.5 w-3.5 fill-current shrink-0" %} WhatsApp
                   </a>
                 {% endif %}
                 {% if attempt.status == "failed" and attempt.communication.status == "failed" %}
@@ -381,7 +394,7 @@
                   {% csrf_token %}
                   <input type="hidden" name="action" value="retry">
                   <input type="hidden" name="attempt_id" value="{{ attempt.id }}">
-                  <button type="submit" class="sc20-retry-button" aria-label="Tentar novamente o aviso para {{ attempt.recipient }}">Tentar novamente</button>
+                  <button type="submit" class="sc20-retry-button" aria-label="Tentar novamente o aviso para {{ attempt.formatted_recipient }}">Tentar novamente</button>
                 </form>
                 {% elif attempt.status == "failed" %}
                 <span class="text-xs text-grafite" title="Tentativa anterior superada por reenvio posterior">Superado</span>
