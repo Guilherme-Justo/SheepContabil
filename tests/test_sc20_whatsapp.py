@@ -345,8 +345,8 @@ def test_sc20_page_renders_dual_contacts_and_preferred_pill(
     assert "+55 (11) 91111-2222" in html
     assert "dual_wpp@empresa.example.test" in html
     assert "+55 (11) 93333-4444" in html
-    assert "Preferencial" in html
-    assert "sc20-pref-pill" in html
+    assert "Canal preferencial" in html
+    assert "sc20-pref-star" in html
     assert "sc20-email-pill" in html
     assert "sc20-email-icon" in html
     assert "mailto:dual_email@empresa.example.test?" in html
