@@ -74,7 +74,15 @@ def test_sc20_dispatch_flow_with_playwright(
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(viewport={"width": 1400, "height": 900})
 
-        # Intercepta qualquer chamada externa para o wa.me para testes determinísticos
+        # Intercepta chamadas externas para o WhatsApp para testes determinísticos
+        context.route(
+            "https://api.whatsapp.com/**",
+            lambda route: route.fulfill(
+                status=200,
+                content_type="text/html",
+                body="<html><body><h1>WhatsApp Web Simulado</h1></body></html>",
+            ),
+        )
         context.route(
             "https://wa.me/**",
             lambda route: route.fulfill(
@@ -107,8 +115,12 @@ def test_sc20_dispatch_flow_with_playwright(
         whatsapp_pill = page.locator("a.sc20-whatsapp-pill").first
         assert whatsapp_pill.is_visible()
         pill_href = whatsapp_pill.get_attribute("href") or ""
-        assert "https://wa.me/5561991365756" in pill_href
-        assert "Beta" in unquote(pill_href)
+        assert "https://api.whatsapp.com/send?phone=5561991365756" in pill_href
+        decoded_href = unquote(pill_href)
+        assert "Beta" in decoded_href
+        assert "🔔" in decoded_href
+        assert "📋" in decoded_href
+        assert "💡" in decoded_href
 
         # Testa a máscara de documento no formulário do SC-20
         doc_input = page.locator('input[name="client_document"]')
@@ -188,7 +200,7 @@ def test_sc20_dispatch_flow_with_playwright(
         with context.expect_page() as new_page_info:
             whatsapp_attempt_link.click()
         whatsapp_page = new_page_info.value
-        assert "https://wa.me/5561991365756" in whatsapp_page.url
+        assert "https://api.whatsapp.com/send?phone=5561991365756" in whatsapp_page.url
 
         # Salva screenshot da tela de evidências da execução
         if SCREENSHOT_DIR.exists():
