@@ -68,17 +68,23 @@ def test_certificate_whatsapp_url_normalization_and_message_content() -> None:
     # Normalizou 11 dígitos acrescentando DDI 55
     assert url.startswith("https://api.whatsapp.com/send?phone=5511988887777&text=")
 
-    # Decodifica o texto para validar conteúdo e emojis
+    # Decodifica o texto para validar conteúdo limpo Clean B2B sem emojis de 4 bytes
     encoded_text = url.split("&text=")[1]
     decoded = urllib.parse.unquote(encoded_text)
 
-    assert "🔔" in decoded
-    assert "📋" in decoded
-    assert "💡" in decoded
-    assert "SheepContabil" in decoded
+    # Garante ausência dos emojis que causam corrupção e substituição por
+    assert "🔔" not in decoded
+    assert "📋" not in decoded
+    assert "💡" not in decoded
+    assert "\ufffd" not in decoded
+
+    # Cabeçalhos executivos corporativos
+    assert "*SheepContabil · Monitoramento de Certificados Digitais*" in decoded
+    assert "*Dados do Certificado:*" in decoded
+    assert "*Orientação para Renovação:*" in decoded
+    assert "• Empresa: *Aurora Serviços Fictícios*" in decoded
+    assert "• Documento: 12.345.678/0001-90" in decoded
     assert "Ana Paula" in decoded
-    assert "Aurora Serviços Fictícios" in decoded
-    assert "12.345.678/0001-90" in decoded
     assert "WPP-NORM" in decoded
     assert "Vencimento Crítico" in decoded
     assert "Autoridade Certificadora" in decoded

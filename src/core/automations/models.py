@@ -1015,7 +1015,7 @@ class DigitalCertificate(models.Model):
             lines.append(f"Aviso de teste redirecionado. Destinatário original: {original}")
             lines.append("----------------------------------------\n")
 
-        lines.append("🔔 *SheepContabil · Monitoramento de Certificados Digitais*")
+        lines.append("*SheepContabil · Monitoramento de Certificados Digitais*")
         lines.append("")
         contact = self.contact_name or self.client_name
         lines.append(f"Olá, *{contact}*,")
@@ -1024,7 +1024,7 @@ class DigitalCertificate(models.Model):
             "está próximo da data de expiração."
         )
         lines.append("")
-        lines.append("📋 *Dados do Certificado:*")
+        lines.append("*Dados do Certificado:*")
         lines.append(f"• Empresa: *{self.client_name}*")
         lines.append(f"• Documento: {self.formatted_document}")
         lines.append(f"• Validade: *{self.valid_until:%d/%m/%Y}*")
@@ -1032,7 +1032,7 @@ class DigitalCertificate(models.Model):
         if self.serial_number:
             lines.append(f"• Identificador: {self.serial_number}")
         lines.append("")
-        lines.append("💡 *Orientação para Renovação:*")
+        lines.append("*Orientação para Renovação:*")
         lines.append(
             "Recomendamos iniciar com antecedência o processo de renovação junto à "
             "Autoridade Certificadora (AC) para evitar interrupções no faturamento (NF-e) "
