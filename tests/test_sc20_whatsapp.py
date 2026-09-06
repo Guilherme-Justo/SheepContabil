@@ -347,3 +347,87 @@ def test_sc20_page_renders_dual_contacts_and_preferred_pill(
     assert "+55 (11) 93333-4444" in html
     assert "Preferencial" in html
     assert "sc20-pref-pill" in html
+    assert "sc20-email-pill" in html
+    assert "sc20-email-icon" in html
+    assert "mailto:dual_email@empresa.example.test?" in html
+    assert "mailto:dual_wpp@empresa.example.test?" in html
+    assert "sc20-whatsapp-pill" in html
+
+
+def test_certificate_has_email_flag_and_mailto_url() -> None:
+    cert_with_email = DigitalCertificate.objects.create(
+        serial_number="EMAIL-01",
+        client_name="Empresa Alpha Ltda",
+        client_document="12345678000190",
+        responsible_name="Mariana Souza",
+        contact_email="mariana@alpha.example.test",
+        contact_phone="+55 11 98888-7777",
+        preferred_channel=CommunicationChannel.EMAIL,
+        valid_until=timezone.localdate() + timedelta(days=20),
+        status=CertificateStatus.ACTIVE,
+    )
+    assert cert_with_email.has_email is True
+    mailto = cert_with_email.mailto_url()
+    assert mailto.startswith("mailto:mariana@alpha.example.test?")
+    assert "subject=Aviso%20de%20Vencimento" in mailto
+    assert "Empresa%20Alpha%20Ltda" in mailto
+    assert "Mariana%20Souza" in mailto
+
+    # Test override setting
+    with override_settings(SC20_EMAIL_OVERRIDE_TO="teste@sheepcontabil.com"):
+        override_mailto = cert_with_email.mailto_url()
+        assert override_mailto.startswith("mailto:teste@sheepcontabil.com?")
+        assert "AMBIENTE%20DE%20TESTE" in override_mailto
+
+    cert_without_email = DigitalCertificate.objects.create(
+        serial_number="NO-EMAIL-01",
+        client_name="Sem Email Ltda",
+        client_document="12345678000190",
+        responsible_name="Sem Email",
+        contact_email="",
+        contact_phone="+55 11 98888-7777",
+        preferred_channel=CommunicationChannel.WHATSAPP,
+        valid_until=timezone.localdate() + timedelta(days=20),
+        status=CertificateStatus.ACTIVE,
+    )
+    assert cert_without_email.has_email is False
+    assert cert_without_email.mailto_url() == ""
+
+
+def test_communication_attempt_mailto_url(
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    cert = DigitalCertificate.objects.create(
+        serial_number="EMAIL-ATTEMPT-01",
+        client_name="Empresa Beta Ltda",
+        client_document="98765432000110",
+        responsible_name="Carlos Silva",
+        contact_email="carlos@beta.example.test",
+        contact_phone="",
+        preferred_channel=CommunicationChannel.EMAIL,
+        valid_until=timezone.localdate() + timedelta(days=10),
+        status=CertificateStatus.ACTIVE,
+    )
+    run = create_sc20_run(triggered_by=processes_operator, base_date=timezone.localdate())
+    comm = CertificateCommunication.objects.create(
+        certificate=cert,
+        certificate_valid_until=cert.valid_until,
+        channel=CommunicationChannel.EMAIL,
+        recipient="carlos@beta.example.test",
+        policy_key="sc20-60-days-v1",
+        first_run=run,
+        latest_run=run,
+    )
+    attempt = comm.attempts.create(
+        run=run,
+        sequence=1,
+        status=CommunicationStatus.SENT,
+        recipient="carlos@beta.example.test",
+        provider_message_id="sim-email-002",
+        payload={"synthetic": True, "mailto_url": cert.mailto_url()},
+    )
+    assert attempt.is_email is True
+    assert attempt.is_whatsapp is False
+    assert attempt.mailto_url.startswith("mailto:carlos@beta.example.test?")
+    assert "Empresa%20Beta%20Ltda" in attempt.mailto_url

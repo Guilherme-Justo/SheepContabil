@@ -68,6 +68,8 @@
             <span class="inline-flex items-center gap-1.5">
               {% if attempt.is_whatsapp %}
                 <span class="sc20-wpp-icon" aria-hidden="true">{% include "components/icons/whatsapp.html" with class="h-3.5 w-3.5 fill-current" %}</span>
+              {% elif attempt.is_email %}
+                <span class="sc20-email-icon" aria-hidden="true">{% include "components/icons/mail.html" with class="h-3.5 w-3.5 fill-current" %}</span>
               {% endif %}
               <span>{{ attempt.formatted_recipient }}</span>
             </span>
@@ -94,6 +96,14 @@
                   title="Abrir no WhatsApp Web"
                 >
                   {% include "components/icons/whatsapp.html" with class="h-3.5 w-3.5 fill-current shrink-0" %} WhatsApp
+                </a>
+              {% elif attempt.is_email and attempt.mailto_url %}
+                <a
+                  href="{{ attempt.mailto_url }}"
+                  class="sc20-email-pill"
+                  title="Abrir no cliente de e-mail padrão para redigir aviso"
+                >
+                  {% include "components/icons/mail.html" with class="h-3.5 w-3.5 fill-current shrink-0" %} E-mail
                 </a>
               {% endif %}
             </div>

@@ -133,6 +133,17 @@ def test_sc20_dispatch_flow_with_playwright(
         assert "*Dados do Certificado:*" in decoded_href
         assert "*Orientação para Renovação:*" in decoded_href
 
+        # Verifica existência do botão de E-mail e ícone de envelope
+        email_pill = page.locator("a.sc20-email-pill").first
+        assert email_pill.is_visible()
+        assert email_pill.locator("svg").is_visible()
+        assert page.locator(".sc20-email-icon svg").first.is_visible()
+        email_href = email_pill.get_attribute("href") or ""
+        assert email_href.startswith("mailto:")
+        decoded_email_href = unquote(email_href)
+        assert "Aviso de Vencimento de Certificado Digital" in decoded_email_href
+        assert "SheepContabil Gestão & Automações · SC-20" in decoded_email_href
+
         # Testa a máscara de documento no formulário do SC-20
         doc_input = page.locator('input[name="client_document"]')
         assert doc_input.is_visible()
