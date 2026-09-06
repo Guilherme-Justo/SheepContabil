@@ -72,7 +72,7 @@ def test_certificate_whatsapp_url_normalization_and_message_content() -> None:
     encoded_text = url.split("&text=")[1]
     decoded = urllib.parse.unquote(encoded_text)
 
-    # Garante ausência dos emojis que causam corrupção e substituição por 
+    # Garante ausência dos emojis que causam corrupção e substituição por
     assert "🔔" not in decoded
     assert "📋" not in decoded
     assert "💡" not in decoded

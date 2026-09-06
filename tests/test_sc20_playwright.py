@@ -118,9 +118,13 @@ def test_sc20_dispatch_flow_with_playwright(
         assert "https://api.whatsapp.com/send?phone=5561991365756" in pill_href
         decoded_href = unquote(pill_href)
         assert "Beta" in decoded_href
-        assert "🔔" in decoded_href
-        assert "📋" in decoded_href
-        assert "💡" in decoded_href
+        assert "🔔" not in decoded_href
+        assert "📋" not in decoded_href
+        assert "💡" not in decoded_href
+        assert "\ufffd" not in decoded_href
+        assert "*SheepContabil · Monitoramento de Certificados Digitais*" in decoded_href
+        assert "*Dados do Certificado:*" in decoded_href
+        assert "*Orientação para Renovação:*" in decoded_href
 
         # Testa a máscara de documento no formulário do SC-20
         doc_input = page.locator('input[name="client_document"]')
