@@ -111,9 +111,13 @@ def test_sc20_dispatch_flow_with_playwright(
         assert "Envio real de e-mails ativado" in page.content()
         assert "guilherme15rj@gmail.com" in page.content()
 
-        # Verifica existência do botão de WhatsApp na tabela de certificados
+        # Verifica existência do botão de WhatsApp e formatação de telefone na tabela
         whatsapp_pill = page.locator("a.sc20-whatsapp-pill").first
         assert whatsapp_pill.is_visible()
+        assert whatsapp_pill.locator("svg").is_visible()
+        assert "+55 (11) 98888-7777" in page.content()
+        assert page.locator(".sc20-wpp-icon svg").first.is_visible()
+        assert "💬" not in page.content()
         pill_href = whatsapp_pill.get_attribute("href") or ""
         assert "https://api.whatsapp.com/send?phone=5561991365756" in pill_href
         decoded_href = unquote(pill_href)
@@ -195,10 +199,13 @@ def test_sc20_dispatch_flow_with_playwright(
         assert "Alpha Engenharia Ltda" in content
         assert "Beta Distribuidora S/A" in content
         assert "E-mail enviado via Gmail SMTP." in content
+        assert "+55 (11) 98888-7777" in content
+        assert "💬" not in content
 
-        # Na tabela de tentativas da execução, o botão de WhatsApp deve estar disponível
+        # Na tabela de tentativas da execução, o botão de WhatsApp deve estar disponível com SVG
         whatsapp_attempt_link = page.locator("a.sc20-whatsapp-pill").first
         assert whatsapp_attempt_link.is_visible()
+        assert whatsapp_attempt_link.locator("svg").is_visible()
 
         # Clica no link do WhatsApp e valida a nova aba
         with context.expect_page() as new_page_info:

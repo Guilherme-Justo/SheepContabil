@@ -151,10 +151,13 @@ def test_sc20_page_renders_whatsapp_button(
     assert response.status_code == 200
     html = response.content.decode()
 
-    # O botão de WhatsApp deve estar presente na tabela de certificados
+    # O botão de WhatsApp deve estar presente na tabela de certificados com ícone SVG
     assert "sc20-whatsapp-pill" in html
     assert "https://api.whatsapp.com/send?phone=5511999992002" in html
     assert 'target="_blank"' in html
+    assert "+55 (11) 99999-2002" in html
+    assert "sc20-wpp-icon" in html
+    assert "💬" not in html
 
 
 def test_run_detail_page_renders_whatsapp_link_for_whatsapp_attempt(
@@ -191,9 +194,12 @@ def test_run_detail_page_renders_whatsapp_link_for_whatsapp_attempt(
     assert response.status_code == 200
     html = response.content.decode()
 
-    # Na tabela de tentativas da execução deve haver o botão de WhatsApp
+    # Na tabela de tentativas da execução deve haver o botão de WhatsApp e telefone formatado
     assert "https://api.whatsapp.com/send?phone=5511999992002" in html
     assert "sc20-whatsapp-pill" in html
+    assert "+55 (11) 99999-2002" in html
+    assert "sc20-wpp-icon" in html
+    assert "💬" not in html
 
 
 def test_certificate_whatsapp_url_formats_unformatted_document() -> None:
