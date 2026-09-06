@@ -16,6 +16,7 @@ from core.automations.models import (
     CommunicationChannel,
     CommunicationStatus,
     DigitalCertificate,
+    format_phone,
 )
 from core.automations.sc20.services import create_sc20_run
 from core.identity.models import User
@@ -219,3 +220,82 @@ def test_certificate_whatsapp_url_international_numbers() -> None:
     cert_pt = _cert_whatsapp(serial="WPP-PT", phone="+351 912 345 678", days=10)
     url_pt = cert_pt.whatsapp_url()
     assert url_pt.startswith("https://api.whatsapp.com/send?phone=351912345678&text=")
+
+
+def test_format_phone_helper() -> None:
+    # Celular nacional com DDI
+    assert format_phone("5561991365756") == "+55 (61) 99136-5756"
+    assert format_phone("+5561991365756") == "+55 (61) 99136-5756"
+    assert format_phone("+55 (61) 99136-5756") == "+55 (61) 99136-5756"
+
+    # Celular nacional sem DDI
+    assert format_phone("61991365756") == "+55 (61) 99136-5756"
+
+    # Fixo nacional com e sem DDI
+    assert format_phone("1133334444") == "+55 (11) 3333-4444"
+    assert format_phone("551133334444") == "+55 (11) 3333-4444"
+
+    # Internacional
+    assert format_phone("+351912345678") == "+351 912345678"
+    assert format_phone("+351 912 345 678") == "+351 912 345 678"
+    assert format_phone("+1 202 555-0199") == "+1 202 555-0199"
+
+    # Vazios e None
+    assert format_phone("") == ""
+    assert format_phone(None) == ""
+
+
+def test_digital_certificate_formatted_phone_property() -> None:
+    cert = _cert_whatsapp(serial="WPP-FMT-PROP", phone="+5561991365756", days=10)
+    assert cert.formatted_phone == "+55 (61) 99136-5756"
+
+    cert_clean = _cert_whatsapp(serial="WPP-FMT-CLEAN", phone="11988887777", days=10)
+    assert cert_clean.formatted_phone == "+55 (11) 98888-7777"
+
+
+def test_communication_attempt_formatted_recipient_property(
+    modules: dict[str, AutomationModule],
+) -> None:
+    cert = _cert_whatsapp(serial="WPP-ATTEMPT-FMT", phone="5561991365756", days=10)
+    run = create_sc20_run(triggered_by=None, base_date=timezone.localdate())
+
+    comm = CertificateCommunication.objects.create(
+        certificate=cert,
+        certificate_valid_until=cert.valid_until,
+        channel=CommunicationChannel.WHATSAPP,
+        recipient=cert.contact_phone,
+        policy_key="sc20-60-days-v1",
+        first_run=run,
+        latest_run=run,
+    )
+    attempt_wpp = CommunicationAttempt.objects.create(
+        communication=comm,
+        run=run,
+        sequence=1,
+        status=CommunicationStatus.SENT,
+        recipient="5561991365756",
+        provider_message_id="sim-fmt-001",
+        payload={"synthetic": True},
+    )
+    assert attempt_wpp.formatted_recipient == "+55 (61) 99136-5756"
+
+    # E-mail permanece intocado
+    comm_email = CertificateCommunication.objects.create(
+        certificate=cert,
+        certificate_valid_until=cert.valid_until,
+        channel=CommunicationChannel.EMAIL,
+        recipient="contato@empresa.example.test",
+        policy_key="sc20-60-days-v1",
+        first_run=run,
+        latest_run=run,
+    )
+    attempt_email = CommunicationAttempt.objects.create(
+        communication=comm_email,
+        run=run,
+        sequence=1,
+        status=CommunicationStatus.SENT,
+        recipient="contato@empresa.example.test",
+        provider_message_id="sim-email-001",
+        payload={"synthetic": True},
+    )
+    assert attempt_email.formatted_recipient == "contato@empresa.example.test"

@@ -31,6 +31,47 @@ def format_cpf_cnpj(value: str | None) -> str:
     return str(value)
 
 
+def format_phone(value: str | None) -> str:
+    """Formata número de telefone (+55 (DD) 9XXXX-XXXX / XXXX-XXXX ou internacional)."""
+    if not value:
+        return ""
+    raw = str(value).strip()
+    if not raw:
+        return ""
+
+    digits = re.sub(r"\D", "", raw)
+    if not digits:
+        return raw
+
+    # Caso 1: Número internacional explícito com '+' (exceto Brasil +55)
+    if raw.startswith("+") and not digits.startswith("55"):
+        if " " in raw or "(" in raw or "-" in raw:
+            return raw
+        for ddi_len in (3, 2, 1):
+            if len(digits) > ddi_len + 4:
+                prefix = digits[:ddi_len]
+                rest = digits[ddi_len:]
+                if prefix in ("351", "598", "595", "54", "56", "34", "44", "39", "49", "33", "1"):
+                    return f"+{prefix} {rest}"
+        return raw
+
+    # Caso 2: Brasil com DDI 55
+    if digits.startswith("55"):
+        local = digits[2:]
+        if len(local) == 11:
+            return f"+55 ({local[:2]}) {local[2:7]}-{local[7:]}"
+        if len(local) == 10:
+            return f"+55 ({local[:2]}) {local[2:6]}-{local[6:]}"
+
+    # Caso 3: Brasil sem DDI explícito
+    if len(digits) == 11 and not raw.startswith("+"):
+        return f"+55 ({digits[:2]}) {digits[2:7]}-{digits[7:]}"
+    if len(digits) == 10 and not raw.startswith("+"):
+        return f"+55 ({digits[:2]}) {digits[2:6]}-{digits[6:]}"
+
+    return raw
+
+
 class AutomationNature(models.TextChoices):
     AI_AGENT = "ai_agent", "Agente de IA"
     RPA = "rpa", "RPA"
@@ -950,6 +991,10 @@ class DigitalCertificate(models.Model):
         return format_cpf_cnpj(self.client_document)
 
     @property
+    def formatted_phone(self) -> str:
+        return format_phone(self.contact_phone)
+
+    @property
     def document(self) -> str:
         return self.formatted_document
 
@@ -1192,6 +1237,12 @@ class CommunicationAttempt(models.Model):
         if cert is not None:
             return str(cert.whatsapp_url())
         return ""
+
+    @property
+    def formatted_recipient(self) -> str:
+        if self.is_whatsapp:
+            return format_phone(self.recipient)
+        return self.recipient
 
 
 class BriefingTemplate(models.Model):
