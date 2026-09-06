@@ -311,6 +311,8 @@ def _deliver(
     }
     if communication.channel == "whatsapp":
         attempt_payload["whatsapp_url"] = certificate.whatsapp_url()
+    elif communication.channel == "email":
+        attempt_payload["mailto_url"] = certificate.mailto_url()
 
     CommunicationAttempt.objects.create(
         communication=communication,

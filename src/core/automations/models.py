@@ -1026,6 +1026,72 @@ class DigitalCertificate(models.Model):
     def has_whatsapp(self) -> bool:
         return bool(self.contact_phone and self.contact_phone.strip())
 
+    @property
+    def has_email(self) -> bool:
+        return bool(self.contact_email and self.contact_email.strip())
+
+    def mailto_url(self, *, override_email: str | None = None) -> str:
+        configured_override = getattr(settings, "SC20_EMAIL_OVERRIDE_TO", "")
+        email_to_use = (
+            override_email if override_email is not None else configured_override
+        ).strip()
+        override_active = bool(email_to_use)
+        target_email = email_to_use if override_active else (self.contact_email or "").strip()
+        if not target_email:
+            return ""
+
+        days = self.days_remaining
+        if days < 0:
+            urgency_text = f"EXPIRADO há {self.days_remaining_abs} dia(s)"
+        elif days == 0:
+            urgency_text = "VENCE HOJE"
+        elif days <= 15:
+            urgency_text = f"Vencimento Crítico (restam {days} dias)"
+        elif days <= 30:
+            urgency_text = f"Atenção ao Vencimento (restam {days} dias)"
+        else:
+            urgency_text = f"Aviso Preventivo (restam {days} dias)"
+
+        subject = f"Aviso de Vencimento de Certificado Digital · {self.client_name}"
+
+        lines: list[str] = []
+        if override_active:
+            lines.append("[AMBIENTE DE TESTE SHEEPCONTABIL]")
+            original = self.contact_email or "Não informado"
+            lines.append(f"Aviso de teste redirecionado. Destinatário original: {original}")
+            lines.append("----------------------------------------\n")
+
+        contact = self.contact_name or self.client_name
+        lines.append(f"Olá, {contact},")
+        lines.append("")
+        lines.append(
+            f"Informamos que o certificado digital da empresa {self.client_name} "
+            "está próximo da data de expiração."
+        )
+        lines.append("")
+        lines.append("Dados do Certificado:")
+        lines.append(f"• Empresa: {self.client_name}")
+        lines.append(f"• Documento: {self.formatted_document}")
+        lines.append(f"• Validade: {self.valid_until:%d/%m/%Y}")
+        lines.append(f"• Situação: {urgency_text}")
+        if self.serial_number:
+            lines.append(f"• Identificador: {self.serial_number}")
+        lines.append("")
+        lines.append("Orientação para Renovação:")
+        lines.append(
+            "Recomendamos iniciar com antecedência o processo de renovação junto à "
+            "Autoridade Certificadora (AC) para evitar interrupções no faturamento (NF-e) "
+            "e no cumprimento de obrigações acessórias."
+        )
+        lines.append("")
+        lines.append("SheepContabil Gestão & Automações · SC-20")
+
+        body = "\n".join(lines)
+        params = urllib.parse.urlencode(
+            {"subject": subject, "body": body}, quote_via=urllib.parse.quote
+        )
+        return f"mailto:{target_email}?{params}"
+
     def whatsapp_url(self, *, override_phone: str | None = None) -> str:
         configured_override = getattr(settings, "SC20_WHATSAPP_OVERRIDE_TO", "")
         phone_to_use = (
@@ -1232,10 +1298,25 @@ class CommunicationAttempt(models.Model):
         return self.channel == CommunicationChannel.WHATSAPP
 
     @property
+    def is_email(self) -> bool:
+        return self.channel == CommunicationChannel.EMAIL
+
+    @property
     def whatsapp_url(self) -> str:
+        if isinstance(self.payload, dict) and self.payload.get("whatsapp_url"):
+            return str(self.payload["whatsapp_url"])
         cert = getattr(self.communication, "certificate", None)
         if cert is not None:
             return str(cert.whatsapp_url())
+        return ""
+
+    @property
+    def mailto_url(self) -> str:
+        if isinstance(self.payload, dict) and self.payload.get("mailto_url"):
+            return str(self.payload["mailto_url"])
+        cert = getattr(self.communication, "certificate", None)
+        if cert is not None:
+            return str(cert.mailto_url())
         return ""
 
     @property
