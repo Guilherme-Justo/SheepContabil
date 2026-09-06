@@ -165,10 +165,20 @@
               <div class="mt-1 flex flex-col gap-1 text-xs">
                 {% if certificate.contact_email %}
                   <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="sc20-email-icon" aria-hidden="true">{% include "components/icons/mail.html" with class="h-3.5 w-3.5 fill-current" %}</span>
                     <span class="text-grafite">E-mail:</span>
                     <span class="text-tinta dark:text-gray-200">{{ certificate.contact_email }}</span>
                     {% if certificate.preferred_channel == "email" and certificate.contact_phone %}
                       <span class="sc20-pref-pill" title="Canal preferencial configurado para disparo automático">Preferencial</span>
+                    {% endif %}
+                    {% if certificate.has_email %}
+                      <a
+                        href="{{ certificate.mailto_url }}"
+                        class="sc20-email-pill ml-1"
+                        title="Abrir no cliente de e-mail padrão para redigir aviso"
+                      >
+                        {% include "components/icons/mail.html" with class="h-3.5 w-3.5 fill-current shrink-0" %} E-mail
+                      </a>
                     {% endif %}
                   </div>
                 {% endif %}
@@ -379,6 +389,8 @@
               <span class="inline-flex items-center gap-1.5">
                 {% if attempt.is_whatsapp %}
                   <span class="sc20-wpp-icon" aria-hidden="true">{% include "components/icons/whatsapp.html" with class="h-3.5 w-3.5 fill-current" %}</span>
+                {% elif attempt.is_email %}
+                  <span class="sc20-email-icon" aria-hidden="true">{% include "components/icons/mail.html" with class="h-3.5 w-3.5 fill-current" %}</span>
                 {% endif %}
                 <span>{{ attempt.get_channel_display }}</span>
               </span>
@@ -400,6 +412,14 @@
                   >
                     {% include "components/icons/whatsapp.html" with class="h-3.5 w-3.5 fill-current shrink-0" %} WhatsApp
                   </a>
+                {% elif attempt.is_email and attempt.mailto_url %}
+                  <a
+                    href="{{ attempt.mailto_url }}"
+                    class="sc20-email-link"
+                    title="Abrir no cliente de e-mail padrão para redigir aviso"
+                  >
+                    {% include "components/icons/mail.html" with class="h-3.5 w-3.5 fill-current shrink-0" %} E-mail
+                  </a>
                 {% endif %}
                 {% if attempt.status == "failed" and attempt.communication.status == "failed" %}
                 <form method="post" class="inline-block">
@@ -410,7 +430,7 @@
                 </form>
                 {% elif attempt.status == "failed" %}
                 <span class="text-xs text-grafite" title="Tentativa anterior superada por reenvio posterior">Superado</span>
-                {% elif not attempt.is_whatsapp %}
+                {% elif not attempt.is_whatsapp and not attempt.is_email %}
                 <span class="text-xs text-grafite" aria-label="Nenhuma ação necessária">—</span>
                 {% endif %}
               </div>
