@@ -1684,6 +1684,27 @@ input[type="checkbox"][aria-invalid="true"],
   color: #4ade80;
 }
 
+.sc20-pref-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.38rem;
+  border-radius: 9999px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #0d6b63;
+  background-color: rgba(31, 166, 154, 0.12);
+  border: 1px solid rgba(31, 166, 154, 0.3);
+}
+
+.dark .sc20-pref-pill {
+  color: #79d8cf;
+  background-color: rgba(31, 166, 154, 0.18);
+  border-color: rgba(31, 166, 154, 0.35);
+}
+
 
 
 
