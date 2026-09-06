@@ -1674,6 +1674,16 @@ input[type="checkbox"][aria-invalid="true"],
   color: #86efac;
 }
 
+.sc20-wpp-icon {
+  color: #25D366;
+  display: inline-flex;
+  align-items: center;
+}
+
+.dark .sc20-wpp-icon {
+  color: #4ade80;
+}
+
 
 
 
