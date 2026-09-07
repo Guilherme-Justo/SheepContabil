@@ -151,8 +151,9 @@ def test_sc20_page_renders_whatsapp_button(
     assert response.status_code == 200
     html = response.content.decode()
 
-    # O botão de WhatsApp deve estar presente na tabela de certificados com ícone SVG
-    assert "sc20-whatsapp-pill" in html
+    # O link de WhatsApp deve estar presente no número de telefone na tabela de certificados
+    assert "sc20-contact-whatsapp" in html
+    assert "sc20-contact-link" in html
     assert "https://api.whatsapp.com/send?phone=5511999992002" in html
     assert 'target="_blank"' in html
     assert "+55 (11) 99999-2002" in html
@@ -347,11 +348,12 @@ def test_sc20_page_renders_dual_contacts_and_preferred_pill(
     assert "+55 (11) 93333-4444" in html
     assert "Canal preferencial" in html
     assert "sc20-pref-star" in html
-    assert "sc20-email-pill" in html
+    assert "sc20-contact-link" in html
+    assert "sc20-contact-email" in html
+    assert "sc20-contact-whatsapp" in html
     assert "sc20-email-icon" in html
     assert "mailto:dual_email@empresa.example.test?" in html
     assert "mailto:dual_wpp@empresa.example.test?" in html
-    assert "sc20-whatsapp-pill" in html
 
 
 def test_certificate_has_email_flag_and_mailto_url() -> None:

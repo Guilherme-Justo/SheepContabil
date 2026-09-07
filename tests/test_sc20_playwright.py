@@ -112,17 +112,16 @@ def test_sc20_dispatch_flow_with_playwright(
         assert "Envio real de e-mails ativado" in page.content()
         assert "guilherme15rj@gmail.com" in page.content()
 
-        # Verifica existência do botão de WhatsApp e formatação de telefone na tabela
-        whatsapp_pill = page.locator("a.sc20-whatsapp-pill").first
-        assert whatsapp_pill.is_visible()
-        assert whatsapp_pill.locator("svg").is_visible()
+        # Verifica existência do link direto de WhatsApp e formatação de telefone na tabela
+        whatsapp_link = page.locator("a.sc20-contact-whatsapp").first
+        assert whatsapp_link.is_visible()
         assert "+55 (11) 98888-7777" in page.content()
         assert "clara@beta.example.test" in page.content()
         assert page.locator(".sc20-pref-star").first.is_visible()
         assert page.locator(".sc20-pref-star svg").first.is_visible()
         assert page.locator(".sc20-wpp-icon svg").first.is_visible()
         assert "💬" not in page.content()
-        pill_href = whatsapp_pill.get_attribute("href") or ""
+        pill_href = whatsapp_link.get_attribute("href") or ""
         assert "https://api.whatsapp.com/send?phone=5561991365756" in pill_href
         decoded_href = unquote(pill_href)
         assert "Beta" in decoded_href
@@ -134,12 +133,11 @@ def test_sc20_dispatch_flow_with_playwright(
         assert "*Dados do Certificado:*" in decoded_href
         assert "*Orientação para Renovação:*" in decoded_href
 
-        # Verifica existência do botão de E-mail e ícone de envelope
-        email_pill = page.locator("a.sc20-email-pill").first
-        assert email_pill.is_visible()
-        assert email_pill.locator("svg").is_visible()
+        # Verifica existência do link direto de E-mail e ícone de envelope
+        email_link = page.locator("a.sc20-contact-email").first
+        assert email_link.is_visible()
         assert page.locator(".sc20-email-icon svg").first.is_visible()
-        email_href = email_pill.get_attribute("href") or ""
+        email_href = email_link.get_attribute("href") or ""
         assert email_href.startswith("mailto:")
         decoded_email_href = unquote(email_href)
         assert "Aviso de Vencimento de Certificado Digital" in decoded_email_href
