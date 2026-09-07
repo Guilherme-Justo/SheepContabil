@@ -436,6 +436,19 @@
     color: #0b1a20;
     font-size: .85rem;
   }
+  .dark .sc20-phone-shell select.sc20-phone-select {
+    color: white !important;
+    background-color: transparent !important;
+    border-right-color: rgba(255, 255, 255, 0.12) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23ffffff' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right .35rem center !important;
+    background-size: .8rem !important;
+  }
+  .dark .sc20-phone-shell select.sc20-phone-select option {
+    background: #091216;
+    color: white;
+  }
   .sc20-phone-shell input.sc20-phone-input {
     flex: 1 1 0%;
     min-width: 0;
@@ -1348,9 +1361,12 @@ body.mobile-menu-active {
   }
   .sc20-phone-shell select.sc20-phone-select {
     color: white;
-    background: transparent !important;
-    border-right-color: rgba(255,255,255,.12) !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.6)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
+    background-color: transparent !important;
+    border-right-color: rgba(255, 255, 255, 0.12) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23ffffff' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right .35rem center !important;
+    background-size: .8rem !important;
   }
   .sc20-phone-shell select.sc20-phone-select option {
     background: #091216;
@@ -1961,36 +1977,6 @@ input[type="checkbox"][aria-invalid="true"],
   color: #86efac;
 }
 
-/* SC-20 Phone Shell Dark Theme */
-.dark .sc20-phone-shell {
-  background: #091216;
-  border-color: rgba(255,255,255,.15);
-}
-.dark .sc20-phone-shell:focus-within {
-  border-color: #1fa69a;
-  box-shadow: 0 0 0 4px rgba(31,166,154,.18);
-}
-.dark .sc20-phone-shell.has-error,
-.dark .sc20-phone-shell:has([aria-invalid="true"]) {
-  border-color: #ff6b63;
-}
-.dark .sc20-phone-shell select.sc20-phone-select {
-  color: white;
-  background: transparent !important;
-  border-right-color: rgba(255,255,255,.12) !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.6)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
-}
-.dark .sc20-phone-shell select.sc20-phone-select option {
-  background: #091216;
-  color: white;
-}
-.dark .sc20-phone-shell input.sc20-phone-input {
-  color: white;
-  background: transparent !important;
-}
-.dark .sc20-phone-shell input.sc20-phone-input::placeholder {
-  color: rgba(255,255,255,.35);
-}
 
 /* Universal Form Error Orchestration & Scroll Margins */
 .form-control,
