@@ -143,6 +143,20 @@ def test_sc20_dispatch_flow_with_playwright(
         assert "Aviso de Vencimento de Certificado Digital" in decoded_email_href
         assert "SheepContabil Gestão & Automações · SC-20" in decoded_email_href
 
+        # Testa alternância silenciosa de canal preferencial via HTMX ao clicar na estrela vazia (☆)
+        star_btn = page.locator("button.sc20-pref-star-btn").first
+        assert star_btn.is_visible()
+        assert star_btn.locator("svg").is_visible()
+        star_btn.click()
+        page.wait_for_timeout(400)
+        assert page.locator(".sc20-pref-star-active").first.is_visible()
+
+        # Alterna de volta para WhatsApp para preservar o fluxo de disparo subsequente
+        toggle_back_btn = page.locator("button.sc20-pref-star-btn").first
+        assert toggle_back_btn.is_visible()
+        toggle_back_btn.click()
+        page.wait_for_timeout(400)
+
         # Testa a máscara de documento no formulário do SC-20
         doc_input = page.locator('input[name="client_document"]')
         assert doc_input.is_visible()

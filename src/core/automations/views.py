@@ -46,6 +46,7 @@ from core.automations.models import (
     AutomationRun,
     CertificateCommunication,
     CommunicationAttempt,
+    CommunicationChannel,
     CommunicationStatus,
     DigitalCertificate,
     DocumentDecision,
@@ -1512,6 +1513,31 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
             )
             _dispatch_sc20(request, run)
             return redirect("automations:run-detail", run_id=run.id)
+        elif action == "set_preferred_channel":
+            cert_id = request.POST.get("certificate_id", "")
+            channel = request.POST.get("channel", "")
+            if channel not in CommunicationChannel.values:
+                return HttpResponseBadRequest("Canal inválido.")
+            try:
+                certificate = DigitalCertificate.objects.get(pk=cert_id)
+            except (DigitalCertificate.DoesNotExist, ValueError):
+                return HttpResponseBadRequest("Certificado não encontrado.")
+
+            if channel == CommunicationChannel.EMAIL and not certificate.contact_email:
+                return HttpResponseBadRequest("Certificado não possui e-mail cadastrado.")
+            if channel == CommunicationChannel.WHATSAPP and not certificate.contact_phone:
+                return HttpResponseBadRequest("Certificado não possui WhatsApp cadastrado.")
+
+            certificate.preferred_channel = channel
+            certificate.save(update_fields=["preferred_channel", "updated_at"])
+
+            if request.headers.get("HX-Request"):
+                return render(
+                    request,
+                    "automations/components/sc20_contact_cell.html",
+                    {"certificate": certificate, "module_slug": module.slug},
+                )
+            return redirect("automations:module-detail", slug=module.slug)
         else:
             return HttpResponseBadRequest("Ação inválida.")
 

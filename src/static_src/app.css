@@ -1684,22 +1684,66 @@ input[type="checkbox"][aria-invalid="true"],
   color: #4ade80;
 }
 
-.sc20-pref-star {
+.sc20-pref-star,
+.sc20-pref-star-active {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 1rem;
+  height: 1rem;
   color: #d97706;
   flex-shrink: 0;
-  cursor: help;
+  cursor: default;
   transition: transform 0.15s ease;
 }
 
-.sc20-pref-star:hover {
+.sc20-pref-star:hover,
+.sc20-pref-star-active:hover {
   transform: scale(1.2);
 }
 
-.dark .sc20-pref-star {
+.dark .sc20-pref-star,
+.dark .sc20-pref-star-active {
   color: #fbbf24;
+}
+
+.sc20-pref-star-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.sc20-pref-star-btn:hover {
+  color: #d97706;
+  transform: scale(1.25);
+}
+
+.sc20-pref-star-btn:focus-visible {
+  outline: 2px solid #d97706;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.dark .sc20-pref-star-btn {
+  color: #64748b;
+}
+
+.dark .sc20-pref-star-btn:hover {
+  color: #fbbf24;
+}
+
+.dark .sc20-pref-star-btn:focus-visible {
+  outline-color: #fbbf24;
 }
 
 /* SC-20 E-mail Integration */
