@@ -92,12 +92,56 @@ window.showToast = ({ title = "", message = "", type = "warning", duration = 500
 
 document.body.addEventListener("htmx:responseError", (event) => {
   setSc04PollingError(event, true);
+  const elt = event.detail?.elt;
+  const starBtn = elt?.classList?.contains("sc20-pref-star-btn") ? elt : elt?.closest?.(".sc20-pref-star-btn");
+  if (starBtn) {
+    starBtn.classList.add("sc20-star-error");
+    setTimeout(() => {
+      starBtn.classList.remove("sc20-star-error");
+    }, 600);
+    const errorText = event.detail?.xhr?.responseText?.trim();
+    window.showToast({
+      title: "Falha ao definir canal preferencial",
+      message: errorText || "Não foi possível alterar o canal preferencial. Tente novamente.",
+      type: "error",
+      duration: 6000,
+    });
+  }
 });
 document.body.addEventListener("htmx:sendError", (event) => {
   setSc04PollingError(event, true);
+  const elt = event.detail?.elt;
+  const starBtn = elt?.classList?.contains("sc20-pref-star-btn") ? elt : elt?.closest?.(".sc20-pref-star-btn");
+  if (starBtn) {
+    starBtn.classList.add("sc20-star-error");
+    setTimeout(() => {
+      starBtn.classList.remove("sc20-star-error");
+    }, 600);
+    window.showToast({
+      title: "Erro de conexão",
+      message: "Falha na comunicação com o servidor. Verifique sua conexão.",
+      type: "error",
+      duration: 6000,
+    });
+  }
 });
 document.body.addEventListener("htmx:timeout", (event) => {
   setSc04PollingError(event, true);
+  const elt = event.detail?.elt;
+  const starBtn = elt?.classList?.contains("sc20-pref-star-btn") ? elt : elt?.closest?.(".sc20-pref-star-btn");
+  if (starBtn) {
+    starBtn.classList.add("sc20-star-error");
+    setTimeout(() => {
+      starBtn.classList.remove("sc20-star-error");
+    }, 600);
+    window.showToast({
+      title: "Tempo esgotado",
+      message: "O servidor demorou para responder ao definir o canal preferencial. Tente novamente.",
+      type: "error",
+      duration: 6000,
+    });
+    return;
+  }
   window.showToast({
     title: "Instabilidade de rede",
     message: "O servidor demorou para responder. Tentando restabelecer sincronização...",

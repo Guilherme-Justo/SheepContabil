@@ -157,6 +157,38 @@ def test_sc20_dispatch_flow_with_playwright(
         toggle_back_btn.click()
         page.wait_for_timeout(400)
 
+        # Testa resiliência: se o backend falhar (HTTP 400),
+        # a alteração visual NÃO deve ocorrer e o Toast de erro deve ser exibido.
+        error_star_btn = page.locator("button.sc20-pref-star-btn").first
+        assert error_star_btn.is_visible()
+
+        def handle_star_error(route):
+            post_data = route.request.post_data or ""
+            if "set_preferred_channel" in post_data:
+                route.fulfill(
+                    status=400,
+                    content_type="text/plain; charset=utf-8",
+                    body="Certificado não possui canal disponível.",
+                )
+            else:
+                route.continue_()
+
+        page.route(f"**{module_path}*", handle_star_error)
+        error_star_btn.click()
+        page.wait_for_timeout(500)
+
+        # A estrela clicada DEVE permanecer como botão outline (não virou estrela ativa)
+        assert page.locator("button.sc20-pref-star-btn").first.is_visible()
+        # O Toast de erro com role="alert" deve estar visível
+        error_toast = page.locator(".toast-notification.toast-error")
+        assert error_toast.is_visible()
+        toast_text_lower = error_toast.inner_text().lower()
+        assert "falha ao definir canal preferencial" in toast_text_lower
+        assert "certificado não possui canal disponível." in toast_text_lower
+
+        # Remove interceptação para os passos seguintes
+        page.unroute(f"**{module_path}*", handle_star_error)
+
         # Testa a máscara de documento no formulário do SC-20
         doc_input = page.locator('input[name="client_document"]')
         assert doc_input.is_visible()
@@ -172,6 +204,34 @@ def test_sc20_dispatch_flow_with_playwright(
         assert phone_input.is_visible()
         phone_input.fill("61991365756")
         assert phone_input.input_value() == "(61) 99136-5756"
+
+        # Valida geometria e alinhamento do shell monolítico de telefone
+        shell = page.locator(".sc20-phone-shell").first
+        assert shell.is_visible()
+        sel_box = country_select.bounding_box()
+        inp_box = phone_input.bounding_box()
+        assert sel_box is not None and inp_box is not None
+        # Ambos devem ter exatamente a mesma altura (44px)
+        assert abs(sel_box["height"] - inp_box["height"]) < 2.0
+        # O input deve ter largura confortável (> 150px) para acomodar o número sem corte
+        assert inp_box["width"] > 150
+
+        # Testa responsividade em smartphone (390px): coluna de ação não quebra palavras
+        page.set_viewport_size({"width": 390, "height": 844})
+        attempts_table = page.locator(".sc20-attempts-table").first
+        if attempts_table.is_visible():
+            attempts_table.scroll_into_view_if_needed()
+            action_cell = page.locator(".sc20-attempts-table td.text-right").first
+            if action_cell.is_visible():
+                action_link_sel = "a.sc20-email-link, a.sc20-whatsapp-link"
+                email_or_wpp_link = action_cell.locator(action_link_sel).first
+                if email_or_wpp_link.is_visible():
+                    box = email_or_wpp_link.bounding_box()
+                    assert box is not None
+                    # Altura de linha única (< 32px), sem quebra em duas linhas
+                    assert box["height"] < 32.0
+        # Restaura viewport desktop para continuar os testes de formulário
+        page.set_viewport_size({"width": 1440, "height": 900})
 
         # Troca de país para Portugal (+351) e valida troca de placeholder e máscara livre
         country_select.select_option("351")
