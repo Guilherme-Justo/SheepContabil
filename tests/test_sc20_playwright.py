@@ -308,3 +308,85 @@ def test_sc20_dispatch_flow_with_playwright(
             )
 
         browser.close()
+
+
+def test_sc20_phone_select_chevron_in_dark_mode(
+    live_server,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    """Verifica se a seta/chevron do seletor de DDI está posicionada e visível em modo Dark."""
+    sc20 = modules["SC-20"]
+    login_url = f"{live_server.url}{reverse('identity:login')}"
+    module_path = reverse("automations:module-detail", kwargs={"slug": sc20.slug})
+    module_url = f"{live_server.url}{module_path}"
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(viewport={"width": 1400, "height": 900})
+        page = context.new_page()
+
+        page.goto(login_url)
+        page.fill('input[name="username"]', "operador")
+        page.fill('input[name="password"]', "safe-test-password")
+        page.click('button[type="submit"]')
+        page.wait_for_load_state("networkidle")
+
+        page.goto(module_url)
+        page.wait_for_load_state("networkidle")
+
+        phone_select = page.locator("select.sc20-phone-select")
+        expect(phone_select).to_be_visible()
+
+        # 1. Valida estilos em Dark Mode
+        page.evaluate("document.documentElement.classList.add('dark')")
+        dark_styles = phone_select.evaluate(
+            """el => {
+                const s = window.getComputedStyle(el);
+                return {
+                    backgroundImage: s.backgroundImage,
+                    backgroundPosition: s.backgroundPosition,
+                    backgroundPositionX: s.backgroundPositionX,
+                    backgroundPositionY: s.backgroundPositionY,
+                    backgroundRepeat: s.backgroundRepeat,
+                    backgroundSize: s.backgroundSize,
+                    color: s.color,
+                };
+            }"""
+        )
+
+        assert "data:image/svg+xml" in dark_styles["backgroundImage"]
+        assert "%23ffffff" in dark_styles["backgroundImage"]
+        assert dark_styles["backgroundRepeat"] == "no-repeat"
+        assert dark_styles["backgroundSize"] != "auto"
+        # O posicionamento não pode ter resetado para o canto superior esquerdo (0 0)
+        assert dark_styles["backgroundPositionX"] != "0%"
+        assert dark_styles["backgroundPositionX"] != "0px"
+
+        # Screenshot de evidência do shell em dark mode
+        phone_shell = page.locator(".sc20-phone-shell").first
+        if SCREENSHOT_DIR.exists():
+            phone_shell.screenshot(
+                path=str(SCREENSHOT_DIR / "playwright_sc20_03_phone_dark_chevron.png"),
+            )
+
+        # 2. Valida estilos em Light Mode
+        page.evaluate("document.documentElement.classList.remove('dark')")
+        light_styles = phone_select.evaluate(
+            """el => {
+                const s = window.getComputedStyle(el);
+                return {
+                    backgroundImage: s.backgroundImage,
+                    backgroundPositionX: s.backgroundPositionX,
+                    backgroundRepeat: s.backgroundRepeat,
+                    backgroundSize: s.backgroundSize,
+                };
+            }"""
+        )
+
+        assert "data:image/svg+xml" in light_styles["backgroundImage"]
+        assert light_styles["backgroundRepeat"] == "no-repeat"
+        assert light_styles["backgroundPositionX"] != "0%"
+        assert light_styles["backgroundPositionX"] != "0px"
+
+        browser.close()
