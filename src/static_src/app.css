@@ -383,34 +383,74 @@
   }
   .sc20-retry-button:hover { border-color: rgba(196,69,61,.45); background: rgba(196,69,61,.12); }
   .sc20-certificates-table { min-width: 58rem; }
-  .sc20-attempts-table { min-width: 50rem; }
-  .sc20-phone-group {
+  .sc20-attempts-table { min-width: 54rem; }
+  .sc20-attempts-table td:last-child,
+  .sc20-attempts-table th:last-child {
+    white-space: nowrap;
+  }
+  .sc20-phone-shell {
     display: flex;
     align-items: stretch;
     width: 100%;
+    height: 2.75rem;
+    border: 1px solid rgba(90,112,120,.28);
+    border-radius: .8rem;
+    background: white;
+    overflow: hidden;
+    transition: border-color .15s, box-shadow .15s;
   }
-  .sc20-phone-group .sc20-phone-select {
-    width: auto !important;
-    min-width: 8.5rem;
-    max-width: 11.5rem;
-    border-top-right-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
-    border-right: none !important;
-    font-size: .8rem;
-    padding-left: .65rem;
-    padding-right: 1.5rem;
+  .sc20-phone-shell:focus-within {
+    border-color: #1fa69a;
+    box-shadow: 0 0 0 4px rgba(31,166,154,.12);
+  }
+  .sc20-phone-shell.has-error,
+  .sc20-phone-shell:has([aria-invalid="true"]) {
+    border-color: #c4453d;
+  }
+  .sc20-phone-shell select.sc20-phone-select {
+    width: 5.35rem !important;
+    min-width: 5.35rem !important;
+    max-width: 5.35rem !important;
+    flex-shrink: 0;
+    border: none !important;
+    border-right: 1px solid rgba(90,112,120,.2) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #0b1a20;
+    font-size: .82rem;
+    font-weight: 500;
+    padding: 0 1.25rem 0 .65rem !important;
+    outline: none !important;
+    box-shadow: none !important;
     cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(11,26,32,0.6)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right .35rem center !important;
+    background-size: .8rem !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .sc20-phone-group .sc20-phone-input {
+  .sc20-phone-shell select.sc20-phone-select option {
+    background: white;
+    color: #0b1a20;
+    font-size: .85rem;
+  }
+  .sc20-phone-shell input.sc20-phone-input {
     flex: 1 1 0%;
     min-width: 0;
-    border-top-left-radius: 0 !important;
-    border-bottom-left-radius: 0 !important;
+    height: 100% !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #0b1a20;
+    font-size: .92rem;
+    padding: 0 .82rem !important;
+    outline: none !important;
+    box-shadow: none !important;
   }
-  .sc20-phone-group .sc20-phone-select:focus,
-  .sc20-phone-group .sc20-phone-input:focus {
-    position: relative;
-    z-index: 2;
+  .sc20-phone-shell input.sc20-phone-input::placeholder {
+    color: rgba(90,112,120,.55);
   }
 
   .sc05-action-panel {
@@ -1294,6 +1334,35 @@ body.mobile-menu-active {
     border-color: #1fa69a;
     box-shadow: 0 0 0 4px rgba(31,166,154,.18);
   }
+  .sc20-phone-shell {
+    background: #091216;
+    border-color: rgba(255,255,255,.15);
+  }
+  .sc20-phone-shell:focus-within {
+    border-color: #1fa69a;
+    box-shadow: 0 0 0 4px rgba(31,166,154,.18);
+  }
+  .sc20-phone-shell.has-error,
+  .sc20-phone-shell:has([aria-invalid="true"]) {
+    border-color: #ff6b63;
+  }
+  .sc20-phone-shell select.sc20-phone-select {
+    color: white;
+    background: transparent !important;
+    border-right-color: rgba(255,255,255,.12) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.6)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
+  }
+  .sc20-phone-shell select.sc20-phone-select option {
+    background: #091216;
+    color: white;
+  }
+  .sc20-phone-shell input.sc20-phone-input {
+    color: white;
+    background: transparent !important;
+  }
+  .sc20-phone-shell input.sc20-phone-input::placeholder {
+    color: rgba(255,255,255,.35);
+  }
   .sc04-file-control input[type="file"]::file-selector-button {
     background: rgba(255,255,255,.12);
     color: white;
@@ -1659,6 +1728,8 @@ input[type="checkbox"][aria-invalid="true"],
   color: #15803d;
   text-decoration: none;
   transition: opacity 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .sc20-whatsapp-link:hover {
@@ -1746,6 +1817,27 @@ input[type="checkbox"][aria-invalid="true"],
   outline-color: #fbbf24;
 }
 
+.sc20-pref-star-btn.htmx-request {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: wait;
+}
+
+@keyframes sc20-star-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+.sc20-star-error {
+  animation: sc20-star-shake 0.35s ease-in-out;
+  color: #c4453d !important;
+}
+
+.dark .sc20-star-error {
+  color: #ff6b63 !important;
+}
+
 /* SC-20 E-mail Integration */
 .sc20-email-pill {
   display: inline-flex;
@@ -1790,6 +1882,8 @@ input[type="checkbox"][aria-invalid="true"],
   color: #0f766e;
   text-decoration: none;
   transition: opacity 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .sc20-email-link:hover {
@@ -1866,6 +1960,38 @@ input[type="checkbox"][aria-invalid="true"],
 .dark .sc20-contact-whatsapp:hover {
   color: #86efac;
 }
+
+/* SC-20 Phone Shell Dark Theme */
+.dark .sc20-phone-shell {
+  background: #091216;
+  border-color: rgba(255,255,255,.15);
+}
+.dark .sc20-phone-shell:focus-within {
+  border-color: #1fa69a;
+  box-shadow: 0 0 0 4px rgba(31,166,154,.18);
+}
+.dark .sc20-phone-shell.has-error,
+.dark .sc20-phone-shell:has([aria-invalid="true"]) {
+  border-color: #ff6b63;
+}
+.dark .sc20-phone-shell select.sc20-phone-select {
+  color: white;
+  background: transparent !important;
+  border-right-color: rgba(255,255,255,.12) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(255,255,255,0.6)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E") !important;
+}
+.dark .sc20-phone-shell select.sc20-phone-select option {
+  background: #091216;
+  color: white;
+}
+.dark .sc20-phone-shell input.sc20-phone-input {
+  color: white;
+  background: transparent !important;
+}
+.dark .sc20-phone-shell input.sc20-phone-input::placeholder {
+  color: rgba(255,255,255,.35);
+}
+
 
 
 

@@ -263,18 +263,18 @@ VALID_BRAZILIAN_DDDS: set[str] = {
 }
 
 COUNTRY_PHONE_CHOICES: list[tuple[str, str]] = [
-    ("55", "🇧🇷 Brasil (+55)"),
-    ("1", "🇺🇸 Estados Unidos (+1)"),
-    ("351", "🇵🇹 Portugal (+351)"),
-    ("54", "🇦🇷 Argentina (+54)"),
-    ("598", "🇺🇾 Uruguai (+598)"),
-    ("595", "🇵🇾 Paraguai (+595)"),
-    ("56", "🇨🇱 Chile (+56)"),
-    ("34", "🇪🇸 Espanha (+34)"),
-    ("44", "🇬🇧 Reino Unido (+44)"),
-    ("39", "🇮🇹 Itália (+39)"),
-    ("49", "🇩🇪 Alemanha (+49)"),
-    ("33", "🇫🇷 França (+33)"),
+    ("55", "🇧🇷 +55"),
+    ("1", "🇺🇸 +1"),
+    ("351", "🇵🇹 +351"),
+    ("54", "🇦🇷 +54"),
+    ("598", "🇺🇾 +598"),
+    ("595", "🇵🇾 +595"),
+    ("56", "🇨🇱 +56"),
+    ("34", "🇪🇸 +34"),
+    ("44", "🇬🇧 +44"),
+    ("39", "🇮🇹 +39"),
+    ("49", "🇩🇪 +49"),
+    ("33", "🇫🇷 +33"),
 ]
 
 VALID_COUNTRY_DDIS: set[str] = {code for code, _ in COUNTRY_PHONE_CHOICES}

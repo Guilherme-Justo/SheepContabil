@@ -190,6 +190,23 @@
     x-data="{
       preferredChannel: '{{ form.preferred_channel.value|default:'email' }}',
       phoneCountry: '{{ form.phone_country.value|default:'55' }}',
+      get countryName() {
+        const names = {
+          '55': 'Brasil (+55)',
+          '1': 'Estados Unidos (+1)',
+          '351': 'Portugal (+351)',
+          '54': 'Argentina (+54)',
+          '598': 'Uruguai (+598)',
+          '595': 'Paraguai (+595)',
+          '56': 'Chile (+56)',
+          '34': 'Espanha (+34)',
+          '44': 'Reino Unido (+44)',
+          '39': 'Itália (+39)',
+          '49': 'Alemanha (+49)',
+          '33': 'França (+33)',
+        };
+        return names[this.phoneCountry] || 'Selecionar país e DDI';
+      },
       get phonePlaceholder() {
         if (this.phoneCountry === '55') return '(11) 99999-0000';
         if (this.phoneCountry === '1') return '(555) 000-0000';
@@ -252,37 +269,34 @@
           {{ field.label }}
           <span class="text-carmim" aria-hidden="true" x-show="preferredChannel === 'whatsapp'" x-cloak> *</span><span class="sr-only" x-show="preferredChannel === 'whatsapp'"> (obrigatório)</span>
         </label>
-        <div class="sc20-phone-group">
-          <div class="relative shrink-0">
-            <label for="{{ form.phone_country.id_for_label }}" class="sr-only">{{ form.phone_country.label }}</label>
-            <select
-              id="{{ form.phone_country.id_for_label }}"
-              name="phone_country"
-              x-model="phoneCountry"
-              @change="onCountryChange($event.target.value)"
-              class="sc20-phone-select"
-              aria-label="Selecionar país e DDI do telefone"
-            >
-              {% for val, text in form.phone_country.field.choices %}
-                <option value="{{ val }}" {% if form.phone_country.value == val %}selected{% endif %}>{{ text }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="relative flex-1 min-w-0">
-            <input
-              type="tel"
-              id="{{ field.id_for_label }}"
-              name="{{ field.name }}"
-              value="{{ field.value|default:'' }}"
-              data-mask="phone"
-              :placeholder="phonePlaceholder"
-              class="sc20-phone-input"
-              autocomplete="tel"
-              inputmode="tel"
-              :aria-required="preferredChannel === 'whatsapp'"
-              {% if field.errors %}aria-invalid="true" aria-describedby="{{ field.id_for_label }}_errors"{% endif %}
-            >
-          </div>
+        <div class="sc20-phone-shell sc20-phone-group{% if field.errors or form.phone_country.errors %} has-error{% endif %}">
+          <label for="{{ form.phone_country.id_for_label }}" class="sr-only">{{ form.phone_country.label }}</label>
+          <select
+            id="{{ form.phone_country.id_for_label }}"
+            name="phone_country"
+            x-model="phoneCountry"
+            @change="onCountryChange($event.target.value)"
+            class="sc20-phone-select"
+            :title="countryName"
+            aria-label="Selecionar país e DDI do telefone"
+          >
+            {% for val, text in form.phone_country.field.choices %}
+              <option value="{{ val }}" {% if form.phone_country.value == val %}selected{% endif %}>{{ text }}</option>
+            {% endfor %}
+          </select>
+          <input
+            type="tel"
+            id="{{ field.id_for_label }}"
+            name="{{ field.name }}"
+            value="{{ field.value|default:'' }}"
+            data-mask="phone"
+            :placeholder="phonePlaceholder"
+            class="sc20-phone-input"
+            autocomplete="tel"
+            inputmode="tel"
+            :aria-required="preferredChannel === 'whatsapp'"
+            {% if field.errors or form.phone_country.errors %}aria-invalid="true" aria-describedby="{{ field.id_for_label }}_errors"{% endif %}
+          >
         </div>
         {% if field.help_text %}<p id="{{ field.id_for_label }}_helptext" class="form-help">{{ field.help_text|safe }}</p>{% endif %}
         {% if field.errors %}<p id="{{ field.id_for_label }}_errors" class="field-error" role="alert">{{ field.errors.0 }}</p>{% endif %}
@@ -331,7 +345,7 @@
             {% include "components/sortable_th.html" with field="channel" label="Canal" current_sort=attempts_current_sort sort_query_params=attempts_sort_query_params sort_param="attempts_sort" target_id="sc20-attempts-region" %}
             {% include "components/sortable_th.html" with field="status" label="Resultado" current_sort=attempts_current_sort sort_query_params=attempts_sort_query_params sort_param="attempts_sort" target_id="sc20-attempts-region" %}
             {% include "components/sortable_th.html" with field="created_at" label="Data e hora" current_sort=attempts_current_sort sort_query_params=attempts_sort_query_params sort_param="attempts_sort" target_id="sc20-attempts-region" %}
-            <th scope="col" class="text-right">Ação</th>
+            <th scope="col" class="text-right whitespace-nowrap">Ação</th>
           </tr>
         </thead>
         <tbody>
@@ -356,8 +370,8 @@
               {% if attempt.error_message %}<span class="mt-2 block max-w-sm text-xs leading-5 text-carmim">{{ attempt.error_message }}</span>{% endif %}
             </td>
             <td class="font-mono text-xs">{{ attempt.created_at|date:"d/m/Y H:i" }}</td>
-            <td class="text-right">
-              <div class="flex items-center justify-end gap-2">
+            <td class="text-right whitespace-nowrap">
+              <div class="flex items-center justify-end gap-2 flex-nowrap shrink-0">
                 {% if attempt.is_whatsapp and attempt.whatsapp_url %}
                   <a
                     href="{{ attempt.whatsapp_url }}"
