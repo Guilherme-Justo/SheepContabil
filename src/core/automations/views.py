@@ -358,12 +358,13 @@ def _sc04_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
 def sc04_upload(request: HttpRequest) -> HttpResponse:
     module = _visible_sc04_module(request)
     form = SC04UploadForm(request.POST, request.FILES)
+    is_hx = bool(request.headers.get("HX-Request"))
     if not form.is_valid() or form.validated_document is None:
         return render(
             request,
             "automations/sc04_detail.html",
             _sc04_dashboard_context(request, module, upload_form=form),
-            status=400,
+            status=200 if is_hx else 400,
         )
     validated = form.validated_document
     try:
@@ -375,17 +376,25 @@ def sc04_upload(request: HttpRequest) -> HttpResponse:
         )
     except (SC04Error, ValidationError) as exc:
         form.add_error(None, str(exc))
+        status_code = 503 if isinstance(exc, SC04Error) else (200 if is_hx else 400)
         return render(
             request,
             "automations/sc04_detail.html",
             _sc04_dashboard_context(request, module, upload_form=form),
-            status=503 if isinstance(exc, SC04Error) else 400,
+            status=status_code,
         )
     if should_dispatch:
         _dispatch_sc04(request, run)
     else:
         messages.info(request, "O conteúdo já existia e foi registrado como duplicado.")
-    return redirect("automations:sc04-document-detail", document_id=ingestion.document_id)
+    target_url = reverse(
+        "automations:sc04-document-detail", kwargs={"document_id": ingestion.document_id}
+    )
+    if is_hx:
+        response = HttpResponse(status=200)
+        response["HX-Redirect"] = target_url
+        return response
+    return redirect(target_url)
 
 
 @login_required
@@ -913,7 +922,12 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
                         "Esta solicitação já havia sido registrada; "
                         "nenhuma execução foi duplicada.",
                     )
-                return redirect("automations:run-detail", run_id=creation.run.id)
+                target_url = reverse("automations:run-detail", kwargs={"run_id": creation.run.id})
+                if request.headers.get("HX-Request"):
+                    response = HttpResponse(status=200)
+                    response["HX-Redirect"] = target_url
+                    return response
+                return redirect(target_url)
 
     clients = SC05Client.objects.all()
 
@@ -1371,7 +1385,12 @@ def _sc06_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
                         "client_document": start_form.cleaned_data["client_document"],
                     }
                 )
-                return redirect(f"{reverse('automations:sc06-briefing-new')}?{params}")
+                target_url = f"{reverse('automations:sc06-briefing-new')}?{params}"
+                if request.headers.get("HX-Request"):
+                    response = HttpResponse(status=200)
+                    response["HX-Redirect"] = target_url
+                    return response
+                return redirect(target_url)
 
     briefings = SocietaryBriefing.objects.filter(run__module=module).select_related(
         "template_version", "created_by", "completed_by", "run"
