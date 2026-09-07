@@ -433,3 +433,117 @@ def test_communication_attempt_mailto_url(
     assert attempt.is_whatsapp is False
     assert attempt.mailto_url.startswith("mailto:carlos@beta.example.test?")
     assert "Empresa%20Beta%20Ltda" in attempt.mailto_url
+
+
+def test_sc20_set_preferred_channel_via_htmx(
+    client: Client,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    cert = DigitalCertificate.objects.create(
+        serial_number="DUAL-TOGGLE-01",
+        client_name="Cliente Alternável S/A",
+        client_document="12345678000199",
+        responsible_name="Fernanda Lima",
+        contact_email="fernanda@cliente.example.test",
+        contact_phone="+55 11 97777-8888",
+        preferred_channel=CommunicationChannel.EMAIL,
+        valid_until=timezone.localdate() + timedelta(days=20),
+        status=CertificateStatus.ACTIVE,
+    )
+
+    client.force_login(processes_operator)
+    url = reverse("automations:module-detail", kwargs={"slug": modules["SC-20"].slug})
+
+    # 1. Altera via HTMX para WhatsApp
+    response = client.post(
+        url,
+        data={
+            "action": "set_preferred_channel",
+            "certificate_id": str(cert.id),
+            "channel": CommunicationChannel.WHATSAPP,
+        },
+        HTTP_HX_REQUEST="true",
+    )
+    assert response.status_code == 200
+    html = response.content.decode()
+
+    # O certificado deve ter sido atualizado no banco
+    cert.refresh_from_db()
+    assert cert.preferred_channel == CommunicationChannel.WHATSAPP
+
+    # Na resposta HTMX, WhatsApp tem estrela ativa (★) e E-mail tem estrela outline (☆)
+    assert "sc20-pref-star-active" in html
+    assert "sc20-pref-star-btn" in html
+    assert 'action": "set_preferred_channel"' in html
+    assert 'channel": "email"' in html
+
+    # 2. Altera de volta para E-mail
+    response_back = client.post(
+        url,
+        data={
+            "action": "set_preferred_channel",
+            "certificate_id": str(cert.id),
+            "channel": CommunicationChannel.EMAIL,
+        },
+        HTTP_HX_REQUEST="true",
+    )
+    assert response_back.status_code == 200
+    html_back = response_back.content.decode()
+    cert.refresh_from_db()
+    assert cert.preferred_channel == CommunicationChannel.EMAIL
+    assert 'channel": "whatsapp"' in html_back
+
+
+def test_sc20_set_preferred_channel_validations(
+    client: Client,
+    processes_operator: User,
+    modules: dict[str, AutomationModule],
+) -> None:
+    cert_only_email = DigitalCertificate.objects.create(
+        serial_number="ONLY-EMAIL-01",
+        client_name="Sem Telefone Ltda",
+        client_document="12345678000100",
+        responsible_name="Só Email",
+        contact_email="email@only.example.test",
+        contact_phone="",
+        preferred_channel=CommunicationChannel.EMAIL,
+        valid_until=timezone.localdate() + timedelta(days=20),
+        status=CertificateStatus.ACTIVE,
+    )
+
+    client.force_login(processes_operator)
+    url = reverse("automations:module-detail", kwargs={"slug": modules["SC-20"].slug})
+
+    # Tenta definir WhatsApp em quem não tem telefone
+    res_no_phone = client.post(
+        url,
+        data={
+            "action": "set_preferred_channel",
+            "certificate_id": str(cert_only_email.id),
+            "channel": CommunicationChannel.WHATSAPP,
+        },
+    )
+    assert res_no_phone.status_code == 400
+
+    # Canal inválido
+    res_bad_channel = client.post(
+        url,
+        data={
+            "action": "set_preferred_channel",
+            "certificate_id": str(cert_only_email.id),
+            "channel": "carrier_pigeon",
+        },
+    )
+    assert res_bad_channel.status_code == 400
+
+    # Certificado inexistente
+    res_bad_cert = client.post(
+        url,
+        data={
+            "action": "set_preferred_channel",
+            "certificate_id": "00000000-0000-0000-0000-000000000000",
+            "channel": CommunicationChannel.EMAIL,
+        },
+    )
+    assert res_bad_cert.status_code == 400

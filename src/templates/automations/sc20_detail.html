@@ -162,53 +162,7 @@
             <td><span class="status-badge status-{{ certificate.status_tone }}"><i></i>{{ certificate.get_status_display }}</span></td>
             <td>
               <span class="block font-medium text-tinta">{{ certificate.contact_name }}</span>
-              <div class="mt-1 flex flex-col gap-1 text-xs">
-                {% if certificate.contact_email %}
-                  <div class="flex flex-wrap items-center gap-1.5">
-                    {% if certificate.preferred_channel == "email" and certificate.contact_phone %}
-                      <span class="sc20-pref-star" title="Canal preferencial configurado para disparo automático" aria-label="Canal preferencial">
-                        {% include "components/icons/star.html" with class="h-3 w-3 fill-current" %}
-                      </span>
-                    {% endif %}
-                    <span class="sc20-email-icon" aria-hidden="true">{% include "components/icons/mail.html" with class="h-3.5 w-3.5 fill-current" %}</span>
-                    <span class="text-grafite">E-mail:</span>
-                    {% if certificate.has_email %}
-                      <a
-                        href="{{ certificate.mailto_url }}"
-                        class="sc20-contact-link sc20-contact-email"
-                        title="Abrir no cliente de e-mail padrão para redigir aviso"
-                      >{{ certificate.contact_email }}</a>
-                    {% else %}
-                      <span class="text-tinta dark:text-gray-200">{{ certificate.contact_email }}</span>
-                    {% endif %}
-                  </div>
-                {% endif %}
-                {% if certificate.contact_phone %}
-                  <div class="flex flex-wrap items-center gap-1.5">
-                    {% if certificate.preferred_channel == "whatsapp" and certificate.contact_email %}
-                      <span class="sc20-pref-star" title="Canal preferencial configurado para disparo automático" aria-label="Canal preferencial">
-                        {% include "components/icons/star.html" with class="h-3 w-3 fill-current" %}
-                      </span>
-                    {% endif %}
-                    <span class="sc20-wpp-icon" aria-hidden="true">{% include "components/icons/whatsapp.html" with class="h-3.5 w-3.5 fill-current" %}</span>
-                    <span class="text-grafite">WhatsApp:</span>
-                    {% if certificate.has_whatsapp %}
-                      <a
-                        href="{{ certificate.whatsapp_url }}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="sc20-contact-link sc20-contact-whatsapp"
-                        title="Abrir conversa no WhatsApp Web"
-                      >{{ certificate.formatted_phone }}</a>
-                    {% else %}
-                      <span class="text-tinta dark:text-gray-200">{{ certificate.formatted_phone }}</span>
-                    {% endif %}
-                  </div>
-                {% endif %}
-                {% if not certificate.contact_email and not certificate.contact_phone %}
-                  <span class="text-grafite">—</span>
-                {% endif %}
-              </div>
+              {% include "automations/components/sc20_contact_cell.html" with certificate=certificate module_slug=module.slug %}
             </td>
           </tr>
           {% empty %}
