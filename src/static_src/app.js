@@ -171,6 +171,12 @@ document.body.addEventListener("htmx:afterSwap", (event) => {
   }
 });
 
+document.body.addEventListener("htmx:afterSettle", () => {
+  requestAnimationFrame(() => {
+    focusAndScrollToFirstError(document);
+  });
+});
+
 const formatDocument = (value) => {
   if (!value) return "";
   const digits = String(value).replace(/\D/g, "").slice(0, 14);
@@ -325,6 +331,86 @@ document.addEventListener("change", (e) => {
 });
 
 
+function focusAndScrollToFirstError(root = document, { smooth = true } = {}) {
+  const searchRoot = root && root.isConnected && root.querySelector ? root : document;
+  if (!searchRoot || !searchRoot.querySelector) return null;
+
+  // 1. First find the first invalid interactive control
+  const invalidControl = searchRoot.querySelector(
+    'input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"]'
+  );
+
+  // 2. Or find the first field error
+  const fieldError = searchRoot.querySelector(
+    '.field-error, .sc06-dark-field-error, .sc05-dark-field-error'
+  );
+
+  // 3. Or find a general form-level error alert
+  const formError = searchRoot.querySelector(
+    '.form-error, .sc06-dark-form-error, .sc05-dark-error, [role="alert"]'
+  );
+
+  const target = invalidControl || fieldError || formError;
+  if (!target || !target.isConnected) return null;
+
+  // If inside a closed HTML details element, expand it
+  const parentDetails = target.closest("details");
+  if (parentDetails && !parentDetails.open) {
+    parentDetails.open = true;
+  }
+
+  // Smooth scroll to the target (scroll-margin-top handles header offset)
+  try {
+    target.scrollIntoView({
+      behavior: smooth ? "smooth" : "auto",
+      block: "center",
+      inline: "nearest",
+    });
+  } catch {
+    target.scrollIntoView();
+  }
+
+  // Focus
+  const focusTarget =
+    invalidControl || (target.matches("input, select, textarea, button") ? target : null);
+  if (focusTarget && typeof focusTarget.focus === "function") {
+    try {
+      focusTarget.focus({ preventScroll: true });
+    } catch {
+      // Ignore focus limitations
+    }
+  } else if (typeof target.focus === "function") {
+    try {
+      if (!target.hasAttribute("tabindex")) {
+        target.setAttribute("tabindex", "-1");
+      }
+      target.focus({ preventScroll: true });
+    } catch {
+      // Ignore focus limitations
+    }
+  }
+
+  // Transient visual pulse highlight
+  const highlightEl = invalidControl
+    ? (invalidControl.closest(".sc20-phone-shell") ||
+       invalidControl.closest(".sc04-file-control") ||
+       invalidControl.closest(".sc05-dark-field") ||
+       invalidControl.closest(".sc06-dark-field") ||
+       invalidControl)
+    : target;
+
+  if (highlightEl && highlightEl.classList) {
+    highlightEl.classList.add("field-error-highlight");
+    setTimeout(() => {
+      highlightEl.classList.remove("field-error-highlight");
+    }, 1200);
+  }
+
+  return target;
+}
+
+window.focusAndScrollToFirstError = focusAndScrollToFirstError;
+
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll('[data-mask="document"], [data-sc06-answer="current_cnpj"], input[name="client_document"]').forEach((field) => {
     if (field.value) field.value = formatDocument(field.value);
@@ -334,6 +420,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const country = countrySelect ? countrySelect.value : "55";
     if (field.value) field.value = formatPhone(field.value, country);
   });
+
+  // Orchestrate focus and scroll to first error if page was loaded with validation errors
+  setTimeout(() => {
+    focusAndScrollToFirstError(document);
+  }, 120);
 });
 
 window.sc06BriefingForm = (config) => ({
@@ -355,6 +446,9 @@ window.sc06BriefingForm = (config) => ({
         if (field.value) field.value = formatPhone(field.value);
       });
       this.initialSnapshot = JSON.stringify(this.answers);
+      setTimeout(() => {
+        focusAndScrollToFirstError(this.$root);
+      }, 100);
     });
 
     window.addEventListener("beforeunload", (e) => {

@@ -104,7 +104,7 @@
         <div class="sc06-question-grid">
           {% for question in section.questions %}
           <div
-            class="sc06-question"
+            class="sc06-question sc06-question-card"
             data-question-id="{{ question.id }}"
             x-show="isQuestionVisible('{{ question.id|escapejs }}', '{{ section.id|escapejs }}')"
             x-effect="setContainerEnabled($el, isQuestionVisible('{{ question.id|escapejs }}', '{{ section.id|escapejs }}'))"

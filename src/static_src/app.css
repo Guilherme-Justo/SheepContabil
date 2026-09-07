@@ -1992,8 +1992,38 @@ input[type="checkbox"][aria-invalid="true"],
   color: rgba(255,255,255,.35);
 }
 
+/* Universal Form Error Orchestration & Scroll Margins */
+.form-control,
+.form-input,
+.form-select,
+.form-textarea,
+.sc04-upload-card,
+.sc04-file-control,
+.sc05-action-panel,
+.sc05-dark-field,
+.sc06-start-panel,
+.sc06-dark-field,
+.sc06-section-card,
+.sc06-question-card,
+.sc20-phone-shell,
+.form-error,
+.sc05-dark-error,
+.sc06-dark-form-error,
+.sc06-dark-field-error,
+.field-error,
+[aria-invalid="true"] {
+  scroll-margin-top: 5.5rem;
+}
 
+@keyframes field-error-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(196, 69, 61, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(196, 69, 61, 0.4);
+  }
+}
 
-
-
-
+.field-error-highlight {
+  animation: field-error-pulse 0.6s ease-in-out 2;
+}
