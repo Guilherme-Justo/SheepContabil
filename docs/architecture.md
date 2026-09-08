@@ -157,7 +157,7 @@ Cada transição é validada no backend. Exceções técnicas não são exibidas
 
 ### 6.2 Disparo agendado
 
-Um Railway Cron executa um pulso curto a cada 15 minutos. O comando consulta no PostgreSQL o que venceu segundo `America/Sao_Paulo`, cria a chave idempotente e publica SC-04 diariamente e SC-20 mensalmente no Redis. O agendador chama o mesmo serviço de aplicação usado pelo comando manual, com ator de sistema. Assim, o cron da plataforma não codifica a regra de cada cliente e uma oscilação de minutos não muda a competência.
+Um Railway Cron executa um pulso curto a cada 15 minutos. O comando consulta no PostgreSQL o que venceu segundo `APP_TIME_ZONE`, cria a chave idempotente e publica no Redis somente módulos habilitados com a frequência esperada: SC-04 diariamente após `SC04_DAILY_HOUR` e SC-20 no primeiro dia do mês após `SC20_MONTHLY_HOUR`. O agendador chama o mesmo serviço de aplicação usado pelo comando manual, com ator de sistema. Assim, o cron da plataforma não codifica a regra de cada cliente e uma oscilação de minutos não muda a competência.
 
 ## 7. Persistência
 

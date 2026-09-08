@@ -7,7 +7,7 @@ from django.core.checks import CheckMessage, Error, register
 
 
 @register()
-def sc04_settings_check(
+def automation_settings_check(
     app_configs: object | None,
     **kwargs: Any,
 ) -> list[CheckMessage]:
@@ -42,6 +42,13 @@ def sc04_settings_check(
             Error(
                 "SC04_DAILY_HOUR precisa ficar entre 0 e 23.",
                 id="automations.E042",
+            )
+        )
+    if not 0 <= int(settings.SC20_MONTHLY_HOUR) <= 23:
+        errors.append(
+            Error(
+                "SC20_MONTHLY_HOUR precisa ficar entre 0 e 23.",
+                id="automations.E044",
             )
         )
     if str(settings.S3_ADDRESSING_STYLE) not in {"auto", "path", "virtual"}:
