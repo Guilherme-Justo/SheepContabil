@@ -68,5 +68,6 @@ deduplicação estável.
 - [x] Linha do tempo protegida pelo RBAC do módulo.
 - [x] IDs técnicos restritos ao administrador.
 - [x] Testes de segurança, idempotência, falha ambígua e ausência de histórico fabricado.
-- [ ] Migration validada no PostgreSQL do CI.
+- [x] Migration validada no PostgreSQL do CI do
+  [PR #44](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/34284759591).
 - [ ] Deploy automático e smoke público validados após merge.
