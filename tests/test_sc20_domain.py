@@ -5,10 +5,13 @@ from datetime import date, timedelta
 import pytest
 from django.core.management import call_command
 from django.db.models.deletion import ProtectedError
+from django.test import override_settings
 from freezegun import freeze_time
 
+from core.automations.checks import automation_settings_check
 from core.automations.management.commands import dispatch_due_schedules
 from core.automations.models import (
+    AutomationFrequency,
     AutomationModule,
     AutomationRun,
     CertificateCommunication,
@@ -38,6 +41,13 @@ class RecordingGateway:
 class ExplodingGateway:
     def send(self, message: NotificationMessage) -> DeliveryResult:
         raise TimeoutError(message.idempotency_key)
+
+
+def _configure_monthly_schedule(modules: dict[str, AutomationModule]) -> AutomationModule:
+    module = modules["SC-20"]
+    module.frequency = AutomationFrequency.MONTHLY
+    module.save(update_fields=("frequency",))
+    return module
 
 
 def _certificate(
@@ -224,6 +234,7 @@ def test_monthly_dispatch_is_idempotent_and_anchored_to_competence(
     modules: dict[str, AutomationModule],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _configure_monthly_schedule(modules)
     dispatched: list[str] = []
     monkeypatch.setattr(dispatch_due_schedules.run_sc20_task, "delay", dispatched.append)
 
@@ -243,6 +254,7 @@ def test_monthly_dispatch_recovers_a_broker_failure_before_execution(
     modules: dict[str, AutomationModule],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _configure_monthly_schedule(modules)
     dispatched: list[str] = []
 
     def dispatch(run_id: str) -> None:
@@ -269,15 +281,86 @@ def test_monthly_dispatch_recovers_a_broker_failure_before_execution(
     assert run.finished_at is None
 
 
-@freeze_time("2026-08-01 10:59:00")
-def test_monthly_dispatch_waits_until_eight_oclock_in_sao_paulo(
+@freeze_time("2026-08-01 12:59:00")
+@override_settings(SC20_MONTHLY_HOUR=10)
+def test_monthly_dispatch_waits_until_configured_hour_in_sao_paulo(
     modules: dict[str, AutomationModule],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _configure_monthly_schedule(modules)
     dispatched: list[str] = []
     monkeypatch.setattr(dispatch_due_schedules.run_sc20_task, "delay", dispatched.append)
 
     call_command("dispatch_due_schedules", verbosity=0)
+
+    assert not AutomationRun.objects.exists()
+    assert dispatched == []
+
+
+@pytest.mark.parametrize(("hour", "is_valid"), ((-1, False), (0, True), (23, True), (24, False)))
+def test_sc20_monthly_hour_system_check(hour: int, is_valid: bool) -> None:
+    with override_settings(SC20_MONTHLY_HOUR=hour):
+        errors = automation_settings_check(None)
+
+    has_sc20_hour_error = any(error.id == "automations.E044" for error in errors)
+    assert has_sc20_hour_error is not is_valid
+
+
+@freeze_time("2026-08-01 13:00:00")
+@override_settings(SC20_MONTHLY_HOUR=10)
+def test_monthly_dispatch_runs_at_configured_hour_in_sao_paulo(
+    modules: dict[str, AutomationModule],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_monthly_schedule(modules)
+    dispatched: list[str] = []
+    monkeypatch.setattr(dispatch_due_schedules.run_sc20_task, "delay", dispatched.append)
+
+    call_command("dispatch_due_schedules", verbosity=0)
+
+    run = AutomationRun.objects.get(module_id="SC-20")
+    assert dispatched == [str(run.id)]
+
+
+@freeze_time("2026-08-01 12:59:00")
+@override_settings(SC20_MONTHLY_HOUR=10)
+def test_monthly_dispatch_force_bypasses_only_the_configured_hour(
+    modules: dict[str, AutomationModule],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_monthly_schedule(modules)
+    dispatched: list[str] = []
+    monkeypatch.setattr(dispatch_due_schedules.run_sc20_task, "delay", dispatched.append)
+
+    call_command("dispatch_due_schedules", force=True, verbosity=0)
+
+    run = AutomationRun.objects.get(module_id="SC-20")
+    assert dispatched == [str(run.id)]
+
+
+@pytest.mark.parametrize(
+    ("is_enabled", "frequency"),
+    (
+        (False, AutomationFrequency.MONTHLY),
+        (True, AutomationFrequency.ON_DEMAND),
+    ),
+)
+@freeze_time("2026-08-30 15:00:00")
+def test_monthly_dispatch_requires_enabled_monthly_module(
+    modules: dict[str, AutomationModule],
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    is_enabled: bool,
+    frequency: str,
+) -> None:
+    module = modules["SC-20"]
+    module.is_enabled = is_enabled
+    module.frequency = frequency
+    module.save(update_fields=("is_enabled", "frequency"))
+    dispatched: list[str] = []
+    monkeypatch.setattr(dispatch_due_schedules.run_sc20_task, "delay", dispatched.append)
+
+    call_command("dispatch_due_schedules", force=True, verbosity=0)
 
     assert not AutomationRun.objects.exists()
     assert dispatched == []

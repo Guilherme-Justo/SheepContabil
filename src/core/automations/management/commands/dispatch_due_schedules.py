@@ -53,31 +53,35 @@ class Command(BaseCommand):
         elif self._sc04_is_enabled():
             self.stdout.write("SC-04 ainda não venceu hoje.")
 
-        due_at = timezone.make_aware(
-            datetime.combine(local_now.date().replace(day=1), time(hour=8)),
-            timezone.get_current_timezone(),
-        )
-        if local_now < due_at and not forced:
-            self.stdout.write("SC-20 ainda não venceu nesta competência.")
-        else:
-            competence_date = local_now.date().replace(day=1)
-            run, should_dispatch = prepare_scheduled_sc20_run(base_date=competence_date)
-            if not should_dispatch:
-                self.stdout.write(f"SC-20 já registrado para {local_now:%Y-%m}: {run.id}")
+        if self._sc20_is_enabled():
+            due_at = timezone.make_aware(
+                datetime.combine(
+                    local_now.date().replace(day=1),
+                    time(hour=int(settings.SC20_MONTHLY_HOUR)),
+                ),
+                timezone.get_current_timezone(),
+            )
+            if local_now < due_at and not forced:
+                self.stdout.write("SC-20 ainda não venceu nesta competência.")
             else:
-                try:
-                    run_sc20_task.delay(str(run.id))
-                except Exception as exc:
-                    self._mark_dispatch_failure(
-                        run,
-                        summary="Não foi possível publicar a execução mensal.",
-                        exc=exc,
-                    )
-                    errors.append(exc)
+                competence_date = local_now.date().replace(day=1)
+                run, should_dispatch = prepare_scheduled_sc20_run(base_date=competence_date)
+                if not should_dispatch:
+                    self.stdout.write(f"SC-20 já registrado para {local_now:%Y-%m}: {run.id}")
                 else:
-                    self.stdout.write(
-                        self.style.SUCCESS(f"SC-20 publicado para {local_now:%Y-%m}: {run.id}")
-                    )
+                    try:
+                        run_sc20_task.delay(str(run.id))
+                    except Exception as exc:
+                        self._mark_dispatch_failure(
+                            run,
+                            summary="Não foi possível publicar a execução mensal.",
+                            exc=exc,
+                        )
+                        errors.append(exc)
+                    else:
+                        self.stdout.write(
+                            self.style.SUCCESS(f"SC-20 publicado para {local_now:%Y-%m}: {run.id}")
+                        )
         if errors:
             raise errors[0]
 
@@ -87,6 +91,14 @@ class Command(BaseCommand):
             code="SC-04",
             is_enabled=True,
             frequency=AutomationFrequency.DAILY,
+        ).exists()
+
+    @staticmethod
+    def _sc20_is_enabled() -> bool:
+        return AutomationModule.objects.filter(
+            code="SC-20",
+            is_enabled=True,
+            frequency=AutomationFrequency.MONTHLY,
         ).exists()
 
     @staticmethod

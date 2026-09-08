@@ -42,7 +42,7 @@ A seleção cobre as três naturezas do catálogo e combina dois processos de co
 - Storage privado compatível com S3 ativo no SC-04, com objetos endereçados por hash, checagem de integridade e nenhum arquivo persistido no disco do contêiner.
 - O mesmo storage privado conserva screenshots PNG recortados ao cliente/erro do SC-05 por tentativa, com SHA-256 e tamanho verificados no download novamente autorizado.
 - Resiliência em desenvolvimento local: fallback automático e transparente para SQLite (`var/dev.sqlite3`) e FileSystem Storage (`var/storage/`) em modo `DEBUG` quando executado fora do Docker.
-- Docker Compose local para web, worker, simulador SC-05 separado, scheduler efêmero, banco, Redis e MinIO.
+- Docker Compose local para web, worker, simulador SC-05 separado, banco, Redis e MinIO; com a stack ativa, o pulso do scheduler pode ser executado de forma avulsa por `docker compose exec web python src/manage.py dispatch_due_schedules`.
 - Na Railway, a IaC preserva apenas `web`, `worker` e `scheduler`: o worker inicia o WSGI do simulador como processo auxiliar com ambiente sanitizado, sem herdar Redis, S3 ou OpenAI. O Playwright usa `127.0.0.1:8000`; a plataforma alcança a mesma porta apenas pela rede privada para healthcheck, sem domínio público.
 
 Os motivos, consequências e alternativas rejeitadas estão em [`docs/architecture.md`](docs/architecture.md) e nos nove ADRs de [`docs/adr/`](docs/adr/).

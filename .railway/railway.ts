@@ -30,7 +30,6 @@ export default defineRailway(() => {
     S3_REGION: ref(artifacts, "REGION"),
     S3_ADDRESSING_STYLE: "path",
     SC04_AUTO_ROUTE_THRESHOLD: "0.85",
-    SC04_DAILY_HOUR: "8",
   };
 
   const web = service("web", {
@@ -99,6 +98,8 @@ export default defineRailway(() => {
       APP_TIME_ZONE: "America/Sao_Paulo",
       DATABASE_URL: database.env.DATABASE_URL,
       REDIS_URL: broker.env.REDIS_URL,
+      SC04_DAILY_HOUR: "8",
+      SC20_MONTHLY_HOUR: "8",
     },
   });
 

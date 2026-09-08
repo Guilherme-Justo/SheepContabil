@@ -605,7 +605,7 @@ def test_dispatch_command_publishes_sc04_daily_once(
     run = AutomationRun.objects.get(module_id="SC-04")
     assert run.idempotency_key == "sc04:scheduled:2026-08-31"
     assert sc04_dispatched == [str(run.id)]
-    assert len(sc20_dispatched) == 1
+    assert sc20_dispatched == []
 
 
 def test_ingest_document_persists_page_count_at_creation(

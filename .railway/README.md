@@ -15,7 +15,7 @@ O arquivo não inclui segredos. `preserve()` mantém valores já cadastrados na 
 
 ## Scheduler e simulador SC-05
 
-O recurso `scheduler` executa `dispatch_due_schedules` a cada 15 minutos e publica no Redis o SC-04 diário e o SC-20 mensal elegíveis. Competência, janela horária e recuperação de falha anterior ao início são controladas no PostgreSQL; a função efêmera não contém a regra de negócio nem executa o processamento completo.
+O recurso `scheduler` executa `dispatch_due_schedules` a cada 15 minutos e publica no Redis o SC-04 diário e o SC-20 mensal elegíveis. `SC04_DAILY_HOUR` e `SC20_MONTHLY_HOUR` definem os horários em `APP_TIME_ZONE`; módulo desativado ou com frequência diferente da esperada não é publicado. O pulso pode ocorrer até 14 minutos e 59 segundos depois do horário configurado. Competência e recuperação de falha anterior ao início são controladas no PostgreSQL. As únicas credenciais concedidas à função efêmera são banco, Redis e o segredo Django por referência; além delas, recebe apenas settings neutros de runtime, sem acesso a S3, OpenAI ou SMTP.
 
 O plano Railway disponível não comporta um quarto serviço de aplicação. Por isso, a IaC declara somente `web`, `worker` e `scheduler`; ela não cria um recurso `simulator`. O Compose local continua com o simulador em contêiner separado para conservar a fronteira de processo durante desenvolvimento e testes.
 

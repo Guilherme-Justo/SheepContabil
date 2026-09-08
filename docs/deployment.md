@@ -117,7 +117,7 @@ O smoke autenticado bloqueou e desbloqueou Aurora, validou três portais, seis P
 
 ## Scheduler do SC-04 e SC-20
 
-A Railway executa `python src/manage.py dispatch_due_schedules` a cada 15 minutos em UTC. O comando converte as regras para `America/Sao_Paulo`: após 08:00 cria no máximo uma chave diária `sc04:scheduled:AAAA-MM-DD`; para o SC-20, só considera a competência vencida após o primeiro dia do mês às 08:00 e cria `sc20:scheduled:AAAA-MM`. A data-base mensal permanece ancorada no primeiro dia mesmo se o pulso atrasar.
+A Railway executa `python src/manage.py dispatch_due_schedules` a cada 15 minutos em UTC. O comando converte as regras para `APP_TIME_ZONE`: `SC04_DAILY_HOUR` define o horário diário do SC-04 e `SC20_MONTHLY_HOUR` define o horário do primeiro dia do mês para o SC-20, ambos com padrão `8`. Cada processo só é publicado quando seu módulo está habilitado e mantém a frequência esperada. As chaves idempotentes são `sc04:scheduled:AAAA-MM-DD` e `sc20:scheduled:AAAA-MM`; a data-base mensal permanece ancorada no primeiro dia mesmo se o pulso atrasar. Como o cron pulsa a cada 15 minutos, a publicação pode ocorrer até 14 minutos e 59 segundos depois do horário configurado.
 
 O pulso termina sem executar a automação. Se a publicação no broker falhar antes de o worker iniciar, a execução registra a falha e o pulso seguinte pode republicar o mesmo UUID; qualquer execução já iniciada ou terminal continua protegida contra duplicidade. Para um ensaio operacional controlado fora do horário, use `python src/manage.py dispatch_due_schedules --force` apenas com dados sintéticos.
 
