@@ -86,7 +86,11 @@ def test_operator_posts_happy_path_and_dispatches_only_the_run_uuid(
 ) -> None:
     sc05_client = _client()
     dispatched: list[str] = []
-    monkeypatch.setattr(run_sc05_task, "delay", lambda run_id: dispatched.append(run_id))
+    monkeypatch.setattr(
+        run_sc05_task,
+        "apply_async",
+        lambda *, args, task_id: dispatched.append(args[0]),
+    )
     client.force_login(technology_operator)
 
     response = client.post(
@@ -115,7 +119,7 @@ def test_failure_scenario_is_rejected_for_operator_and_available_to_admin(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sc05_client = _client()
-    monkeypatch.setattr(run_sc05_task, "delay", lambda run_id: None)
+    monkeypatch.setattr(run_sc05_task, "apply_async", lambda *, args, task_id: None)
     payload = {
         "client": str(sc05_client.id),
         "action": SC05Action.BLOCK,
@@ -156,7 +160,11 @@ def test_partial_run_can_be_resumed_explicitly_by_authorized_operator(
     )
     SC05Client.objects.filter(pk=sc05_client.pk).update(status=SC05ClientStatus.PARTIAL)
     dispatched: list[str] = []
-    monkeypatch.setattr(run_sc05_task, "delay", lambda run_id: dispatched.append(run_id))
+    monkeypatch.setattr(
+        run_sc05_task,
+        "apply_async",
+        lambda *, args, task_id: dispatched.append(args[0]),
+    )
     client.force_login(technology_operator)
 
     response = client.post(
@@ -274,11 +282,11 @@ def test_broker_failure_is_recorded_as_safe_terminal_failure(
 ) -> None:
     sc05_client = _client()
 
-    def unavailable(run_id: str) -> None:
-        del run_id
+    def unavailable(*, args: tuple[str], task_id: str) -> None:
+        del args, task_id
         raise ConnectionError("broker detail must not leak")
 
-    monkeypatch.setattr(run_sc05_task, "delay", unavailable)
+    monkeypatch.setattr(run_sc05_task, "apply_async", unavailable)
     client.force_login(technology_operator)
     response = client.post(
         _module_url(modules),
@@ -307,7 +315,11 @@ def test_repeated_idempotency_key_does_not_dispatch_the_same_run_twice(
     sc05_client = _client()
     request_key = uuid4()
     dispatched: list[str] = []
-    monkeypatch.setattr(run_sc05_task, "delay", lambda run_id: dispatched.append(run_id))
+    monkeypatch.setattr(
+        run_sc05_task,
+        "apply_async",
+        lambda *, args, task_id: dispatched.append(args[0]),
+    )
     client.force_login(technology_operator)
     payload = {
         "client": str(sc05_client.id),
@@ -347,11 +359,11 @@ def test_broker_failure_during_resume_keeps_partial_run_retryable(
     )
     SC05Client.objects.filter(pk=sc05_client.pk).update(status=SC05ClientStatus.PARTIAL)
 
-    def unavailable(run_id: str) -> None:
-        del run_id
+    def unavailable(*, args: tuple[str], task_id: str) -> None:
+        del args, task_id
         raise ConnectionError("private broker detail")
 
-    monkeypatch.setattr(run_sc05_task, "delay", unavailable)
+    monkeypatch.setattr(run_sc05_task, "apply_async", unavailable)
     client.force_login(technology_operator)
     response = client.post(reverse("automations:sc05-resume", kwargs={"run_id": run.id}))
 

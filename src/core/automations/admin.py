@@ -118,7 +118,18 @@ class AutomationRunAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     list_display = ("id", "module", "status", "trigger", "triggered_by", "created_at")
     list_filter = ("module", "status", "trigger")
     search_fields = ("id", "summary", "error_message", "idempotency_key")
-    readonly_fields = ("id", "created_at")
+    readonly_fields = (
+        "id",
+        "task_id",
+        "queued_at",
+        "dispatch_started_at",
+        "broker_published_at",
+        "heartbeat_at",
+        "reconciliation_attempts",
+        "created_at",
+        "started_at",
+        "finished_at",
+    )
     date_hierarchy = "created_at"
 
 

@@ -16,10 +16,11 @@ from core.automations.sc20.services import execute_sc20
     reject_on_worker_lost=True,
 )
 def run_sc04_task(task: Any, run_id: str) -> dict[str, int]:
-    delivery_info = getattr(task.request, "delivery_info", None) or {}
+    task_id, redelivered = _delivery_context(task)
     result = execute_sc04(
         run_id,
-        resume_interrupted=bool(delivery_info.get("redelivered")),
+        task_id=task_id,
+        resume_interrupted=redelivered,
     )
     return {
         "received": result.received,
@@ -37,10 +38,11 @@ def run_sc04_task(task: Any, run_id: str) -> dict[str, int]:
     reject_on_worker_lost=True,
 )
 def run_sc05_task(task: Any, run_id: str) -> dict[str, int | bool]:
-    delivery_info = getattr(task.request, "delivery_info", None) or {}
+    task_id, redelivered = _delivery_context(task)
     result = execute_sc05(
         run_id,
-        resume_interrupted=bool(delivery_info.get("redelivered")),
+        task_id=task_id,
+        resume_interrupted=redelivered,
     )
     return {
         "applied": result.applied,
@@ -51,12 +53,30 @@ def run_sc05_task(task: Any, run_id: str) -> dict[str, int | bool]:
     }
 
 
-@shared_task(name="automations.sc20.execute")  # type: ignore[untyped-decorator]
-def run_sc20_task(run_id: str) -> dict[str, int]:
-    result = execute_sc20(run_id)
+@shared_task(  # type: ignore[untyped-decorator]
+    bind=True,
+    name="automations.sc20.execute",
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
+def run_sc20_task(task: Any, run_id: str) -> dict[str, int]:
+    task_id, redelivered = _delivery_context(task)
+    result = execute_sc20(
+        run_id,
+        task_id=task_id,
+        resume_interrupted=redelivered,
+    )
     return {
         "selected": result.selected,
         "sent": result.sent,
         "failed": result.failed,
         "deduplicated": result.deduplicated,
     }
+
+
+def _delivery_context(task: Any) -> tuple[str | None, bool]:
+    request = task.request
+    raw_task_id = getattr(request, "id", None)
+    task_id = str(raw_task_id) if raw_task_id else None
+    delivery_info = getattr(request, "delivery_info", None) or {}
+    return task_id, bool(delivery_info.get("redelivered"))

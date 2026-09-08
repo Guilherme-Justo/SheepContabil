@@ -3,13 +3,13 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass, field
 from datetime import date
+from uuid import uuid4
 
 import pytest
 from django.core.management import call_command
 from django.utils import timezone
 from freezegun import freeze_time
 
-from core.automations.management.commands import dispatch_due_schedules
 from core.automations.models import (
     AutomationFrequency,
     AutomationModule,
@@ -519,6 +519,57 @@ def test_redelivery_recovers_interrupted_attempt_without_duplicate_decision(
     assert result.routed == 1
 
 
+def test_superseded_sc04_worker_cannot_persist_classifier_result(
+    modules: dict[str, AutomationModule],
+    administrator: User,
+    fiscal_client: FiscalClient,
+) -> None:
+    storage = MemoryStorage()
+    run = _manual_upload(
+        modules=modules,
+        administrator=administrator,
+        storage=storage,
+        content=b"DOCUMENTO SINTETICO COM ENTREGA SUBSTITUIDA",
+    )
+    old_task_id = run.task_id
+    replacement_task_id = uuid4()
+    assert old_task_id is not None
+
+    class RotatingClassifier:
+        provider = "fake"
+        model = "fake-classifier-v1"
+
+        def classify(self, request: ClassificationRequest) -> ClassificationPrediction:
+            del request
+            AutomationRun.objects.filter(pk=run.pk).update(
+                status=RunStatus.QUEUED,
+                task_id=replacement_task_id,
+                queued_at=timezone.now(),
+                heartbeat_at=None,
+            )
+            return _prediction(client=fiscal_client)
+
+    execute_sc04(
+        run.id,
+        storage=storage,
+        extractor=FixedExtractor(
+            "NOTA FISCAL. CNPJ 12.345.678/0001-90. Aurora Participações Demo."
+        ),
+        classifier=RotatingClassifier(),
+        task_id=old_task_id,
+    )
+
+    run.refresh_from_db()
+    document = FiscalDocument.objects.get()
+    attempt = DocumentClassificationAttempt.objects.get()
+    assert run.status == RunStatus.QUEUED
+    assert run.task_id == replacement_task_id
+    assert document.status == DocumentStatus.PROCESSING
+    assert attempt.status == ClassificationAttemptStatus.PROCESSING
+    assert not DocumentDecision.objects.exists()
+    assert not DocumentRouting.objects.exists()
+
+
 def test_scheduled_run_is_unique_per_daily_competence(
     modules: dict[str, AutomationModule],
 ) -> None:
@@ -596,8 +647,14 @@ def test_dispatch_command_publishes_sc04_daily_once(
     sc04.save(update_fields=("frequency",))
     sc04_dispatched: list[str] = []
     sc20_dispatched: list[str] = []
-    monkeypatch.setattr(dispatch_due_schedules.run_sc04_task, "delay", sc04_dispatched.append)
-    monkeypatch.setattr(dispatch_due_schedules.run_sc20_task, "delay", sc20_dispatched.append)
+    monkeypatch.setattr(
+        "core.automations.dispatching.run_sc04_task.apply_async",
+        lambda *, args, task_id: sc04_dispatched.append(args[0]),
+    )
+    monkeypatch.setattr(
+        "core.automations.dispatching.run_sc20_task.apply_async",
+        lambda *, args, task_id: sc20_dispatched.append(args[0]),
+    )
 
     call_command("dispatch_due_schedules", verbosity=0)
     call_command("dispatch_due_schedules", verbosity=0)

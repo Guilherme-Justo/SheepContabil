@@ -7,15 +7,14 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from core.automations.dispatching import dispatch_run
 from core.automations.models import (
     AutomationFrequency,
     AutomationModule,
-    AutomationRun,
-    RunStatus,
 )
+from core.automations.reconciliation import reconcile_stale_runs
 from core.automations.sc04.services import prepare_scheduled_sc04_run
 from core.automations.sc20.services import prepare_scheduled_sc20_run
-from core.automations.tasks import run_sc04_task, run_sc20_task
 
 
 class Command(BaseCommand):
@@ -29,20 +28,43 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args: object, **options: object) -> None:
-        local_now = timezone.localtime()
+        now = timezone.now()
+        local_now = timezone.localtime(now)
         forced = bool(options.get("force"))
         errors: list[Exception] = []
+        reconciliation = reconcile_stale_runs(at=now)
+        if reconciliation.inspected:
+            self.stdout.write(
+                "Reconciliação: "
+                f"{reconciliation.requeued} republicada(s), "
+                f"{reconciliation.quarantined} em quarentena, "
+                f"{reconciliation.failed} encerrada(s), "
+                f"{reconciliation.inspection_failed} com erro de inspeção, "
+                f"{reconciliation.skipped} ignorada(s)."
+            )
+        if reconciliation.publish_failed:
+            errors.append(
+                RuntimeError(
+                    f"{reconciliation.publish_failed} recuperação(ões) "
+                    "falharam ao publicar no broker."
+                )
+            )
+        if reconciliation.inspection_failed:
+            errors.append(
+                RuntimeError(
+                    f"{reconciliation.inspection_failed} execução(ões) "
+                    "não puderam ser reconciliadas."
+                )
+            )
         if self._sc04_is_enabled() and (forced or local_now.hour >= int(settings.SC04_DAILY_HOUR)):
             run, should_dispatch = prepare_scheduled_sc04_run(base_date=local_now.date())
             if should_dispatch:
                 try:
-                    run_sc04_task.delay(str(run.id))
-                except Exception as exc:
-                    self._mark_dispatch_failure(
+                    dispatch_run(
                         run,
-                        summary="Não foi possível publicar a triagem diária.",
-                        exc=exc,
+                        failure_summary="Não foi possível publicar a triagem diária.",
                     )
+                except Exception as exc:
                     errors.append(exc)
                 else:
                     self.stdout.write(
@@ -70,13 +92,11 @@ class Command(BaseCommand):
                     self.stdout.write(f"SC-20 já registrado para {local_now:%Y-%m}: {run.id}")
                 else:
                     try:
-                        run_sc20_task.delay(str(run.id))
-                    except Exception as exc:
-                        self._mark_dispatch_failure(
+                        dispatch_run(
                             run,
-                            summary="Não foi possível publicar a execução mensal.",
-                            exc=exc,
+                            failure_summary="Não foi possível publicar a execução mensal.",
                         )
+                    except Exception as exc:
                         errors.append(exc)
                     else:
                         self.stdout.write(
@@ -100,18 +120,3 @@ class Command(BaseCommand):
             is_enabled=True,
             frequency=AutomationFrequency.MONTHLY,
         ).exists()
-
-    @staticmethod
-    def _mark_dispatch_failure(
-        run: AutomationRun,
-        *,
-        summary: str,
-        exc: Exception,
-    ) -> None:
-        AutomationRun.objects.filter(pk=run.pk).update(
-            status=RunStatus.FAILED,
-            summary=summary,
-            error_message="O serviço de execução está temporariamente indisponível.",
-            metadata={"dispatch_error": type(exc).__name__},
-            finished_at=timezone.now(),
-        )

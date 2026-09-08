@@ -4,9 +4,10 @@ from collections.abc import Callable
 from contextlib import suppress
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime
 from functools import partial
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -30,6 +31,14 @@ from core.automations.models import (
     SC05Scenario,
     SC05StepAttempt,
     SC05StepStatus,
+)
+from core.automations.run_tracking import (
+    SupersededDelivery,
+    bind_delivery,
+    delivery_matches,
+    require_current_delivery,
+    touch_run,
+    with_reconciliation_event,
 )
 from core.automations.sc05.artifacts import build_screenshot_storage
 from core.automations.sc05.contracts import (
@@ -133,6 +142,8 @@ def create_sc05_run_result(
             summary=(
                 f"{selected_action.label} {locked_client.name}: operação aguardando o worker RPA."
             ),
+            task_id=uuid4(),
+            queued_at=timezone.now(),
         )
         operation = SC05Operation.objects.create(
             run=run,
@@ -192,7 +203,27 @@ def resume_sc05_run(run_id: str | UUID) -> AutomationRun:
         run.error_message = ""
         run.finished_at = None
         run.metadata = {**run.metadata, "sc05_resume_history": resume_history}
-        run.save(update_fields=("status", "summary", "error_message", "finished_at", "metadata"))
+        run.task_id = uuid4()
+        run.queued_at = timezone.now()
+        run.dispatch_started_at = None
+        run.broker_published_at = None
+        run.heartbeat_at = None
+        run.reconciliation_attempts = 0
+        run.save(
+            update_fields=(
+                "status",
+                "summary",
+                "error_message",
+                "finished_at",
+                "metadata",
+                "task_id",
+                "queued_at",
+                "dispatch_started_at",
+                "broker_published_at",
+                "heartbeat_at",
+                "reconciliation_attempts",
+            )
+        )
         operation.save(update_fields=("resume_count", "updated_at"))
     return run
 
@@ -202,10 +233,15 @@ def execute_sc05(
     *,
     gateways_factory: Callable[[], PortalGatewaySession] | None = None,
     storage: ScreenshotStorage | None = None,
+    task_id: str | UUID | None = None,
     resume_interrupted: bool = False,
 ) -> SC05ExecutionResult:
-    operation = _prepare_operation(run_id, resume_interrupted=resume_interrupted)
-    if operation.run.status not in ACTIVE_RUN_STATUSES:
+    operation, should_execute = _prepare_operation(
+        run_id,
+        task_id=task_id,
+        resume_interrupted=resume_interrupted,
+    )
+    if not should_execute:
         return _summarize(operation)
 
     if gateways_factory is None:
@@ -219,6 +255,8 @@ def execute_sc05(
         storage = storage or build_screenshot_storage()
         with gateways_factory() as gateways:
             for step in operation.steps.order_by("position"):
+                require_current_delivery(operation.run_id, task_id=operation.run.task_id)
+                touch_run(operation.run_id, task_id=operation.run.task_id)
                 try:
                     _apply_step(
                         operation=operation,
@@ -232,24 +270,44 @@ def execute_sc05(
                     _mark_step_failed(step, exc)
                     break
             if failure is not None:
+                require_current_delivery(operation.run_id, task_id=operation.run.task_id)
+                touch_run(operation.run_id, task_id=operation.run.task_id)
                 compensation_failed = _compensate(
                     operation=operation,
                     failed_step=failed_step,
                     gateways=gateways,
                     storage=storage,
                 )
-                _finish_failed(operation, failure, compensation_failed=compensation_failed)
+                _finish_failed(
+                    operation,
+                    failure,
+                    compensation_failed=compensation_failed,
+                    expected_task_id=operation.run.task_id,
+                )
             else:
-                _finish_succeeded(operation)
+                require_current_delivery(operation.run_id, task_id=operation.run.task_id)
+                _finish_succeeded(operation, expected_task_id=operation.run.task_id)
+    except SupersededDelivery:
+        pass
     except SC05Error as exc:
-        _finish_failed(operation, exc, compensation_failed=_has_residual_state(operation))
+        _finish_failed(
+            operation,
+            exc,
+            compensation_failed=_has_residual_state(operation),
+            expected_task_id=operation.run.task_id,
+        )
     except Exception as exc:
         safe_error = PortalOperationError(
             "O worker RPA foi interrompido antes de confirmar todos os sistemas.",
             code="unexpected_worker_error",
             transient=True,
         )
-        _finish_failed(operation, safe_error, compensation_failed=_has_residual_state(operation))
+        _finish_failed(
+            operation,
+            safe_error,
+            compensation_failed=_has_residual_state(operation),
+            expected_task_id=operation.run.task_id,
+        )
         raise safe_error from exc
 
     operation.refresh_from_db()
@@ -260,8 +318,9 @@ def execute_sc05(
 def _prepare_operation(
     run_id: str | UUID,
     *,
+    task_id: str | UUID | None,
     resume_interrupted: bool,
-) -> SC05Operation:
+) -> tuple[SC05Operation, bool]:
     with transaction.atomic():
         operation = (
             SC05Operation.objects.select_for_update()
@@ -269,47 +328,106 @@ def _prepare_operation(
             .get(run_id=UUID(str(run_id)))
         )
         run = operation.run
+        if not bind_delivery(run, task_id):
+            return operation, False
         if run.status not in ACTIVE_RUN_STATUSES:
-            return operation
+            return operation, False
+        now = timezone.now()
+        run.dispatch_started_at = run.dispatch_started_at or run.queued_at or now
+        run.broker_published_at = run.broker_published_at or now
         if run.status == RunStatus.RUNNING and not resume_interrupted:
-            raise PortalOperationError(
-                "A execução já está sendo processada por outro worker.",
-                code="run_already_running",
+            return operation, False
+        if run.status == RunStatus.RUNNING and resume_interrupted:
+            _close_interrupted_sc05_attempts(operation=operation, now=now)
+            previous_task_id = run.task_id
+            run.reconciliation_attempts += 1
+            run.task_id = None
+            operation.client.status = SC05ClientStatus.PARTIAL
+            operation.client.save(update_fields=("status", "updated_at"))
+            run.status = RunStatus.PARTIALLY_FAILED
+            run.summary = (
+                f"{operation.get_action_display()} interrompido para {operation.client.name}; "
+                "nenhuma ação externa foi repetida automaticamente."
             )
-        if resume_interrupted:
-            now = timezone.now()
-            running_attempts = SC05StepAttempt.objects.filter(
-                step__operation=operation,
-                status=SC05AttemptStatus.RUNNING,
-            )
-            for attempt in running_attempts:
-                attempt.status = SC05AttemptStatus.FAILED
-                attempt.error_code = "worker_interrupted"
-                attempt.error_message = "A tentativa foi interrompida antes da confirmação."
-                attempt.finished_at = now
-                attempt.save(
-                    update_fields=(
-                        "status",
-                        "error_code",
-                        "error_message",
-                        "finished_at",
-                    )
+            run.error_message = "Reconcilie os três portais antes de retomar a mesma execução."
+            run.metadata = {
+                **with_reconciliation_event(
+                    run.metadata,
+                    action="quarantined",
+                    reason="broker_redelivery_with_ambiguous_external_state",
+                    at=now,
+                    previous_task_id=previous_task_id,
+                    details={"attempt": run.reconciliation_attempts},
+                ),
+                "reconciliation_required": True,
+            }
+            run.finished_at = now
+            run.heartbeat_at = now
+            run.save(
+                update_fields=(
+                    "task_id",
+                    "dispatch_started_at",
+                    "broker_published_at",
+                    "reconciliation_attempts",
+                    "status",
+                    "summary",
+                    "error_message",
+                    "metadata",
+                    "finished_at",
+                    "heartbeat_at",
                 )
-            SC05PortalStep.objects.filter(
-                operation=operation,
-                status=SC05StepStatus.RUNNING,
-            ).update(
-                status=SC05StepStatus.FAILED,
-                error_message="A etapa foi interrompida e será reconciliada.",
-                finished_at=now,
             )
+            return operation, False
         run.status = RunStatus.RUNNING
-        run.started_at = run.started_at or timezone.now()
+        run.started_at = run.started_at or now
         run.finished_at = None
         run.error_message = ""
         run.summary = f"{operation.get_action_display()} em andamento nos sistemas simulados."
-        run.save(update_fields=("status", "started_at", "finished_at", "error_message", "summary"))
-    return operation
+        run.heartbeat_at = now
+        run.save(
+            update_fields=(
+                "task_id",
+                "dispatch_started_at",
+                "broker_published_at",
+                "status",
+                "started_at",
+                "finished_at",
+                "error_message",
+                "summary",
+                "heartbeat_at",
+                "reconciliation_attempts",
+                "metadata",
+            )
+        )
+    return operation, True
+
+
+def _close_interrupted_sc05_attempts(*, operation: SC05Operation, now: datetime) -> None:
+    running_attempts = SC05StepAttempt.objects.filter(
+        step__operation=operation,
+        status=SC05AttemptStatus.RUNNING,
+    )
+    for attempt in running_attempts:
+        attempt.status = SC05AttemptStatus.FAILED
+        attempt.error_code = "worker_interrupted"
+        attempt.error_message = "A tentativa foi interrompida antes da confirmação."
+        attempt.finished_at = now
+        attempt.save(
+            update_fields=(
+                "status",
+                "error_code",
+                "error_message",
+                "finished_at",
+            )
+        )
+    SC05PortalStep.objects.filter(
+        operation=operation,
+        status=SC05StepStatus.RUNNING,
+    ).update(
+        status=SC05StepStatus.FAILED,
+        error_message="A etapa foi interrompida e será reconciliada.",
+        finished_at=now,
+    )
 
 
 def _apply_step(
@@ -321,22 +439,20 @@ def _apply_step(
 ) -> None:
     prior_status = step.status
     first_observation = not step.before_state
-    step.status = SC05StepStatus.RUNNING
-    step.started_at = step.started_at or timezone.now()
-    step.finished_at = None
-    step.error_message = ""
-    step.save(update_fields=("status", "started_at", "finished_at", "error_message", "updated_at"))
+    _start_step(operation=operation, step=step, expected_task_id=operation.run.task_id)
     gateway = gateways.gateway(SC05Portal(step.portal))
     observed = _invoke(
         step=step,
         operation=SC05AttemptOperation.INSPECT,
         storage=storage,
+        expected_task_id=operation.run.task_id,
         call=lambda: gateway.inspect(
             client_reference=operation.client.external_reference,
             scenario=_execution_scenario(operation),
             phase="apply",
         ),
     )
+    require_current_delivery(operation.run_id, task_id=operation.run.task_id)
     if first_observation:
         _validate_initial_state(operation=operation, step=step, observed=observed.state)
         step.before_state = deepcopy(observed.state)
@@ -370,6 +486,7 @@ def _apply_step(
         step=step,
         operation=SC05AttemptOperation.APPLY,
         storage=storage,
+        expected_task_id=operation.run.task_id,
         call=lambda: gateway.apply(
             client_reference=operation.client.external_reference,
             action=SC05Action(operation.action),
@@ -377,6 +494,7 @@ def _apply_step(
             phase="apply",
         ),
     )
+    require_current_delivery(operation.run_id, task_id=operation.run.task_id)
     step.after_state = deepcopy(changed.state)
     if not _states_equal(changed.state, desired):
         step.save(update_fields=("after_state", "updated_at"))
@@ -387,6 +505,23 @@ def _apply_step(
     step.error_message = ""
     step.finished_at = timezone.now()
     step.save(update_fields=("status", "after_state", "error_message", "finished_at", "updated_at"))
+
+
+@transaction.atomic
+def _start_step(
+    *,
+    operation: SC05Operation,
+    step: SC05PortalStep,
+    expected_task_id: UUID | None,
+) -> None:
+    run = AutomationRun.objects.select_for_update().get(pk=operation.run_id)
+    if run.status != RunStatus.RUNNING or not delivery_matches(run, expected_task_id):
+        raise SupersededDelivery
+    step.status = SC05StepStatus.RUNNING
+    step.started_at = step.started_at or timezone.now()
+    step.finished_at = None
+    step.error_message = ""
+    step.save(update_fields=("status", "started_at", "finished_at", "error_message", "updated_at"))
 
 
 def _desired_state(
@@ -531,12 +666,19 @@ def _invoke(
     step: SC05PortalStep,
     operation: SC05AttemptOperation,
     storage: ScreenshotStorage,
+    expected_task_id: UUID | None,
     call: Callable[[], PortalEvidence],
 ) -> PortalEvidence:
-    attempt = _start_attempt(step, operation)
+    require_current_delivery(step.operation.run_id, task_id=expected_task_id)
+    attempt = _start_attempt(
+        step,
+        operation,
+        expected_task_id=expected_task_id,
+    )
     evidence: PortalEvidence | None = None
     try:
         evidence = call()
+        require_current_delivery(step.operation.run_id, task_id=expected_task_id)
         if operation in {SC05AttemptOperation.APPLY, SC05AttemptOperation.COMPENSATE}:
             step.after_state = deepcopy(evidence.state)
             step.save(update_fields=("after_state", "updated_at"))
@@ -545,8 +687,12 @@ def _invoke(
             f"{attempt.sequence:02d}-{operation}.png"
         )
         stored = storage.put(key=key, content=evidence.screenshot)
+        require_current_delivery(step.operation.run_id, task_id=expected_task_id)
         _record_artifact(attempt=attempt, stored=stored)
+    except SupersededDelivery:
+        raise
     except SC05Error as exc:
+        require_current_delivery(step.operation.run_id, task_id=expected_task_id)
         if isinstance(exc, PortalOperationError) and exc.screenshot:
             with suppress(Exception):
                 key = (
@@ -554,10 +700,13 @@ def _invoke(
                     f"{attempt.sequence:02d}-{operation}-failure.png"
                 )
                 stored = storage.put(key=key, content=exc.screenshot)
+                require_current_delivery(step.operation.run_id, task_id=expected_task_id)
                 _record_artifact(attempt=attempt, stored=stored)
+        require_current_delivery(step.operation.run_id, task_id=expected_task_id)
         _fail_attempt(attempt, exc, evidence.state if evidence else {})
         raise
     except Exception as exc:
+        require_current_delivery(step.operation.run_id, task_id=expected_task_id)
         error = PortalOperationError(
             f"{step.get_portal_display()} ficou indisponível durante a operação.",
             code="portal_unavailable",
@@ -565,6 +714,7 @@ def _invoke(
         )
         _fail_attempt(attempt, error, evidence.state if evidence else {})
         raise error from exc
+    require_current_delivery(step.operation.run_id, task_id=expected_task_id)
     _succeed_attempt(attempt, evidence.state)
     return evidence
 
@@ -579,10 +729,16 @@ def _record_artifact(*, attempt: SC05StepAttempt, stored: StoredScreenshot) -> N
     )
 
 
+@transaction.atomic
 def _start_attempt(
     step: SC05PortalStep,
     operation: SC05AttemptOperation,
+    *,
+    expected_task_id: UUID | None,
 ) -> SC05StepAttempt:
+    run = AutomationRun.objects.select_for_update().get(pk=step.operation.run_id)
+    if run.status != RunStatus.RUNNING or not delivery_matches(run, expected_task_id):
+        raise SupersededDelivery
     latest = step.attempts.aggregate(value=Max("sequence"))["value"] or 0
     return SC05StepAttempt.objects.create(
         step=step,
@@ -648,6 +804,7 @@ def _compensate(
                 step=step,
                 operation=SC05AttemptOperation.INSPECT,
                 storage=storage,
+                expected_task_id=operation.run.task_id,
                 call=partial(
                     gateway.inspect,
                     client_reference=operation.client.external_reference,
@@ -656,6 +813,7 @@ def _compensate(
                 ),
             )
             if _states_equal(current.state, step.before_state):
+                require_current_delivery(operation.run_id, task_id=operation.run.task_id)
                 if step.status == SC05StepStatus.FAILED:
                     continue
                 step.status = SC05StepStatus.COMPENSATED
@@ -678,6 +836,7 @@ def _compensate(
                 step=step,
                 operation=SC05AttemptOperation.COMPENSATE,
                 storage=storage,
+                expected_task_id=operation.run.task_id,
                 call=partial(
                     gateway.restore,
                     client_reference=operation.client.external_reference,
@@ -691,6 +850,7 @@ def _compensate(
                 raise PortalStateConflictError(
                     f"{step.get_portal_display()} não confirmou a restauração."
                 )
+            require_current_delivery(operation.run_id, task_id=operation.run.task_id)
             step.status = SC05StepStatus.COMPENSATED
             step.after_state = deepcopy(restored.state)
             step.error_message = ""
@@ -705,6 +865,7 @@ def _compensate(
                 )
             )
         except SC05Error as exc:
+            require_current_delivery(operation.run_id, task_id=operation.run.task_id)
             compensation_failed = True
             step.status = SC05StepStatus.COMPENSATION_FAILED
             step.error_message = exc.safe_message
@@ -713,7 +874,11 @@ def _compensate(
     return compensation_failed
 
 
-def _finish_succeeded(operation: SC05Operation) -> None:
+def _finish_succeeded(
+    operation: SC05Operation,
+    *,
+    expected_task_id: UUID | None,
+) -> None:
     with transaction.atomic():
         locked = (
             SC05Operation.objects.select_for_update()
@@ -721,6 +886,8 @@ def _finish_succeeded(operation: SC05Operation) -> None:
             .get(pk=operation.pk)
         )
         run = locked.run
+        if run.status != RunStatus.RUNNING or run.task_id != expected_task_id:
+            return
         client = locked.client
         if locked.action == SC05Action.BLOCK:
             task_step = locked.steps.get(portal=SC05Portal.TASKS)
@@ -739,7 +906,16 @@ def _finish_succeeded(operation: SC05Operation) -> None:
         )
         run.error_message = ""
         run.finished_at = timezone.now()
-        run.save(update_fields=("status", "summary", "error_message", "finished_at"))
+        run.heartbeat_at = run.finished_at
+        run.save(
+            update_fields=(
+                "status",
+                "summary",
+                "error_message",
+                "finished_at",
+                "heartbeat_at",
+            )
+        )
 
 
 def _finish_failed(
@@ -747,6 +923,7 @@ def _finish_failed(
     error: SC05Error,
     *,
     compensation_failed: bool,
+    expected_task_id: UUID | None,
 ) -> None:
     with transaction.atomic():
         locked = (
@@ -755,6 +932,8 @@ def _finish_failed(
             .get(pk=operation.pk)
         )
         run = locked.run
+        if run.status != RunStatus.RUNNING or run.task_id != expected_task_id:
+            return
         if error.code == "task_marker_without_snapshot":
             locked.client.status = SC05ClientStatus.UNKNOWN
             locked.client.save(update_fields=("status", "updated_at"))
@@ -785,12 +964,25 @@ def _finish_failed(
             )
         run.error_message = error.safe_message
         run.finished_at = timezone.now()
-        run.save(update_fields=("status", "summary", "error_message", "finished_at"))
+        run.heartbeat_at = run.finished_at
+        run.save(
+            update_fields=(
+                "status",
+                "summary",
+                "error_message",
+                "finished_at",
+                "heartbeat_at",
+            )
+        )
 
 
 def _has_residual_state(operation: SC05Operation) -> bool:
     return operation.steps.filter(
-        status__in=(SC05StepStatus.APPLIED, SC05StepStatus.COMPENSATION_FAILED)
+        status__in=(
+            SC05StepStatus.RUNNING,
+            SC05StepStatus.APPLIED,
+            SC05StepStatus.COMPENSATION_FAILED,
+        )
     ).exists()
 
 

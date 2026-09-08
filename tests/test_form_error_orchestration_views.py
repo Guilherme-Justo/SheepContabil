@@ -69,7 +69,10 @@ def test_sc04_upload_htmx_success_redirect(
     """Valida que upload com sucesso sob HTMX retorna status 200 com header HX-Redirect."""
     storage = MemoryStorage()
     monkeypatch.setattr("core.automations.sc04.services.build_object_storage", lambda: storage)
-    monkeypatch.setattr("core.automations.views.run_sc04_task.delay", lambda run_id: None)
+    monkeypatch.setattr(
+        "core.automations.dispatching.run_sc04_task.apply_async",
+        lambda *, args, task_id: None,
+    )
 
     url = reverse("automations:sc04-upload")
     sample_file = SimpleUploadedFile(
@@ -108,7 +111,10 @@ def test_sc05_operation_htmx_success_redirect(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Valida execução do SC-05 com sucesso sob HTMX retornando 200 com HX-Redirect."""
-    monkeypatch.setattr("core.automations.views.run_sc05_task.delay", lambda run_id: None)
+    monkeypatch.setattr(
+        "core.automations.dispatching.run_sc05_task.apply_async",
+        lambda *, args, task_id: None,
+    )
     sc05 = modules["SC-05"]
     client_obj = SC05Client.objects.create(
         name="Cliente Teste",

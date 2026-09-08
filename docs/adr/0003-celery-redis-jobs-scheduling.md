@@ -23,11 +23,18 @@ Topologia:
 Políticas:
 
 - chave de idempotência por comando/período;
-- retentativa somente para falha transitória;
-- backoff exponencial, jitter, timeout e limite de tentativas;
-- tarefas idempotentes e seguras diante de redelivery;
-- reconciliação de execuções enfileiradas/presas;
+- identificador UUID de entrega persistido antes da publicação e usado como fencing token no worker;
+- `acks_late` e redelivery após perda do worker, sem retentativa automática da tarefa inteira;
+- publicação fora da transação do banco e atualização condicional em falha do broker;
+- início e confirmação da publicação persistidos separadamente, para que backlog confirmado não seja confundido com mensagem órfã;
+- heartbeat persistido e tempos ordenados como limite brando < limite rígido < visibilidade do Redis < corte de órfão;
+- reconciliação limitada a uma recuperação automática por padrão, com histórico preservado nos metadados;
+- SC-04 pode retomar trabalho interrompido depois de fechar a tentativa anterior;
+- SC-05 enfileirado pode recuperar uma publicação não confirmada, mas uma execução já iniciada fica parcial e exige reinspeção manual dos três portais;
+- SC-20 já iniciado nunca é reenviado automaticamente, pois uma comunicação aceita e não confirmada no banco é ambígua;
+- entregas antigas ou substituídas são no-op e conclusões usam comparação de estado e identificador;
 - mesma entrada de aplicação para disparo manual e agendado;
+- o pulso reconcilia um lote limitado antes de publicar novas competências;
 - o processo do cron deve terminar após publicar os trabalhos vencidos;
 - regras de horário ficam no domínio, em `America/Sao_Paulo`, e não no cron UTC.
 
@@ -45,6 +52,7 @@ Políticas:
 - entrega de mensagem pode ocorrer mais de uma vez;
 - código precisa ser explicitamente idempotente;
 - indisponibilidade do broker exige reconciliação.
+- uma interrupção do SC-20 após o início exige conferência humana até existir outbox transacional com confirmação do provedor.
 
 ## Alternativas consideradas
 

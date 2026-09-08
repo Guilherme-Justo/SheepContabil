@@ -5,7 +5,7 @@ import re
 import unicodedata
 import uuid
 from dataclasses import asdict
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -38,6 +38,14 @@ from core.automations.models import (
     FiscalDocument,
     RunStatus,
     RunTrigger,
+)
+from core.automations.run_tracking import (
+    SupersededDelivery,
+    bind_delivery,
+    delivery_matches,
+    require_current_delivery,
+    touch_run,
+    with_reconciliation_event,
 )
 from core.automations.sc04.classification import (
     PROMPT_VERSION,
@@ -113,13 +121,16 @@ def create_manual_sc04_run(
         raise
     should_dispatch = ingestion.outcome == DocumentRunOutcome.NEW
     if should_dispatch:
+        queued_at = timezone.now()
         AutomationRun.objects.filter(pk=run.pk).update(
             status=RunStatus.QUEUED,
             summary="Documento validado e adicionado à fila.",
             metadata={"received": 1, "policy_version": POLICY_VERSION},
+            task_id=uuid.uuid4(),
+            queued_at=queued_at,
         )
     else:
-        _recompute_run(run.id)
+        recompute_sc04_run(run.id)
     run.refresh_from_db()
     return run, ingestion, should_dispatch
 
@@ -134,6 +145,8 @@ def create_manual_sc04_inbox_run(*, triggered_by: User) -> AutomationRun:
         parameters={"source": DocumentSource.SIMULATED_INBOX},
         idempotency_key=f"sc04:manual-inbox:{token}",
         summary="Caixa sintética adicionada à fila de triagem.",
+        task_id=uuid.uuid4(),
+        queued_at=timezone.now(),
     )
 
 
@@ -152,6 +165,8 @@ def prepare_scheduled_sc04_run(*, base_date: date) -> tuple[AutomationRun, bool]
                 "base_date": competence,
             },
             "summary": "Triagem diária adicionada à fila.",
+            "task_id": uuid.uuid4(),
+            "queued_at": timezone.now(),
         },
     )
     if created:
@@ -169,7 +184,27 @@ def prepare_scheduled_sc04_run(*, base_date: date) -> tuple[AutomationRun, bool]
     run.error_message = ""
     run.metadata = {}
     run.finished_at = None
-    run.save(update_fields=("status", "summary", "error_message", "metadata", "finished_at"))
+    run.task_id = uuid.uuid4()
+    run.queued_at = timezone.now()
+    run.dispatch_started_at = None
+    run.broker_published_at = None
+    run.heartbeat_at = None
+    run.reconciliation_attempts = 0
+    run.save(
+        update_fields=(
+            "status",
+            "summary",
+            "error_message",
+            "metadata",
+            "finished_at",
+            "task_id",
+            "queued_at",
+            "dispatch_started_at",
+            "broker_published_at",
+            "heartbeat_at",
+            "reconciliation_attempts",
+        )
+    )
     return run, True
 
 
@@ -180,14 +215,20 @@ def execute_sc04(
     storage: ObjectStorage | None = None,
     extractor: TextExtractor | None = None,
     classifier: DocumentClassifier | None = None,
+    task_id: str | uuid.UUID | None = None,
     resume_interrupted: bool = False,
 ) -> SC04ExecutionResult:
-    run, should_execute = _start_run(run_id, resume_interrupted=resume_interrupted)
+    run, should_execute = _start_run(
+        run_id,
+        task_id=task_id,
+        resume_interrupted=resume_interrupted,
+    )
     if not should_execute:
         return _result_from_metadata(run.metadata)
     try:
         selected_storage = storage or build_object_storage()
         if run.parameters.get("source") == DocumentSource.SIMULATED_INBOX:
+            require_current_delivery(run.id, task_id=run.task_id)
             ingestion_failures = _ingest_inbox(
                 run=run,
                 inbox=inbox or build_document_inbox(),
@@ -201,8 +242,14 @@ def execute_sc04(
             "decision__document",
             "run",
         ).filter(run=run, status=DocumentRoutingStatus.PENDING):
+            require_current_delivery(run.id, task_id=run.task_id)
+            touch_run(run.id, task_id=run.task_id)
             try:
-                _execute_route(route=pending_route, storage=selected_storage)
+                _execute_route(
+                    route=pending_route,
+                    storage=selected_storage,
+                    expected_task_id=run.task_id,
+                )
             except StorageOperationError:
                 continue
         document_ids = list(
@@ -211,6 +258,8 @@ def execute_sc04(
             .distinct()
         )
         for document_id in document_ids:
+            require_current_delivery(run.id, task_id=run.task_id)
+            touch_run(run.id, task_id=run.task_id)
             _process_document(
                 run=run,
                 document_id=document_id,
@@ -218,9 +267,13 @@ def execute_sc04(
                 extractor=extractor or DefaultTextExtractor(),
                 classifier=classifier,
             )
-        return _recompute_run(run.id)
+        require_current_delivery(run.id, task_id=run.task_id)
+        return recompute_sc04_run(run.id, expected_task_id=run.task_id)
+    except SupersededDelivery:
+        current = AutomationRun.objects.get(pk=run.pk)
+        return _result_from_metadata(current.metadata)
     except Exception as exc:
-        _finish_unhandled_failure(run, exc)
+        _finish_unhandled_failure(run, exc, expected_task_id=run.task_id)
         raise
 
 
@@ -378,7 +431,7 @@ def resolve_document_review(
     try:
         _execute_route(route=route, storage=storage or build_object_storage())
     finally:
-        _recompute_run(review.run_id)
+        recompute_sc04_run(review.run_id)
     return decision
 
 
@@ -396,7 +449,7 @@ def retry_document_route(
     try:
         _execute_route(route=route, storage=storage or build_object_storage())
     finally:
-        _recompute_run(route.run_id)
+        recompute_sc04_run(route.run_id)
     route.refresh_from_db()
     return route
 
@@ -405,10 +458,48 @@ def retry_document_route(
 def _start_run(
     run_id: uuid.UUID | str,
     *,
+    task_id: str | uuid.UUID | None,
     resume_interrupted: bool,
 ) -> tuple[AutomationRun, bool]:
     run = AutomationRun.objects.select_for_update().get(pk=run_id, module_id="SC-04")
+    if not bind_delivery(run, task_id):
+        return run, False
+    now = timezone.now()
+    run.dispatch_started_at = run.dispatch_started_at or run.queued_at or now
+    run.broker_published_at = run.broker_published_at or now
     if run.status == RunStatus.RUNNING and resume_interrupted:
+        if run.reconciliation_attempts >= int(settings.AUTOMATION_RECONCILIATION_MAX_ATTEMPTS):
+            _close_interrupted_sc04_items(run=run, now=now)
+            previous_task_id = run.task_id
+            run.task_id = None
+            run.status = RunStatus.FAILED
+            run.summary = (
+                "A triagem foi interrompida repetidamente e não será retomada automaticamente."
+            )
+            run.error_message = "Revise os documentos com falha antes de iniciar uma nova execução."
+            run.metadata = with_reconciliation_event(
+                run.metadata,
+                action="failed",
+                reason="broker_redelivery_exhausted",
+                at=now,
+                previous_task_id=previous_task_id,
+            )
+            run.finished_at = now
+            run.heartbeat_at = now
+            run.save(
+                update_fields=(
+                    "task_id",
+                    "dispatch_started_at",
+                    "broker_published_at",
+                    "status",
+                    "summary",
+                    "error_message",
+                    "metadata",
+                    "finished_at",
+                    "heartbeat_at",
+                )
+            )
+            return run, False
         interrupted_document_ids = list(
             FiscalDocument.objects.filter(
                 intakes__run_items__run=run,
@@ -427,7 +518,7 @@ def _start_run(
             status=ClassificationAttemptStatus.FAILED,
             error_code="worker_interrupted",
             error_message="O processamento foi retomado após interrupção do worker.",
-            finished_at=timezone.now(),
+            finished_at=now,
         )
         FiscalDocument.objects.filter(id__in=interrupted_document_ids).update(
             status=DocumentStatus.QUEUED,
@@ -438,15 +529,85 @@ def _start_run(
             document_id__in=interrupted_document_ids,
             status=DocumentIntakeStatus.PROCESSING,
         ).update(status=DocumentIntakeStatus.QUEUED)
+        run.reconciliation_attempts += 1
+        run.heartbeat_at = now
+        run.metadata = with_reconciliation_event(
+            run.metadata,
+            action="resumed",
+            reason="broker_redelivery",
+            at=now,
+            previous_task_id=run.task_id,
+            details={"attempt": run.reconciliation_attempts},
+        )
+        run.save(
+            update_fields=(
+                "task_id",
+                "dispatch_started_at",
+                "broker_published_at",
+                "reconciliation_attempts",
+                "heartbeat_at",
+                "metadata",
+            )
+        )
         return run, True
     if run.status not in {RunStatus.PENDING, RunStatus.QUEUED}:
         return run, False
     run.status = RunStatus.RUNNING
-    run.started_at = run.started_at or timezone.now()
+    run.started_at = run.started_at or now
     run.finished_at = None
     run.error_message = ""
-    run.save(update_fields=("status", "started_at", "finished_at", "error_message"))
+    run.heartbeat_at = now
+    run.save(
+        update_fields=(
+            "task_id",
+            "dispatch_started_at",
+            "broker_published_at",
+            "status",
+            "started_at",
+            "finished_at",
+            "error_message",
+            "heartbeat_at",
+        )
+    )
     return run, True
+
+
+def _close_interrupted_sc04_items(*, run: AutomationRun, now: datetime) -> None:
+    interrupted_document_ids = list(
+        FiscalDocument.objects.filter(
+            intakes__run_items__run=run,
+            intakes__run_items__outcome=DocumentRunOutcome.NEW,
+            status__in=(DocumentStatus.QUEUED, DocumentStatus.PROCESSING),
+        )
+        .distinct()
+        .values_list("id", flat=True)
+    )
+    DocumentClassificationAttempt.objects.filter(
+        run=run,
+        status=ClassificationAttemptStatus.PROCESSING,
+    ).update(
+        status=ClassificationAttemptStatus.FAILED,
+        error_code="worker_interrupted",
+        error_message="O worker foi interrompido repetidamente; a tentativa foi encerrada.",
+        finished_at=now,
+    )
+    DocumentRouting.objects.filter(
+        run=run,
+        status=DocumentRoutingStatus.PENDING,
+    ).update(
+        status=DocumentRoutingStatus.FAILED,
+        last_error="O processamento foi interrompido repetidamente.",
+        updated_at=now,
+    )
+    FiscalDocument.objects.filter(id__in=interrupted_document_ids).update(
+        status=DocumentStatus.FAILED,
+        last_error="O processamento foi interrompido repetidamente.",
+    )
+    DocumentIntake.objects.filter(
+        run=run,
+        document_id__in=interrupted_document_ids,
+        status__in=(DocumentIntakeStatus.QUEUED, DocumentIntakeStatus.PROCESSING),
+    ).update(status=DocumentIntakeStatus.FAILED)
 
 
 def _ingest_inbox(
@@ -457,12 +618,14 @@ def _ingest_inbox(
 ) -> int:
     failures = 0
     for attachment in inbox.list_attachments():
+        require_current_delivery(run.id, task_id=run.task_id)
         try:
             validated = validate_document(
                 filename=attachment.filename,
                 declared_content_type=attachment.declared_content_type,
                 content=attachment.content,
             )
+            require_current_delivery(run.id, task_id=run.task_id)
             ingest_document(
                 run=run,
                 source=DocumentSource.SIMULATED_INBOX,
@@ -470,6 +633,8 @@ def _ingest_inbox(
                 validated=validated,
                 storage=storage,
             )
+        except SupersededDelivery:
+            raise
         except Exception:
             failures += 1
             continue
@@ -507,10 +672,7 @@ def _process_document(
                 selected_classifier.model if selected_classifier else str(settings.OPENAI_MODEL)
             ),
             provider=(selected_classifier.provider if selected_classifier else "openai"),
-        )
-        FiscalDocument.objects.filter(pk=document.pk).update(
             extraction_method=extraction.method,
-            extracted_text_sha256=input_sha256,
             extracted_excerpt=extraction.text[:2000],
             page_count=extraction.page_count,
         )
@@ -540,64 +702,73 @@ def _process_document(
             )
             return
         except Exception:
-            DocumentClassificationAttempt.objects.filter(
-                pk=attempt.pk,
-                status=ClassificationAttemptStatus.PROCESSING,
-            ).update(
-                status=ClassificationAttemptStatus.FAILED,
-                error_code="unexpected_classifier_error",
-                error_message="O classificador não pôde concluir a solicitação.",
-                finished_at=timezone.now(),
-            )
+            _record_unexpected_classifier_failure(attempt=attempt, run=run)
             raise
-        predicted_client = (
-            FiscalClient.objects.filter(code=prediction.client_code, is_active=True).first()
-            if prediction.client_code
-            else None
-        )
-        final_client = exact_client or predicted_client
-        final_client_confidence = 1.0 if exact_client else prediction.client_confidence
-        evidence = list(prediction.evidence)
-        if exact_client:
-            evidence.append("Cliente confirmado por identificador ou alias sintético exato.")
-        _complete_attempt(
-            attempt=attempt,
-            prediction=prediction,
-            predicted_client=predicted_client,
-        )
-        FiscalDocument.objects.filter(pk=document.pk).update(
-            classified_type=prediction.document_type,
-            type_confidence=_decimal_confidence(prediction.type_confidence),
-            matched_client=final_client,
-            client_confidence=_decimal_confidence(final_client_confidence),
-            evidence=evidence[:4],
-            last_error="",
-        )
-        reason = _review_reason(
-            document_type=prediction.document_type,
-            type_confidence=prediction.type_confidence,
-            client=final_client,
-            client_confidence=final_client_confidence,
-            is_ambiguous=ambiguous_alias or prediction.is_ambiguous,
-        )
-        if reason is not None:
-            _open_review(document=document, run=run, attempt=attempt, reason=reason)
-            return
-        if final_client is None:
-            raise RuntimeError("routing policy accepted a missing client")
         with transaction.atomic():
-            decision = DocumentDecision.objects.create(
-                document=document,
-                classification_attempt=attempt,
-                document_type=prediction.document_type,
-                client=final_client,
-                origin=DocumentDecisionOrigin.AUTOMATIC,
-                policy_version=POLICY_VERSION,
+            _lock_current_delivery(run)
+            predicted_client = (
+                FiscalClient.objects.filter(code=prediction.client_code, is_active=True).first()
+                if prediction.client_code
+                else None
             )
-            route = _prepare_route(decision=decision, run=run)
-        _execute_route(route=route, storage=storage)
+            final_client = exact_client or predicted_client
+            final_client_confidence = 1.0 if exact_client else prediction.client_confidence
+            evidence = list(prediction.evidence)
+            if exact_client:
+                evidence.append("Cliente confirmado por identificador ou alias sintético exato.")
+            _complete_attempt(
+                attempt=attempt,
+                prediction=prediction,
+                predicted_client=predicted_client,
+            )
+            FiscalDocument.objects.filter(pk=document.pk).update(
+                classified_type=prediction.document_type,
+                type_confidence=_decimal_confidence(prediction.type_confidence),
+                matched_client=final_client,
+                client_confidence=_decimal_confidence(final_client_confidence),
+                evidence=evidence[:4],
+                last_error="",
+            )
+            reason = _review_reason(
+                document_type=prediction.document_type,
+                type_confidence=prediction.type_confidence,
+                client=final_client,
+                client_confidence=final_client_confidence,
+                is_ambiguous=ambiguous_alias or prediction.is_ambiguous,
+            )
+            if reason is not None:
+                _open_review(document=document, run=run, attempt=attempt, reason=reason)
+                route = None
+            else:
+                if final_client is None:
+                    raise RuntimeError("routing policy accepted a missing client")
+                decision = DocumentDecision.objects.create(
+                    document=document,
+                    classification_attempt=attempt,
+                    document_type=prediction.document_type,
+                    client=final_client,
+                    origin=DocumentDecisionOrigin.AUTOMATIC,
+                    policy_version=POLICY_VERSION,
+                )
+                route = _prepare_route(decision=decision, run=run)
+        if route is not None:
+            _execute_route(
+                route=route,
+                storage=storage,
+                expected_task_id=run.task_id,
+            )
+    except SupersededDelivery:
+        return
     except Exception as exc:
-        _mark_document_failed(document=document, run=run, exc=exc)
+        try:
+            _mark_document_failed(
+                document=document,
+                run=run,
+                exc=exc,
+                expected_task_id=run.task_id,
+            )
+        except SupersededDelivery:
+            return
 
 
 @transaction.atomic
@@ -606,6 +777,7 @@ def _claim_document(
     document_id: uuid.UUID | str,
     run: AutomationRun,
 ) -> tuple[FiscalDocument, bool]:
+    _lock_current_delivery(run)
     document = FiscalDocument.objects.select_for_update().get(pk=document_id)
     if (
         document.status != DocumentStatus.QUEUED
@@ -622,6 +794,14 @@ def _claim_document(
     return document, True
 
 
+def _lock_current_delivery(run: AutomationRun) -> AutomationRun:
+    locked = AutomationRun.objects.select_for_update().get(pk=run.pk)
+    if locked.status != RunStatus.RUNNING or not delivery_matches(locked, run.task_id):
+        raise SupersededDelivery
+    return locked
+
+
+@transaction.atomic
 def _create_attempt(
     *,
     document: FiscalDocument,
@@ -630,11 +810,15 @@ def _create_attempt(
     input_char_count: int,
     model: str,
     provider: str,
+    extraction_method: str,
+    extracted_excerpt: str,
+    page_count: int | None,
 ) -> DocumentClassificationAttempt:
+    _lock_current_delivery(run)
     sequence = (
         document.classification_attempts.aggregate(maximum=Max("sequence"))["maximum"] or 0
     ) + 1
-    return DocumentClassificationAttempt.objects.create(
+    attempt = DocumentClassificationAttempt.objects.create(
         document=document,
         run=run,
         sequence=sequence,
@@ -646,6 +830,13 @@ def _create_attempt(
         input_sha256=input_sha256,
         input_char_count=input_char_count,
     )
+    FiscalDocument.objects.filter(pk=document.pk).update(
+        extraction_method=extraction_method,
+        extracted_text_sha256=input_sha256,
+        extracted_excerpt=extracted_excerpt,
+        page_count=page_count,
+    )
+    return attempt
 
 
 def _complete_attempt(
@@ -669,6 +860,7 @@ def _complete_attempt(
     )
 
 
+@transaction.atomic
 def _record_classifier_failure(
     *,
     document: FiscalDocument,
@@ -676,6 +868,7 @@ def _record_classifier_failure(
     attempt: DocumentClassificationAttempt,
     exc: ClassifierError,
 ) -> None:
+    _lock_current_delivery(run)
     status = (
         ClassificationAttemptStatus.INVALID_RESPONSE
         if isinstance(exc, ClassifierInvalidResponse)
@@ -694,6 +887,24 @@ def _record_classifier_failure(
     )
     FiscalDocument.objects.filter(pk=document.pk).update(last_error=str(exc))
     _open_review(document=document, run=run, attempt=attempt, reason=reason)
+
+
+@transaction.atomic
+def _record_unexpected_classifier_failure(
+    *,
+    attempt: DocumentClassificationAttempt,
+    run: AutomationRun,
+) -> None:
+    _lock_current_delivery(run)
+    DocumentClassificationAttempt.objects.filter(
+        pk=attempt.pk,
+        status=ClassificationAttemptStatus.PROCESSING,
+    ).update(
+        status=ClassificationAttemptStatus.FAILED,
+        error_code="unexpected_classifier_error",
+        error_message="O classificador não pôde concluir a solicitação.",
+        finished_at=timezone.now(),
+    )
 
 
 def _open_review(
@@ -734,12 +945,21 @@ def _prepare_route(*, decision: DocumentDecision, run: AutomationRun) -> Documen
     )
 
 
-def _execute_route(*, route: DocumentRouting, storage: ObjectStorage) -> None:
+def _execute_route(
+    *,
+    route: DocumentRouting,
+    storage: ObjectStorage,
+    expected_task_id: uuid.UUID | None = None,
+) -> None:
     route.refresh_from_db()
     if route.status == DocumentRoutingStatus.ROUTED:
         return
     document = route.decision.document
-    DocumentRouting.objects.filter(pk=route.pk).update(attempt_count=F("attempt_count") + 1)
+    with transaction.atomic():
+        if expected_task_id is not None:
+            route.run.task_id = expected_task_id
+            _lock_current_delivery(route.run)
+        DocumentRouting.objects.filter(pk=route.pk).update(attempt_count=F("attempt_count") + 1)
     try:
         storage.copy_if_absent(
             source_key=document.storage_key,
@@ -747,37 +967,45 @@ def _execute_route(*, route: DocumentRouting, storage: ObjectStorage) -> None:
             content_type=document.media_type,
         )
     except StorageOperationError as exc:
+        with transaction.atomic():
+            if expected_task_id is not None:
+                route.run.task_id = expected_task_id
+                _lock_current_delivery(route.run)
+            DocumentRouting.objects.filter(pk=route.pk).update(
+                status=DocumentRoutingStatus.FAILED,
+                last_error=str(exc),
+                updated_at=timezone.now(),
+            )
+            FiscalDocument.objects.filter(pk=document.pk).update(
+                status=DocumentStatus.FAILED,
+                last_error=str(exc),
+            )
+            DocumentIntake.objects.filter(
+                document=document,
+                run=route.run,
+                is_duplicate=False,
+            ).update(status=DocumentIntakeStatus.FAILED)
+        raise
+    finished_at = timezone.now()
+    with transaction.atomic():
+        if expected_task_id is not None:
+            route.run.task_id = expected_task_id
+            _lock_current_delivery(route.run)
         DocumentRouting.objects.filter(pk=route.pk).update(
-            status=DocumentRoutingStatus.FAILED,
-            last_error=str(exc),
-            updated_at=timezone.now(),
+            status=DocumentRoutingStatus.ROUTED,
+            last_error="",
+            routed_at=finished_at,
+            updated_at=finished_at,
         )
         FiscalDocument.objects.filter(pk=document.pk).update(
-            status=DocumentStatus.FAILED,
-            last_error=str(exc),
+            status=DocumentStatus.ROUTED,
+            last_error="",
         )
         DocumentIntake.objects.filter(
             document=document,
             run=route.run,
             is_duplicate=False,
-        ).update(status=DocumentIntakeStatus.FAILED)
-        raise
-    finished_at = timezone.now()
-    DocumentRouting.objects.filter(pk=route.pk).update(
-        status=DocumentRoutingStatus.ROUTED,
-        last_error="",
-        routed_at=finished_at,
-        updated_at=finished_at,
-    )
-    FiscalDocument.objects.filter(pk=document.pk).update(
-        status=DocumentStatus.ROUTED,
-        last_error="",
-    )
-    DocumentIntake.objects.filter(
-        document=document,
-        run=route.run,
-        is_duplicate=False,
-    ).update(status=DocumentIntakeStatus.ROUTED)
+        ).update(status=DocumentIntakeStatus.ROUTED)
 
 
 def _review_reason(
@@ -846,12 +1074,17 @@ def _decimal_confidence(value: float) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.0001"))
 
 
+@transaction.atomic
 def _mark_document_failed(
     *,
     document: FiscalDocument,
     run: AutomationRun,
     exc: Exception,
+    expected_task_id: uuid.UUID | None = None,
 ) -> None:
+    if expected_task_id is not None:
+        run.task_id = expected_task_id
+        _lock_current_delivery(run)
     safe_message = (
         str(exc)
         if isinstance(exc, (StorageOperationError, ValidationError))
@@ -866,7 +1099,12 @@ def _mark_document_failed(
     )
 
 
-def _recompute_run(run_id: uuid.UUID | str) -> SC04ExecutionResult:
+def recompute_sc04_run(
+    run_id: uuid.UUID | str,
+    *,
+    expected_task_id: uuid.UUID | None = None,
+    preserve_terminal_status: bool = False,
+) -> SC04ExecutionResult:
     run = AutomationRun.objects.get(pk=run_id, module_id="SC-04")
     ingestion_failures = _metadata_int(run.metadata.get("ingestion_failures"))
     items = DocumentRunItem.objects.filter(run=run)
@@ -903,7 +1141,17 @@ def _recompute_run(run_id: uuid.UUID | str) -> SC04ExecutionResult:
         duplicates=duplicates,
         failed=failed,
     )
-    if awaiting_review:
+    terminal_statuses = {
+        RunStatus.SUCCEEDED,
+        RunStatus.SUCCEEDED_WITH_WARNINGS,
+        RunStatus.PARTIALLY_FAILED,
+        RunStatus.FAILED,
+        RunStatus.CANCELLED,
+    }
+    if preserve_terminal_status and run.status in terminal_statuses:
+        status = run.status
+        finished_at = run.finished_at or timezone.now()
+    elif awaiting_review:
         status = RunStatus.AWAITING_REVIEW
         finished_at = None
     elif in_progress:
@@ -925,17 +1173,25 @@ def _recompute_run(run_id: uuid.UUID | str) -> SC04ExecutionResult:
     error_message = ""
     if failed:
         error_message = "Há documentos que exigem correção operacional ou nova tentativa."
-    AutomationRun.objects.filter(pk=run.pk).update(
+    run_query = AutomationRun.objects.filter(pk=run.pk)
+    if expected_task_id is not None:
+        run_query = run_query.filter(
+            status=RunStatus.RUNNING,
+            task_id=expected_task_id,
+        )
+    run_query.update(
         status=status,
         summary=summary,
         error_message=error_message,
         metadata={
+            **run.metadata,
             "policy_version": POLICY_VERSION,
             "threshold": float(settings.SC04_AUTO_ROUTE_THRESHOLD),
             "ingestion_failures": ingestion_failures,
             "result": asdict(result),
         },
         finished_at=finished_at,
+        heartbeat_at=timezone.now(),
     )
     return result
 
@@ -976,11 +1232,22 @@ def _fail_run_before_processing(run: AutomationRun, exc: Exception) -> None:
     )
 
 
-def _finish_unhandled_failure(run: AutomationRun, exc: Exception) -> None:
-    AutomationRun.objects.filter(pk=run.pk).update(
+def _finish_unhandled_failure(
+    run: AutomationRun,
+    exc: Exception,
+    *,
+    expected_task_id: uuid.UUID | None,
+) -> None:
+    run_query = AutomationRun.objects.filter(pk=run.pk, status=RunStatus.RUNNING)
+    if expected_task_id is not None:
+        run_query = run_query.filter(task_id=expected_task_id)
+    else:
+        run_query = run_query.filter(task_id__isnull=True)
+    run_query.update(
         status=RunStatus.FAILED,
         summary="A triagem não pôde ser concluída.",
         error_message="O pipeline documental encontrou uma falha operacional.",
         metadata={**run.metadata, "technical_error": type(exc).__name__},
         finished_at=timezone.now(),
+        heartbeat_at=timezone.now(),
     )

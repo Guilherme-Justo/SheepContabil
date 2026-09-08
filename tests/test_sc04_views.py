@@ -131,8 +131,8 @@ def test_valid_upload_is_persisted_dispatched_and_redirected_to_document(
         lambda: storage,
     )
     monkeypatch.setattr(
-        "core.automations.views.run_sc04_task.delay",
-        lambda run_id: dispatched.append(run_id),
+        "core.automations.dispatching.run_sc04_task.apply_async",
+        lambda *, args, task_id: dispatched.append(args[0]),
     )
     client.force_login(fiscal_operator)
 

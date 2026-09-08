@@ -20,6 +20,13 @@ from core.automations.models import (
     RunStatus,
     RunTrigger,
 )
+from core.automations.run_tracking import (
+    SupersededDelivery,
+    bind_delivery,
+    require_current_delivery,
+    touch_run,
+    with_reconciliation_event,
+)
 from core.automations.sc20.gateways import (
     DeliveryResult,
     NotificationGateway,
@@ -67,6 +74,8 @@ def create_sc20_run(
         parameters=parameters,
         idempotency_key=idempotency_key,
         summary="Execução adicionada à fila.",
+        task_id=uuid.uuid4(),
+        queued_at=timezone.now(),
     )
 
 
@@ -82,6 +91,8 @@ def prepare_scheduled_sc20_run(*, base_date: date) -> tuple[AutomationRun, bool]
             "status": RunStatus.QUEUED,
             "parameters": {"base_date": base_date.isoformat(), "competence": competence},
             "summary": "Execução mensal adicionada à fila.",
+            "task_id": uuid.uuid4(),
+            "queued_at": timezone.now(),
         },
     )
     if created:
@@ -101,6 +112,12 @@ def prepare_scheduled_sc20_run(*, base_date: date) -> tuple[AutomationRun, bool]
     run.error_message = ""
     run.metadata = {}
     run.finished_at = None
+    run.task_id = uuid.uuid4()
+    run.queued_at = timezone.now()
+    run.dispatch_started_at = None
+    run.broker_published_at = None
+    run.heartbeat_at = None
+    run.reconciliation_attempts = 0
     run.save(
         update_fields=(
             "status",
@@ -108,6 +125,12 @@ def prepare_scheduled_sc20_run(*, base_date: date) -> tuple[AutomationRun, bool]
             "error_message",
             "metadata",
             "finished_at",
+            "task_id",
+            "queued_at",
+            "dispatch_started_at",
+            "broker_published_at",
+            "heartbeat_at",
+            "reconciliation_attempts",
         )
     )
     return run, True
@@ -118,14 +141,20 @@ def execute_sc20(
     *,
     gateway: NotificationGateway | None = None,
     policy: SC20Policy | None = None,
+    task_id: str | uuid.UUID | None = None,
+    resume_interrupted: bool = False,
 ) -> SC20ExecutionResult:
-    selected_gateway = gateway or get_sc20_gateway()
     selected_policy = policy or SC20Policy()
-    run, should_execute = _start_run(run_id)
+    run, should_execute = _start_run(
+        run_id,
+        task_id=task_id,
+        resume_interrupted=resume_interrupted,
+    )
     if not should_execute:
         return _result_from_metadata(run.metadata)
 
     try:
+        selected_gateway = gateway or get_sc20_gateway()
         retry_id = run.parameters.get("retry_communication_id")
         if retry_id:
             result = _execute_retry(
@@ -135,27 +164,103 @@ def execute_sc20(
             )
         else:
             result = _execute_scan(run=run, gateway=selected_gateway, policy=selected_policy)
-        _finish_run(run=run, result=result, policy=selected_policy)
+        _finish_run(
+            run=run,
+            result=result,
+            policy=selected_policy,
+            expected_task_id=run.task_id,
+        )
         return result
+    except SupersededDelivery:
+        current = AutomationRun.objects.get(pk=run.pk)
+        return _result_from_metadata(current.metadata)
     except Exception as exc:
-        AutomationRun.objects.filter(pk=run.pk).update(
+        run_query = AutomationRun.objects.filter(pk=run.pk, status=RunStatus.RUNNING)
+        if run.task_id is not None:
+            run_query = run_query.filter(task_id=run.task_id)
+        else:
+            run_query = run_query.filter(task_id__isnull=True)
+        run_query.update(
             status=RunStatus.FAILED,
             error_message="Não foi possível concluir a verificação de certificados.",
             metadata={**run.metadata, "technical_error": type(exc).__name__},
             finished_at=timezone.now(),
+            heartbeat_at=timezone.now(),
         )
         raise
 
 
 @transaction.atomic
-def _start_run(run_id: uuid.UUID | str) -> tuple[AutomationRun, bool]:
+def _start_run(
+    run_id: uuid.UUID | str,
+    *,
+    task_id: str | uuid.UUID | None,
+    resume_interrupted: bool,
+) -> tuple[AutomationRun, bool]:
     run = AutomationRun.objects.select_for_update().get(pk=run_id, module_id="SC-20")
-    if run.status in _terminal_statuses() or run.status == RunStatus.RUNNING:
+    if not bind_delivery(run, task_id):
+        return run, False
+    now = timezone.now()
+    run.dispatch_started_at = run.dispatch_started_at or run.queued_at or now
+    run.broker_published_at = run.broker_published_at or now
+    if run.status == RunStatus.RUNNING:
+        if resume_interrupted:
+            previous_task_id = run.task_id
+            run.reconciliation_attempts += 1
+            run.task_id = None
+            run.status = RunStatus.PARTIALLY_FAILED
+            run.summary = (
+                "A verificação foi interrompida durante uma comunicação; "
+                "nenhum reenvio automático foi realizado."
+            )
+            run.error_message = (
+                "Confirme o histórico do provedor antes de autorizar uma nova tentativa."
+            )
+            run.metadata = {
+                **with_reconciliation_event(
+                    run.metadata,
+                    action="quarantined",
+                    reason="broker_redelivery_with_ambiguous_delivery",
+                    at=now,
+                    previous_task_id=previous_task_id,
+                    details={"attempt": run.reconciliation_attempts},
+                ),
+                "reconciliation_required": True,
+            }
+            run.finished_at = now
+            run.heartbeat_at = now
+            run.save(
+                update_fields=(
+                    "task_id",
+                    "dispatch_started_at",
+                    "broker_published_at",
+                    "reconciliation_attempts",
+                    "status",
+                    "summary",
+                    "error_message",
+                    "metadata",
+                    "finished_at",
+                    "heartbeat_at",
+                )
+            )
+        return run, False
+    if run.status in _terminal_statuses():
         return run, False
     run.status = RunStatus.RUNNING
-    run.started_at = timezone.now()
+    run.started_at = now
     run.error_message = ""
-    run.save(update_fields=("status", "started_at", "error_message"))
+    run.heartbeat_at = now
+    run.save(
+        update_fields=(
+            "task_id",
+            "dispatch_started_at",
+            "broker_published_at",
+            "status",
+            "started_at",
+            "error_message",
+            "heartbeat_at",
+        )
+    )
     return run, True
 
 
@@ -173,6 +278,8 @@ def _execute_scan(
     )
     selected = sent = failed = deduplicated = 0
     for certificate in certificates.iterator():
+        require_current_delivery(run.id, task_id=run.task_id)
+        touch_run(run.id, task_id=run.task_id)
         selected += 1
         result = _notify_certificate(
             certificate=certificate,
@@ -199,6 +306,7 @@ def _notify_certificate(
     policy: SC20Policy,
     gateway: NotificationGateway,
 ) -> SC20ExecutionResult:
+    require_current_delivery(run.id, task_id=run.task_id)
     channel = certificate.preferred_channel
     recipient = certificate.recipient_for(channel)
     communication, created = CertificateCommunication.objects.get_or_create(
@@ -229,6 +337,7 @@ def _execute_retry(
     communication_id: str,
     gateway: NotificationGateway,
 ) -> SC20ExecutionResult:
+    require_current_delivery(run.id, task_id=run.task_id)
     communication = (
         CertificateCommunication.objects.select_for_update()
         .select_related("certificate")
@@ -293,6 +402,7 @@ def _deliver(
                 "uma nova tentativa pode ser feita."
             ),
         )
+    require_current_delivery(run.id, task_id=run.task_id)
     status = CommunicationStatus.SENT if delivery.delivered else CommunicationStatus.FAILED
     finished_at = timezone.now()
     is_synthetic = isinstance(gateway, SimulatedNotificationGateway)
@@ -342,6 +452,7 @@ def _finish_run(
     run: AutomationRun,
     result: SC20ExecutionResult,
     policy: SC20Policy,
+    expected_task_id: uuid.UUID | None,
 ) -> None:
     status = RunStatus.SUCCEEDED_WITH_WARNINGS if result.failed else RunStatus.SUCCEEDED
     if run.parameters.get("retry_communication_id"):
@@ -354,14 +465,21 @@ def _finish_run(
             f"{result.selected} certificado(s) na janela; {result.sent} aviso(s) enviado(s); "
             f"{result.failed} falha(s); {result.deduplicated} aviso(s) já registrado(s)."
         )
-    AutomationRun.objects.filter(pk=run.pk).update(
+    run_query = AutomationRun.objects.filter(pk=run.pk, status=RunStatus.RUNNING)
+    if expected_task_id is not None:
+        run_query = run_query.filter(task_id=expected_task_id)
+    else:
+        run_query = run_query.filter(task_id__isnull=True)
+    finished_at = timezone.now()
+    run_query.update(
         status=status,
         summary=summary,
         error_message=(
             "Há avisos com falha disponíveis para uma nova tentativa." if result.failed else ""
         ),
-        metadata={"policy": asdict(policy), "result": asdict(result)},
-        finished_at=timezone.now(),
+        metadata={**run.metadata, "policy": asdict(policy), "result": asdict(result)},
+        finished_at=finished_at,
+        heartbeat_at=finished_at,
     )
 
 
