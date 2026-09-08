@@ -30,6 +30,7 @@ export default defineRailway(() => {
     S3_REGION: ref(artifacts, "REGION"),
     S3_ADDRESSING_STYLE: "path",
     SC04_AUTO_ROUTE_THRESHOLD: "0.85",
+    SC04_DAILY_HOUR: "8",
   };
 
   const web = service("web", {
