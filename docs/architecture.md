@@ -4,7 +4,7 @@
 | --- | --- |
 | Status | Baseline vigente, atualizada com a implementação do Dia 5 |
 | Data da baseline | 2026-08-27 |
-| Última atualização | 2026-09-01 |
+| Última atualização | 2026-09-08 |
 | Escopo funcional | SC-04, SC-05, SC-06 e SC-20 |
 | Horizonte | Entrega pública e demonstrável em uma semana |
 
@@ -324,9 +324,28 @@ Cada adapter deve ter testes de contrato. Fakes são permitidos em testes, mas o
 - eventos de auditoria append-only para ações relevantes;
 - mensagem operacional separada do detalhe técnico.
 
+`AutomationRun` é a projeção do estado atual. `AutomationRunEvent` acrescenta a trilha imutável,
+sequencial e idempotente, sem converter a solução em event sourcing e sem fabricar histórico para
+execuções anteriores à migration `0010`. Criação, fila, publicação, entrega, início, etapas,
+tentativas, integração, reconciliação e encerramento são registrados explicitamente junto da
+mudança de estado sempre que compartilham a mesma fronteira transacional. Signals não são usados,
+pois perderiam ator/origem e não observariam de forma confiável atualizações por queryset.
+
+No SC-20, a tentativa `PENDING` é confirmada no PostgreSQL antes de chamar o gateway fora da
+transação. Sucesso ou falha explícita são finalizados em uma segunda transação cercada pelo
+`task_id`. Uma interrupção ambígua preserva a tentativa pendente e proíbe reenvio automático.
+
 ## 13. Observabilidade
 
-Logs JSON em stdout contêm `request_id`, `run_id`, `module_code`, `user_id`, `client_id`, `step` e `attempt` quando aplicável. O portal apresenta histórico operacional; logs e Sentry opcional atendem diagnóstico técnico.
+Logs JSON em stdout contêm, quando aplicáveis, `request_id`, `run_id`, `module_code`, `task_id`,
+`pulse_id`, `user_id`, `client_id`, `step`, `attempt`, tipo, resultado, duração e código controlado
+de erro. Serviço, ambiente e release são derivados das variáveis da plataforma. Um `ContextVar`
+isola a correlação de cada requisição, entrega e pulso mesmo quando o processo é reutilizado.
+
+O portal apresenta a linha do tempo somente a quem já pode acessar o módulo. IDs técnicos de
+requisição, tarefa e pulso ficam restritos ao administrador. Eventos recusam segredos, dados
+pessoais, corpos, payloads brutos, respostas, conteúdo extraído e chaves de storage. O contrato
+completo está em [traceability.md](traceability.md).
 
 Endpoints:
 
@@ -407,5 +426,6 @@ Os motivos e gatilhos de revisão constam nos ADRs.
 - [ADR-0007 — Sessão Django e RBAC por área](adr/0007-authentication-rbac.md)
 - [ADR-0008 — Railway como plataforma de hospedagem](adr/0008-railway-hosting.md)
 - [ADR-0009 — Decisões arquiteturais evitadas](adr/0009-explicitly-avoided-decisions.md)
+- [ADR-0010 — Rastreabilidade ponta a ponta por eventos imutáveis](adr/0010-end-to-end-traceability.md)
 
 Premissas e incertezas estão registradas em [assumptions.md](assumptions.md).

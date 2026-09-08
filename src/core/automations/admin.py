@@ -6,6 +6,7 @@ from django.http import HttpRequest
 from core.automations.models import (
     AutomationModule,
     AutomationRun,
+    AutomationRunEvent,
     BriefingTemplate,
     BriefingTemplateVersion,
     BriefingVersionStatus,
@@ -118,19 +119,59 @@ class AutomationRunAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     list_display = ("id", "module", "status", "trigger", "triggered_by", "created_at")
     list_filter = ("module", "status", "trigger")
     search_fields = ("id", "summary", "error_message", "idempotency_key")
-    readonly_fields = (
-        "id",
-        "task_id",
-        "queued_at",
-        "dispatch_started_at",
-        "broker_published_at",
-        "heartbeat_at",
-        "reconciliation_attempts",
-        "created_at",
-        "started_at",
-        "finished_at",
-    )
     date_hierarchy = "created_at"
+
+    def get_readonly_fields(
+        self,
+        request: HttpRequest,
+        obj: AutomationRun | None = None,
+    ) -> tuple[str, ...]:
+        return tuple(field.name for field in self.model._meta.fields)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_delete_permission(
+        self,
+        request: HttpRequest,
+        obj: AutomationRun | None = None,
+    ) -> bool:
+        return False
+
+
+@admin.register(AutomationRunEvent)
+class AutomationRunEventAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    """Immutable operational evidence, available only for inspection."""
+
+    list_display = (
+        "sequence",
+        "run",
+        "event_type",
+        "source",
+        "current_status",
+        "occurred_at",
+    )
+    list_filter = ("event_type", "source", "current_status")
+    search_fields = ("run__id", "request_id", "task_id", "deduplication_key")
+    date_hierarchy = "occurred_at"
+    list_per_page = 50
+
+    def get_readonly_fields(
+        self,
+        request: HttpRequest,
+        obj: AutomationRunEvent | None = None,
+    ) -> tuple[str, ...]:
+        return tuple(field.name for field in self.model._meta.fields)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_delete_permission(
+        self,
+        request: HttpRequest,
+        obj: AutomationRunEvent | None = None,
+    ) -> bool:
+        return False
 
 
 @admin.register(DigitalCertificate)

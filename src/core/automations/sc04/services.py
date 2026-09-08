@@ -36,6 +36,8 @@ from core.automations.models import (
     DocumentType,
     FiscalClient,
     FiscalDocument,
+    RunEventSource,
+    RunEventType,
     RunStatus,
     RunTrigger,
 )
@@ -43,6 +45,7 @@ from core.automations.run_tracking import (
     SupersededDelivery,
     bind_delivery,
     delivery_matches,
+    normalize_task_id,
     require_current_delivery,
     touch_run,
     with_reconciliation_event,
@@ -77,6 +80,7 @@ from core.automations.sc04.validation import (
     routed_storage_key,
     validate_document,
 )
+from core.automations.traceability import record_run_event
 
 if TYPE_CHECKING:
     from core.identity.models import User
@@ -99,15 +103,25 @@ def create_manual_sc04_run(
         content=content,
     )
     token = uuid.uuid4().hex
-    run = AutomationRun.objects.create(
-        module=AutomationModule.objects.get(code="SC-04"),
-        trigger=RunTrigger.MANUAL,
-        status=RunStatus.PENDING,
-        triggered_by=triggered_by,
-        parameters={"source": DocumentSource.MANUAL},
-        idempotency_key=f"sc04:manual:{token}",
-        summary="Upload recebido; preparando ingestão segura.",
-    )
+    with transaction.atomic():
+        run = AutomationRun.objects.create(
+            module=AutomationModule.objects.get(code="SC-04"),
+            trigger=RunTrigger.MANUAL,
+            status=RunStatus.PENDING,
+            triggered_by=triggered_by,
+            parameters={"source": DocumentSource.MANUAL},
+            idempotency_key=f"sc04:manual:{token}",
+            summary="Upload recebido; preparando ingestão segura.",
+        )
+        record_run_event(
+            run=run,
+            event_type=RunEventType.CREATED,
+            source=RunEventSource.WEB,
+            actor=triggered_by,
+            current_status=RunStatus.PENDING,
+            deduplication_key="run.created",
+            message="Execução de triagem criada para upload manual.",
+        )
     try:
         ingestion = ingest_document(
             run=run,
@@ -121,23 +135,44 @@ def create_manual_sc04_run(
         raise
     should_dispatch = ingestion.outcome == DocumentRunOutcome.NEW
     if should_dispatch:
-        queued_at = timezone.now()
-        AutomationRun.objects.filter(pk=run.pk).update(
-            status=RunStatus.QUEUED,
-            summary="Documento validado e adicionado à fila.",
-            metadata={"received": 1, "policy_version": POLICY_VERSION},
-            task_id=uuid.uuid4(),
-            queued_at=queued_at,
-        )
+        with transaction.atomic():
+            run = AutomationRun.objects.select_for_update().get(pk=run.pk)
+            run.status = RunStatus.QUEUED
+            run.summary = "Documento validado e adicionado à fila."
+            run.metadata = {"received": 1, "policy_version": POLICY_VERSION}
+            run.task_id = uuid.uuid4()
+            run.queued_at = timezone.now()
+            run.save(
+                update_fields=(
+                    "status",
+                    "summary",
+                    "metadata",
+                    "task_id",
+                    "queued_at",
+                )
+            )
+            record_run_event(
+                run=run,
+                event_type=RunEventType.QUEUED,
+                source=RunEventSource.WEB,
+                actor=triggered_by,
+                previous_status=RunStatus.PENDING,
+                current_status=RunStatus.QUEUED,
+                task_id=run.task_id,
+                outcome="queued",
+                deduplication_key=f"run.queued:{run.task_id}",
+                message="Documento validado e execução adicionada à fila.",
+            )
     else:
         recompute_sc04_run(run.id)
     run.refresh_from_db()
     return run, ingestion, should_dispatch
 
 
+@transaction.atomic
 def create_manual_sc04_inbox_run(*, triggered_by: User) -> AutomationRun:
     token = uuid.uuid4().hex
-    return AutomationRun.objects.create(
+    run = AutomationRun.objects.create(
         module=AutomationModule.objects.get(code="SC-04"),
         trigger=RunTrigger.MANUAL,
         status=RunStatus.QUEUED,
@@ -148,6 +183,28 @@ def create_manual_sc04_inbox_run(*, triggered_by: User) -> AutomationRun:
         task_id=uuid.uuid4(),
         queued_at=timezone.now(),
     )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.CREATED,
+        source=RunEventSource.WEB,
+        actor=triggered_by,
+        current_status=RunStatus.QUEUED,
+        task_id=run.task_id,
+        deduplication_key="run.created",
+        message="Execução de triagem da caixa criada.",
+    )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.QUEUED,
+        source=RunEventSource.WEB,
+        actor=triggered_by,
+        current_status=RunStatus.QUEUED,
+        task_id=run.task_id,
+        outcome="queued",
+        deduplication_key=f"run.queued:{run.task_id}",
+        message="Triagem da caixa adicionada à fila.",
+    )
+    return run
 
 
 @transaction.atomic
@@ -170,6 +227,25 @@ def prepare_scheduled_sc04_run(*, base_date: date) -> tuple[AutomationRun, bool]
         },
     )
     if created:
+        record_run_event(
+            run=run,
+            event_type=RunEventType.CREATED,
+            source=RunEventSource.SCHEDULER,
+            current_status=RunStatus.QUEUED,
+            task_id=run.task_id,
+            deduplication_key="run.created",
+            message="Execução diária de triagem criada pelo agendador.",
+        )
+        record_run_event(
+            run=run,
+            event_type=RunEventType.QUEUED,
+            source=RunEventSource.SCHEDULER,
+            current_status=RunStatus.QUEUED,
+            task_id=run.task_id,
+            outcome="queued",
+            deduplication_key=f"run.queued:{run.task_id}",
+            message="Triagem diária adicionada à fila.",
+        )
         return run, True
     run = AutomationRun.objects.select_for_update().get(pk=run.pk)
     dispatch_failed_before_start = (
@@ -204,6 +280,17 @@ def prepare_scheduled_sc04_run(*, base_date: date) -> tuple[AutomationRun, bool]
             "heartbeat_at",
             "reconciliation_attempts",
         )
+    )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.REQUEUED,
+        source=RunEventSource.SCHEDULER,
+        previous_status=RunStatus.FAILED,
+        current_status=RunStatus.QUEUED,
+        task_id=run.task_id,
+        outcome="requeued",
+        deduplication_key=f"run.requeued:{run.task_id}",
+        message="Triagem diária recolocada na fila após falha de publicação.",
     )
     return run, True
 
@@ -428,10 +515,23 @@ def resolve_document_review(
             last_error="",
         )
         route = _prepare_route(decision=decision, run=review.run)
+        record_run_event(
+            run=review.run,
+            event_type=RunEventType.STEP_FINISHED,
+            source=RunEventSource.WEB,
+            actor=reviewed_by,
+            current_status=review.run.status,
+            entity_type="document_review",
+            entity_id=str(review.id),
+            step="human_review",
+            outcome="resolved",
+            deduplication_key=f"review.resolved:{review.id}",
+            message="Revisão humana concluída e decisão registrada.",
+        )
     try:
         _execute_route(route=route, storage=storage or build_object_storage())
     finally:
-        recompute_sc04_run(review.run_id)
+        recompute_sc04_run(review.run_id, actor=reviewed_by, source=RunEventSource.WEB)
     return decision
 
 
@@ -439,6 +539,7 @@ def retry_document_route(
     document_id: uuid.UUID | str,
     *,
     storage: ObjectStorage | None = None,
+    requested_by: User | None = None,
 ) -> DocumentRouting:
     document_pk = uuid.UUID(str(document_id))
     route = (
@@ -449,7 +550,11 @@ def retry_document_route(
     try:
         _execute_route(route=route, storage=storage or build_object_storage())
     finally:
-        recompute_sc04_run(route.run_id)
+        recompute_sc04_run(
+            route.run_id,
+            actor=requested_by,
+            source=RunEventSource.WEB,
+        )
     route.refresh_from_db()
     return route
 
@@ -463,6 +568,17 @@ def _start_run(
 ) -> tuple[AutomationRun, bool]:
     run = AutomationRun.objects.select_for_update().get(pk=run_id, module_id="SC-04")
     if not bind_delivery(run, task_id):
+        supplied_task_id = normalize_task_id(task_id)
+        record_run_event(
+            run=run,
+            event_type=RunEventType.DELIVERY_IGNORED,
+            source=RunEventSource.WORKER,
+            current_status=run.status,
+            task_id=supplied_task_id,
+            outcome="superseded",
+            deduplication_key=f"delivery.ignored:{supplied_task_id or 'invalid'}",
+            message="Entrega substituída ignorada sem alterar a execução.",
+        )
         return run, False
     now = timezone.now()
     run.dispatch_started_at = run.dispatch_started_at or run.queued_at or now
@@ -498,6 +614,20 @@ def _start_run(
                     "finished_at",
                     "heartbeat_at",
                 )
+            )
+            record_run_event(
+                run=run,
+                event_type=RunEventType.FAILED,
+                source=RunEventSource.WORKER,
+                previous_status=RunStatus.RUNNING,
+                current_status=RunStatus.FAILED,
+                task_id=previous_task_id,
+                outcome="recovery_exhausted",
+                error_code="broker_redelivery_exhausted",
+                deduplication_key=(
+                    f"run.terminal:{previous_task_id or 'without-task'}:redelivery-exhausted"
+                ),
+                message="Triagem encerrada após exceder o limite de recuperação.",
             )
             return run, False
         interrupted_document_ids = list(
@@ -549,9 +679,37 @@ def _start_run(
                 "metadata",
             )
         )
+        record_run_event(
+            run=run,
+            event_type=RunEventType.RESUMED,
+            source=RunEventSource.WORKER,
+            previous_status=RunStatus.RUNNING,
+            current_status=RunStatus.RUNNING,
+            task_id=run.task_id,
+            attempt=run.reconciliation_attempts,
+            outcome="resumed",
+            deduplication_key=(
+                f"run.resumed:{run.task_id or 'without-task'}:{run.reconciliation_attempts}"
+            ),
+            message="Triagem retomada após redelivery do broker.",
+        )
         return run, True
     if run.status not in {RunStatus.PENDING, RunStatus.QUEUED}:
+        supplied_task_id = normalize_task_id(task_id)
+        record_run_event(
+            run=run,
+            event_type=RunEventType.DELIVERY_IGNORED,
+            source=RunEventSource.WORKER,
+            current_status=run.status,
+            task_id=supplied_task_id,
+            outcome="not_executable",
+            deduplication_key=(
+                f"delivery.ignored:{supplied_task_id or 'without-task'}:{run.status}"
+            ),
+            message="Entrega ignorada porque a execução não estava apta a iniciar.",
+        )
         return run, False
+    previous_status = run.status
     run.status = RunStatus.RUNNING
     run.started_at = run.started_at or now
     run.finished_at = None
@@ -568,6 +726,17 @@ def _start_run(
             "error_message",
             "heartbeat_at",
         )
+    )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.STARTED,
+        source=RunEventSource.WORKER,
+        previous_status=previous_status,
+        current_status=RunStatus.RUNNING,
+        task_id=run.task_id,
+        outcome="started",
+        deduplication_key=f"run.started:{run.task_id or 'without-task'}",
+        message="Worker iniciou a triagem documental.",
     )
     return run, True
 
@@ -914,7 +1083,7 @@ def _open_review(
     attempt: DocumentClassificationAttempt,
     reason: str,
 ) -> None:
-    DocumentReview.objects.get_or_create(
+    review, created = DocumentReview.objects.get_or_create(
         document=document,
         defaults={
             "run": run,
@@ -927,6 +1096,20 @@ def _open_review(
     DocumentIntake.objects.filter(document=document, run=run, is_duplicate=False).update(
         status=DocumentIntakeStatus.AWAITING_REVIEW
     )
+    if created:
+        record_run_event(
+            run=run,
+            event_type=RunEventType.REVIEW_REQUIRED,
+            source=RunEventSource.WORKER,
+            current_status=RunStatus.RUNNING,
+            task_id=run.task_id,
+            entity_type="fiscal_document",
+            entity_id=str(document.id),
+            step="classification",
+            outcome=reason,
+            deduplication_key=f"review.required:{review.id}",
+            message="Documento encaminhado para revisão humana.",
+        )
 
 
 def _prepare_route(*, decision: DocumentDecision, run: AutomationRun) -> DocumentRouting:
@@ -1099,13 +1282,17 @@ def _mark_document_failed(
     )
 
 
+@transaction.atomic
 def recompute_sc04_run(
     run_id: uuid.UUID | str,
     *,
     expected_task_id: uuid.UUID | None = None,
     preserve_terminal_status: bool = False,
+    actor: User | None = None,
+    source: str | None = None,
 ) -> SC04ExecutionResult:
-    run = AutomationRun.objects.get(pk=run_id, module_id="SC-04")
+    run = AutomationRun.objects.select_for_update().get(pk=run_id, module_id="SC-04")
+    previous_status = run.status
     ingestion_failures = _metadata_int(run.metadata.get("ingestion_failures"))
     items = DocumentRunItem.objects.filter(run=run)
     received = items.count() + ingestion_failures
@@ -1173,27 +1360,75 @@ def recompute_sc04_run(
     error_message = ""
     if failed:
         error_message = "Há documentos que exigem correção operacional ou nova tentativa."
-    run_query = AutomationRun.objects.filter(pk=run.pk)
-    if expected_task_id is not None:
-        run_query = run_query.filter(
-            status=RunStatus.RUNNING,
-            task_id=expected_task_id,
+    if expected_task_id is not None and (
+        run.status != RunStatus.RUNNING or run.task_id != expected_task_id
+    ):
+        return result
+    run.status = status
+    run.summary = summary
+    run.error_message = error_message
+    run.metadata = {
+        **run.metadata,
+        "policy_version": POLICY_VERSION,
+        "threshold": float(settings.SC04_AUTO_ROUTE_THRESHOLD),
+        "ingestion_failures": ingestion_failures,
+        "result": asdict(result),
+    }
+    run.finished_at = finished_at
+    run.heartbeat_at = timezone.now()
+    run.save(
+        update_fields=(
+            "status",
+            "summary",
+            "error_message",
+            "metadata",
+            "finished_at",
+            "heartbeat_at",
         )
-    run_query.update(
-        status=status,
-        summary=summary,
-        error_message=error_message,
-        metadata={
-            **run.metadata,
-            "policy_version": POLICY_VERSION,
-            "threshold": float(settings.SC04_AUTO_ROUTE_THRESHOLD),
-            "ingestion_failures": ingestion_failures,
-            "result": asdict(result),
-        },
-        finished_at=finished_at,
-        heartbeat_at=timezone.now(),
     )
+    if status != previous_status:
+        event_types: dict[str, str] = {
+            RunStatus.AWAITING_REVIEW: RunEventType.REVIEW_REQUIRED,
+            RunStatus.SUCCEEDED: RunEventType.SUCCEEDED,
+            RunStatus.SUCCEEDED_WITH_WARNINGS: RunEventType.SUCCEEDED_WITH_WARNINGS,
+            RunStatus.PARTIALLY_FAILED: RunEventType.PARTIALLY_FAILED,
+            RunStatus.FAILED: RunEventType.FAILED,
+        }
+        event_type = event_types.get(status, RunEventType.STEP_FINISHED)
+        record_run_event(
+            run=run,
+            event_type=event_type,
+            source=(source or (RunEventSource.WORKER if expected_task_id else RunEventSource.WEB)),
+            actor=actor or (None if expected_task_id else run.triggered_by),
+            previous_status=previous_status,
+            current_status=status,
+            task_id=expected_task_id,
+            step="pipeline",
+            outcome=status,
+            deduplication_key=(
+                f"run.status:{previous_status}:{status}:{expected_task_id or 'without-task'}"
+            ),
+            message=_sc04_status_event_message(status),
+            details={
+                "received_count": result.received,
+                "routed_count": result.routed,
+                "review_count": result.awaiting_review,
+                "duplicate_count": result.duplicates,
+                "failed_count": result.failed,
+            },
+        )
     return result
+
+
+def _sc04_status_event_message(status: str) -> str:
+    messages: dict[str, str] = {
+        RunStatus.AWAITING_REVIEW: "Triagem aguardando revisão humana.",
+        RunStatus.SUCCEEDED: "Triagem concluída com sucesso.",
+        RunStatus.SUCCEEDED_WITH_WARNINGS: "Triagem concluída com alertas.",
+        RunStatus.PARTIALLY_FAILED: "Triagem concluída com falha parcial.",
+        RunStatus.FAILED: "Triagem encerrada com falha.",
+    }
+    return messages.get(status, "Estado da triagem atualizado.")
 
 
 def _result_from_metadata(metadata: dict[str, object]) -> SC04ExecutionResult:
@@ -1217,37 +1452,71 @@ def _metadata_int(value: object) -> int:
     return 0
 
 
+@transaction.atomic
 def _fail_run_before_processing(run: AutomationRun, exc: Exception) -> None:
     safe_message = (
         str(exc)
         if isinstance(exc, (SC04Error, ValidationError))
         else "O upload não pôde ser preparado por uma falha operacional."
     )
-    AutomationRun.objects.filter(pk=run.pk).update(
-        status=RunStatus.FAILED,
-        summary="O upload não pôde ser preparado para processamento.",
-        error_message=safe_message,
-        metadata={"technical_error": type(exc).__name__},
-        finished_at=timezone.now(),
+    locked = AutomationRun.objects.select_for_update().get(pk=run.pk)
+    previous_status = locked.status
+    locked.status = RunStatus.FAILED
+    locked.summary = "O upload não pôde ser preparado para processamento."
+    locked.error_message = safe_message
+    locked.metadata = {"technical_error": type(exc).__name__}
+    locked.finished_at = timezone.now()
+    locked.save(update_fields=("status", "summary", "error_message", "metadata", "finished_at"))
+    record_run_event(
+        run=locked,
+        event_type=RunEventType.FAILED,
+        source=RunEventSource.WEB,
+        actor=locked.triggered_by,
+        previous_status=previous_status,
+        current_status=RunStatus.FAILED,
+        outcome="failed",
+        error_code=type(exc).__name__,
+        deduplication_key="run.terminal:upload-preparation-failed",
+        message="Upload encerrado por falha controlada antes do processamento.",
     )
 
 
+@transaction.atomic
 def _finish_unhandled_failure(
     run: AutomationRun,
     exc: Exception,
     *,
     expected_task_id: uuid.UUID | None,
 ) -> None:
-    run_query = AutomationRun.objects.filter(pk=run.pk, status=RunStatus.RUNNING)
-    if expected_task_id is not None:
-        run_query = run_query.filter(task_id=expected_task_id)
-    else:
-        run_query = run_query.filter(task_id__isnull=True)
-    run_query.update(
-        status=RunStatus.FAILED,
-        summary="A triagem não pôde ser concluída.",
-        error_message="O pipeline documental encontrou uma falha operacional.",
-        metadata={**run.metadata, "technical_error": type(exc).__name__},
-        finished_at=timezone.now(),
-        heartbeat_at=timezone.now(),
+    locked = AutomationRun.objects.select_for_update().get(pk=run.pk)
+    if locked.status != RunStatus.RUNNING or not delivery_matches(locked, expected_task_id):
+        return
+    finished_at = timezone.now()
+    locked.status = RunStatus.FAILED
+    locked.summary = "A triagem não pôde ser concluída."
+    locked.error_message = "O pipeline documental encontrou uma falha operacional."
+    locked.metadata = {**locked.metadata, "technical_error": type(exc).__name__}
+    locked.finished_at = finished_at
+    locked.heartbeat_at = finished_at
+    locked.save(
+        update_fields=(
+            "status",
+            "summary",
+            "error_message",
+            "metadata",
+            "finished_at",
+            "heartbeat_at",
+        )
+    )
+    record_run_event(
+        run=locked,
+        event_type=RunEventType.FAILED,
+        source=RunEventSource.WORKER,
+        previous_status=RunStatus.RUNNING,
+        current_status=RunStatus.FAILED,
+        task_id=expected_task_id,
+        outcome="failed",
+        error_code=type(exc).__name__,
+        deduplication_key=(f"run.terminal:{expected_task_id or 'without-task'}:unhandled-failure"),
+        message="Triagem encerrada por falha técnica controlada.",
     )

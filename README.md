@@ -44,8 +44,10 @@ A seleção cobre as três naturezas do catálogo e combina dois processos de co
 - Resiliência em desenvolvimento local: fallback automático e transparente para SQLite (`var/dev.sqlite3`) e FileSystem Storage (`var/storage/`) em modo `DEBUG` quando executado fora do Docker.
 - Docker Compose local para web, worker, simulador SC-05 separado, banco, Redis e MinIO; com a stack ativa, o pulso do scheduler pode ser executado de forma avulsa por `docker compose exec web python src/manage.py dispatch_due_schedules`.
 - Na Railway, a IaC preserva apenas `web`, `worker` e `scheduler`: o worker inicia o WSGI do simulador como processo auxiliar com ambiente sanitizado, sem herdar Redis, S3 ou OpenAI. O Playwright usa `127.0.0.1:8000`; a plataforma alcança a mesma porta apenas pela rede privada para healthcheck, sem domínio público.
+- Rastreabilidade ponta a ponta por `run_id`, `request_id`, `task_id` e `pulse_id`, com eventos
+  imutáveis, logs JSON correlacionados e linha do tempo protegida pelo RBAC do módulo.
 
-Os motivos, consequências e alternativas rejeitadas estão em [`docs/architecture.md`](docs/architecture.md) e nos nove ADRs de [`docs/adr/`](docs/adr/).
+Os motivos, consequências e alternativas rejeitadas estão em [`docs/architecture.md`](docs/architecture.md) e nos dez ADRs de [`docs/adr/`](docs/adr/).
 
 ## Executar com Docker
 
@@ -183,6 +185,7 @@ tests/                       autenticação, autorização e saúde
 - [`docs/architecture.md`](docs/architecture.md): visão arquitetural completa.
 - [`docs/assumptions.md`](docs/assumptions.md): premissas, dúvidas e riscos.
 - [`docs/deployment.md`](docs/deployment.md): implantação e operação Railway.
+- [`docs/traceability.md`](docs/traceability.md): contrato, segurança, diagnóstico e checklist da trilha unificada.
 - [`docs/adr/`](docs/adr/): decisões arquiteturais versionadas.
 
 O repositório e o portal acima são os endereços canônicos do projeto. Detalhes de operação, smoke test e rollback estão em [`docs/deployment.md`](docs/deployment.md).

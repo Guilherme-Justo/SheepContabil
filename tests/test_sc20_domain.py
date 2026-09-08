@@ -211,21 +211,33 @@ def test_retry_is_discarded_when_certificate_state_has_become_stale(
     assert communication.status == CommunicationStatus.FAILED
 
 
-def test_gateway_exception_is_converted_to_an_auditable_failure(
+def test_gateway_exception_preserves_a_pending_attempt_without_automatic_resend(
     modules: dict[str, AutomationModule],
 ) -> None:
     base_date = date(2026, 8, 30)
     _certificate(serial="TIMEOUT", valid_until=base_date + timedelta(days=15))
     run = create_sc20_run(triggered_by=None, base_date=base_date)
 
-    result = execute_sc20(run.id, gateway=ExplodingGateway())
+    with pytest.raises(TimeoutError):
+        execute_sc20(run.id, gateway=ExplodingGateway())
 
     attempt = CommunicationAttempt.objects.get()
+    communication = CertificateCommunication.objects.get()
     run.refresh_from_db()
-    assert result.failed == 1
-    assert attempt.status == CommunicationStatus.FAILED
-    assert "indisponível" in attempt.error_message
-    assert run.status == RunStatus.SUCCEEDED_WITH_WARNINGS
+    assert attempt.status == CommunicationStatus.PENDING
+    assert attempt.finished_at is None
+    assert attempt.provider_message_id == ""
+    assert attempt.error_message == ""
+    assert communication.status == CommunicationStatus.PENDING
+    assert run.status == RunStatus.PARTIALLY_FAILED
+    assert run.metadata["technical_error"] == "TimeoutError"
+    assert run.metadata["reconciliation_required"] is True
+
+    result = execute_sc20(run.id, gateway=ExplodingGateway())
+
+    assert result.sent == 0
+    assert result.failed == 0
+    assert CommunicationAttempt.objects.count() == 1
 
 
 @freeze_time("2026-08-30 15:00:00")

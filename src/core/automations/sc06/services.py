@@ -12,12 +12,15 @@ from core.automations.models import (
     AutomationRun,
     BriefingTemplateVersion,
     BriefingVersionStatus,
+    RunEventSource,
+    RunEventType,
     RunStatus,
     RunTrigger,
     SocietaryBriefing,
     SocietaryBriefingStatus,
 )
 from core.automations.sc06.rules import format_answers, sanitize_answers
+from core.automations.traceability import record_run_event
 from core.identity.models import User
 
 DEFAULT_TEMPLATE_CODE = "societary-briefing"
@@ -70,13 +73,37 @@ def create_briefing(
         metadata={"answers_count": 0, "synthetic": True},
         started_at=started_at,
     )
-    return SocietaryBriefing.objects.create(
+    briefing = SocietaryBriefing.objects.create(
         template_version=template_version,
         run=run,
         client_name=client_name.strip(),
         client_document=client_document.strip(),
         created_by=created_by,
     )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.CREATED,
+        source=RunEventSource.WEB,
+        actor=created_by,
+        current_status=RunStatus.RUNNING,
+        entity_type="briefing",
+        entity_id=str(briefing.id),
+        deduplication_key="run.created",
+        message="Execução do briefing criada.",
+    )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.STARTED,
+        source=RunEventSource.WEB,
+        actor=created_by,
+        current_status=RunStatus.RUNNING,
+        entity_type="briefing",
+        entity_id=str(briefing.id),
+        deduplication_key="run.started",
+        outcome="started",
+        message="Preenchimento do briefing iniciado.",
+    )
+    return briefing
 
 
 @transaction.atomic
@@ -144,6 +171,19 @@ def complete_briefing(
             "finished_at",
         )
     )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.SUCCEEDED,
+        source=RunEventSource.WEB,
+        actor=completed_by,
+        previous_status=RunStatus.RUNNING,
+        current_status=RunStatus.SUCCEEDED,
+        entity_type="briefing",
+        entity_id=str(briefing.id),
+        outcome="succeeded",
+        deduplication_key="run.terminal:succeeded",
+        message="Briefing concluído e validado.",
+    )
     return briefing
 
 
@@ -170,6 +210,19 @@ def cancel_briefing(
         "cancelled_at": now.isoformat(),
     }
     run.save(update_fields=("status", "finished_at", "summary", "metadata"))
+    record_run_event(
+        run=run,
+        event_type=RunEventType.CANCELLED,
+        source=RunEventSource.WEB,
+        actor=cancelled_by,
+        previous_status=RunStatus.RUNNING,
+        current_status=RunStatus.CANCELLED,
+        entity_type="briefing",
+        entity_id=str(briefing.id),
+        outcome="cancelled",
+        deduplication_key="run.terminal:cancelled",
+        message="Briefing cancelado antes da conclusão.",
+    )
     return briefing
 
 
@@ -181,14 +234,36 @@ def is_briefing_empty(briefing: SocietaryBriefing) -> bool:
 
 
 @transaction.atomic
-def discard_empty_briefing(briefing_id: UUID | str) -> bool:
-    """Remove o briefing e sua execução caso seja um rascunho sem respostas preenchidas."""
+def discard_empty_briefing(
+    briefing_id: UUID | str,
+    *,
+    discarded_by: User | None = None,
+) -> bool:
+    """Cancel an empty draft while preserving its immutable operational evidence."""
     briefing = _locked_briefing(briefing_id)
     _require_draft(briefing)
     if is_briefing_empty(briefing):
+        now = timezone.now()
         run = briefing.run
-        briefing.delete()
-        run.delete()
+        briefing.status = SocietaryBriefingStatus.CANCELLED
+        briefing.save(update_fields=("status", "updated_at"))
+        run.status = RunStatus.CANCELLED
+        run.finished_at = now
+        run.summary = "Rascunho vazio descartado antes do preenchimento."
+        run.save(update_fields=("status", "finished_at", "summary"))
+        record_run_event(
+            run=run,
+            event_type=RunEventType.CANCELLED,
+            source=(RunEventSource.WEB if discarded_by else RunEventSource.SYSTEM),
+            actor=discarded_by,
+            previous_status=RunStatus.RUNNING,
+            current_status=RunStatus.CANCELLED,
+            entity_type="briefing",
+            entity_id=str(briefing.id),
+            outcome="discarded",
+            deduplication_key="run.terminal:discarded",
+            message="Rascunho vazio descartado com a evidência preservada.",
+        )
         return True
     return False
 

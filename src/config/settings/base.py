@@ -38,6 +38,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "config.middleware.TraceContextMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
@@ -122,6 +123,7 @@ CELERY_TASK_SOFT_TIME_LIMIT = 14 * 60
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_ENABLE_UTC = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 CELERY_WORKER_CANCEL_LONG_RUNNING_TASKS_ON_CONNECTION_LOSS = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_BROKER_VISIBILITY_TIMEOUT_SECONDS = env.int(
@@ -190,7 +192,14 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {"json": {"()": "config.logging.JsonFormatter"}},
-    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "json"}},
+    "filters": {"trace_context": {"()": "config.logging.TraceContextFilter"}},
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "filters": ["trace_context"],
+        }
+    },
     "root": {"handlers": ["console"], "level": "INFO"},
     "loggers": {
         "django.server": {"handlers": ["console"], "level": "INFO", "propagate": False},

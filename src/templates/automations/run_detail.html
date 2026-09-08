@@ -51,6 +51,61 @@
   </article>
 </section>
 
+<section class="mt-8" aria-labelledby="run-timeline-title">
+  <div class="section-heading">
+    <p class="eyebrow">Rastreabilidade ponta a ponta</p>
+    <h2 id="run-timeline-title">Linha do tempo operacional</h2>
+    <p class="mt-2 max-w-3xl text-sm leading-6 text-grafite">Eventos imutáveis unem portal, agendador, fila, worker, integrações e reconciliação na ordem em que foram registrados.</p>
+  </div>
+  <div class="table-shell mt-5 overflow-x-auto">
+    <table class="data-table">
+      <caption class="sr-only">Eventos operacionais desta execução</caption>
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Evento</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Origem</th>
+          <th scope="col">Ator</th>
+          <th scope="col">Horário</th>
+          {% if show_technical_trace %}<th scope="col">Correlação</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in run_events %}
+        <tr>
+          <td class="font-mono text-xs">{{ event.sequence|stringformat:"02d" }}</td>
+          <td>
+            <strong>{{ event.get_event_type_display }}</strong>
+            {% if event.message %}<span class="mt-1 block max-w-xl text-xs text-grafite">{{ event.message }}</span>{% endif %}
+            {% if event.step %}<span class="mt-1 block font-mono text-xs text-grafite">Etapa: {{ event.step }}{% if event.attempt != None %} · tentativa {{ event.attempt }}{% endif %}</span>{% endif %}
+          </td>
+          <td>
+            {% if event.current_status %}
+              <span class="status-badge status-{{ event.current_status_tone }}"><i></i>{{ event.get_current_status_display }}</span>
+              {% if event.previous_status and event.previous_status != event.current_status %}<span class="mt-1 block text-xs text-grafite">antes: {{ event.get_previous_status_display }}</span>{% endif %}
+            {% else %}<span class="text-xs text-grafite">Sem alteração</span>{% endif %}
+          </td>
+          <td>{{ event.get_source_display }}</td>
+          <td>{% if event.actor %}{{ event.actor.label }}{% else %}Sistema{% endif %}</td>
+          <td class="font-mono text-xs">{{ event.occurred_at|date:"d/m/Y H:i:s" }}</td>
+          {% if show_technical_trace %}
+          <td class="font-mono text-xs">
+            {% if event.request_id %}<span class="block">req {{ event.request_id }}</span>{% endif %}
+            {% if event.task_id %}<span class="block">task {{ event.task_id }}</span>{% endif %}
+            {% if event.pulse_id %}<span class="block">pulse {{ event.pulse_id }}</span>{% endif %}
+            {% if not event.request_id and not event.task_id and not event.pulse_id %}—{% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="{% if show_technical_trace %}7{% else %}6{% endif %}" class="py-10 text-center text-grafite">Esta execução é anterior à trilha unificada ou ainda não possui evento registrado. O estado funcional existente foi preservado sem criar histórico artificial.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
 {% if run.module.code == "SC-20" %}
 <section class="mt-8">
   <div class="section-heading">

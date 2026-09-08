@@ -10,15 +10,15 @@ from core.automations.sc06.services import discard_empty_briefing, is_briefing_e
 
 class Command(BaseCommand):
     help = (
-        "Remove briefings societários em rascunho que não possuem respostas "
-        "preenchidas (descarte de órfãos)."
+        "Cancela briefings societários em rascunho que não possuem respostas "
+        "preenchidas, preservando a trilha operacional."
     )
 
     def add_arguments(self, parser: Any) -> None:
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Simula a limpeza sem remover nenhum registro do banco de dados.",
+            help="Simula a limpeza sem alterar nenhum registro do banco de dados.",
         )
 
     def handle(self, *args: object, **options: object) -> None:
@@ -34,11 +34,9 @@ class Command(BaseCommand):
                 label = f"{briefing.id} ({briefing.client_name})"
                 if not dry_run:
                     discard_empty_briefing(briefing.id)
-                    self.stdout.write(
-                        self.style.SUCCESS(f"Briefing {label} descartado com sucesso.")
-                    )
+                    self.stdout.write(self.style.SUCCESS(f"Briefing {label} cancelado."))
                 else:
-                    self.stdout.write(f"[DRY-RUN] Briefing {label} seria descartado.")
+                    self.stdout.write(f"[DRY-RUN] Briefing {label} seria cancelado.")
 
         if empty_count == 0:
             self.stdout.write("Nenhum briefing vazio em rascunho encontrado.")
@@ -51,6 +49,7 @@ class Command(BaseCommand):
         else:
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Total de {empty_count} rascunho(s) vazio(s) descartado(s) com sucesso."
+                    f"Total de {empty_count} rascunho(s) vazio(s) "
+                    "cancelado(s) com trilha preservada."
                 )
             )

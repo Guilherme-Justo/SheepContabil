@@ -1,20 +1,27 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, time
+from time import perf_counter
 from typing import Any
+from uuid import UUID, uuid4
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from config.trace_context import trace_context
 from core.automations.dispatching import dispatch_run
 from core.automations.models import (
     AutomationFrequency,
     AutomationModule,
+    AutomationRun,
 )
 from core.automations.reconciliation import reconcile_stale_runs
 from core.automations.sc04.services import prepare_scheduled_sc04_run
 from core.automations.sc20.services import prepare_scheduled_sc20_run
+
+logger = logging.getLogger("sheepcontabil.automations.scheduler")
 
 
 class Command(BaseCommand):
@@ -28,11 +35,63 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args: object, **options: object) -> None:
+        pulse_id = str(uuid4())
+        started_at = perf_counter()
+        with trace_context(pulse_id=pulse_id, source="scheduler"):
+            logger.info(
+                "Pulso do scheduler iniciado.",
+                extra={"event_type": "automation.scheduler.started", "outcome": "started"},
+            )
+            try:
+                self._handle_pulse(*args, **options)
+            except Exception as exc:
+                logger.exception(
+                    "Pulso do scheduler encerrado com falha.",
+                    extra={
+                        "event_type": "automation.scheduler.failed",
+                        "outcome": "failed",
+                        "duration_ms": _elapsed_ms(started_at),
+                        "error_code": type(exc).__name__,
+                    },
+                )
+                raise
+            logger.info(
+                "Pulso do scheduler concluído.",
+                extra={
+                    "event_type": "automation.scheduler.succeeded",
+                    "outcome": "succeeded",
+                    "duration_ms": _elapsed_ms(started_at),
+                },
+            )
+
+    def _handle_pulse(self, *args: object, **options: object) -> None:
         now = timezone.now()
         local_now = timezone.localtime(now)
         forced = bool(options.get("force"))
         errors: list[Exception] = []
         reconciliation = reconcile_stale_runs(at=now)
+        reconciliation_outcome = (
+            "failed"
+            if reconciliation.publish_failed or reconciliation.inspection_failed
+            else "changed"
+            if reconciliation.requeued or reconciliation.quarantined or reconciliation.failed
+            else "noop"
+        )
+        logger.info(
+            "Reconciliação inspecionou %s execução(ões): %s republicada(s), "
+            "%s em quarentena, %s encerrada(s), %s erro(s) de publicação e "
+            "%s erro(s) de inspeção.",
+            reconciliation.inspected,
+            reconciliation.requeued,
+            reconciliation.quarantined,
+            reconciliation.failed,
+            reconciliation.publish_failed,
+            reconciliation.inspection_failed,
+            extra={
+                "event_type": "automation.reconciliation.completed",
+                "outcome": reconciliation_outcome,
+            },
+        )
         if reconciliation.inspected:
             self.stdout.write(
                 "Reconciliação: "
@@ -60,8 +119,9 @@ class Command(BaseCommand):
             run, should_dispatch = prepare_scheduled_sc04_run(base_date=local_now.date())
             if should_dispatch:
                 try:
-                    dispatch_run(
+                    _dispatch_scheduled_run(
                         run,
+                        module_code="SC-04",
                         failure_summary="Não foi possível publicar a triagem diária.",
                     )
                 except Exception as exc:
@@ -92,8 +152,9 @@ class Command(BaseCommand):
                     self.stdout.write(f"SC-20 já registrado para {local_now:%Y-%m}: {run.id}")
                 else:
                     try:
-                        dispatch_run(
+                        _dispatch_scheduled_run(
                             run,
+                            module_code="SC-20",
                             failure_summary="Não foi possível publicar a execução mensal.",
                         )
                     except Exception as exc:
@@ -120,3 +181,49 @@ class Command(BaseCommand):
             is_enabled=True,
             frequency=AutomationFrequency.MONTHLY,
         ).exists()
+
+
+def _dispatch_scheduled_run(
+    run: AutomationRun,
+    *,
+    module_code: str,
+    failure_summary: str,
+) -> UUID:
+    initial_task_id = str(run.task_id) if run.task_id else None
+    with trace_context(
+        run_id=str(run.id),
+        module_code=module_code,
+        task_id=initial_task_id,
+    ):
+        logger.info(
+            "Publicação agendada iniciada.",
+            extra={"event_type": "automation.dispatch.started", "outcome": "started"},
+        )
+        started_at = perf_counter()
+        try:
+            task_id = dispatch_run(run, failure_summary=failure_summary)
+        except Exception as exc:
+            logger.exception(
+                "Publicação agendada falhou.",
+                extra={
+                    "event_type": "automation.dispatch.failed",
+                    "outcome": "failed",
+                    "duration_ms": _elapsed_ms(started_at),
+                    "error_code": type(exc).__name__,
+                },
+            )
+            raise
+        with trace_context(task_id=str(task_id)):
+            logger.info(
+                "Publicação agendada confirmada pelo broker.",
+                extra={
+                    "event_type": "automation.dispatch.published",
+                    "outcome": "succeeded",
+                    "duration_ms": _elapsed_ms(started_at),
+                },
+            )
+        return task_id
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return max(0, round((perf_counter() - started_at) * 1000))

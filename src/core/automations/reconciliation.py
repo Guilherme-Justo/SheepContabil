@@ -25,6 +25,8 @@ from core.automations.models import (
     DocumentRunOutcome,
     DocumentStatus,
     FiscalDocument,
+    RunEventSource,
+    RunEventType,
     RunStatus,
     SC05AttemptStatus,
     SC05ClientStatus,
@@ -35,6 +37,7 @@ from core.automations.models import (
 )
 from core.automations.run_tracking import with_reconciliation_event
 from core.automations.sc04.services import recompute_sc04_run
+from core.automations.traceability import record_run_event
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,13 +147,7 @@ def reconcile_stale_runs(
             try:
                 result = recompute_sc04_run(run_id, preserve_terminal_status=True)
                 if result.received == 0:
-                    AutomationRun.objects.filter(pk=run_id, status=RunStatus.SUCCEEDED).update(
-                        status=RunStatus.FAILED,
-                        summary="A triagem órfã foi encerrada sem itens processados.",
-                        error_message="Inicie uma nova triagem para processar a origem novamente.",
-                        finished_at=now,
-                        heartbeat_at=now,
-                    )
+                    _fail_empty_recovered_sc04(run_id=run_id, now=now)
             except Exception as exc:
                 inspection_failed += 1
                 _record_inspection_failure(run_id=run_id, exc=exc, now=now)
@@ -180,6 +177,35 @@ def reconcile_stale_runs(
         publish_failed=publish_failed,
         inspection_failed=inspection_failed,
         skipped=skipped,
+    )
+
+
+@transaction.atomic
+def _fail_empty_recovered_sc04(*, run_id: UUID, now: datetime) -> None:
+    run = (
+        AutomationRun.objects.select_for_update()
+        .filter(pk=run_id, status=RunStatus.SUCCEEDED)
+        .first()
+    )
+    if run is None:
+        return
+    run.status = RunStatus.FAILED
+    run.summary = "A triagem órfã foi encerrada sem itens processados."
+    run.error_message = "Inicie uma nova triagem para processar a origem novamente."
+    run.finished_at = now
+    run.heartbeat_at = now
+    run.save(update_fields=("status", "summary", "error_message", "finished_at", "heartbeat_at"))
+    record_run_event(
+        run=run,
+        event_type=RunEventType.FAILED,
+        source=RunEventSource.RECONCILER,
+        previous_status=RunStatus.SUCCEEDED,
+        current_status=RunStatus.FAILED,
+        task_id=run.task_id,
+        outcome="empty_recovery",
+        error_code="empty_recovery",
+        deduplication_key="reconciliation.failed:empty-recovery",
+        message="Triagem órfã encerrada sem itens processados.",
     )
 
 
@@ -265,6 +291,7 @@ def _preview_action(run: AutomationRun) -> str:
 
 
 def _claim_recovery(*, run: AutomationRun, now: datetime, reason: str) -> _RunOutcome:
+    previous_status = run.status
     previous_task_id = run.task_id
     task_id = uuid4()
     run.status = RunStatus.QUEUED
@@ -308,6 +335,18 @@ def _claim_recovery(*, run: AutomationRun, now: datetime, reason: str) -> _RunOu
             "metadata",
         )
     )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.REQUEUED,
+        source=RunEventSource.RECONCILER,
+        previous_status=previous_status,
+        current_status=RunStatus.QUEUED,
+        task_id=task_id,
+        attempt=run.reconciliation_attempts,
+        outcome=reason,
+        deduplication_key=f"reconciliation.requeued:{task_id}",
+        message="Execução órfã recuperada e adicionada novamente à fila.",
+    )
     return _RunOutcome(
         "requeued",
         claim=_RecoveryClaim(
@@ -343,6 +382,18 @@ def _fail_pending_sc04(*, run: AutomationRun, now: datetime) -> None:
             "finished_at",
             "heartbeat_at",
         )
+    )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.FAILED,
+        source=RunEventSource.RECONCILER,
+        previous_status=RunStatus.PENDING,
+        current_status=RunStatus.FAILED,
+        task_id=previous_task_id,
+        outcome="stale_pending_upload",
+        error_code="stale_pending_upload",
+        deduplication_key="reconciliation.failed:stale-pending-upload",
+        message="Upload órfão encerrado antes de entrar na fila.",
     )
 
 
@@ -393,6 +444,7 @@ def _exhaust_running_run(*, run: AutomationRun, now: datetime) -> _RunOutcome:
 
 
 def _fence_run(*, run: AutomationRun, now: datetime, action: str, reason: str) -> None:
+    previous_status = run.status
     previous_task_id = run.task_id
     run.task_id = None
     run.status = RunStatus.FAILED
@@ -417,6 +469,19 @@ def _fence_run(*, run: AutomationRun, now: datetime, action: str, reason: str) -
             "finished_at",
             "heartbeat_at",
         )
+    )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.FAILED,
+        source=RunEventSource.RECONCILER,
+        previous_status=previous_status,
+        current_status=RunStatus.FAILED,
+        task_id=previous_task_id,
+        attempt=run.reconciliation_attempts,
+        outcome=action,
+        error_code=reason,
+        deduplication_key=(f"reconciliation.failed:{previous_task_id or 'without-task'}:{reason}"),
+        message="Execução órfã encerrada após esgotar a recuperação automática.",
     )
 
 
@@ -455,9 +520,25 @@ def _quarantine_sc20(*, run: AutomationRun, now: datetime, reason: str) -> None:
             "heartbeat_at",
         )
     )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.QUARANTINED,
+        source=RunEventSource.RECONCILER,
+        previous_status=RunStatus.RUNNING,
+        current_status=RunStatus.PARTIALLY_FAILED,
+        task_id=previous_task_id,
+        attempt=run.reconciliation_attempts,
+        outcome="ambiguous_delivery",
+        error_code=reason,
+        deduplication_key=(
+            f"reconciliation.quarantined:{previous_task_id or 'without-task'}:{reason}"
+        ),
+        message="Execução isolada para conferir uma entrega externa ambígua.",
+    )
 
 
 def _quarantine_sc05(*, run: AutomationRun, now: datetime, reason: str) -> None:
+    previous_status = run.status
     operation = SC05Operation.objects.select_related("client").filter(run=run).first()
     if operation is not None:
         operation.client.status = SC05ClientStatus.PARTIAL
@@ -499,6 +580,23 @@ def _quarantine_sc05(*, run: AutomationRun, now: datetime, reason: str) -> None:
             "finished_at",
             "heartbeat_at",
         )
+    )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.QUARANTINED,
+        source=RunEventSource.RECONCILER,
+        previous_status=previous_status,
+        current_status=RunStatus.PARTIALLY_FAILED,
+        task_id=previous_task_id,
+        entity_type=("sc05_operation" if operation else ""),
+        entity_id=(str(operation.id) if operation else ""),
+        attempt=run.reconciliation_attempts,
+        outcome="ambiguous_external_state",
+        error_code=reason,
+        deduplication_key=(
+            f"reconciliation.quarantined:{previous_task_id or 'without-task'}:{reason}"
+        ),
+        message="Operação RPA isolada para reconciliação manual.",
     )
 
 
@@ -647,6 +745,18 @@ def _record_recovery_publish_failure(
             details={"technical_error": type(exc).__name__},
         )
         run.save(update_fields=("error_message", "metadata"))
+        record_run_event(
+            run=run,
+            event_type=RunEventType.RECONCILIATION_FAILED,
+            source=RunEventSource.RECONCILER,
+            current_status=RunStatus.QUEUED,
+            task_id=claim.task_id,
+            attempt=run.reconciliation_attempts,
+            outcome="publish_failed",
+            error_code=type(exc).__name__,
+            deduplication_key=f"reconciliation.publish-failed:{claim.task_id}",
+            message="Broker não confirmou a publicação de recuperação.",
+        )
 
 
 def _record_inspection_failure(*, run_id: UUID, exc: Exception, now: datetime) -> None:
@@ -664,6 +774,21 @@ def _record_inspection_failure(*, run_id: UUID, exc: Exception, now: datetime) -
                 details={"technical_error": type(exc).__name__},
             )
             run.save(update_fields=("metadata",))
+            record_run_event(
+                run=run,
+                event_type=RunEventType.RECONCILIATION_FAILED,
+                source=RunEventSource.RECONCILER,
+                current_status=run.status,
+                task_id=run.task_id,
+                attempt=run.reconciliation_attempts,
+                outcome="inspection_failed",
+                error_code=type(exc).__name__,
+                deduplication_key=(
+                    f"reconciliation.inspection-failed:{run.reconciliation_attempts}:"
+                    f"{run.task_id or 'without-task'}"
+                ),
+                message="Reconciliação não conseguiu inspecionar a execução.",
+            )
     except Exception:
         return
 

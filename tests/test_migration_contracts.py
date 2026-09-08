@@ -8,6 +8,7 @@ from django.db.migrations.executor import MigrationExecutor
 
 DELIVERY_TRACKING_FROM = ("automations", "0008_alter_automationmodule_options")
 DELIVERY_TRACKING_TO = ("automations", "0009_automationrun_delivery_tracking")
+TRACEABILITY_LATEST = ("automations", "0010_automation_run_event")
 
 
 def test_delivery_tracking_indexes_precede_the_data_backfill() -> None:
@@ -61,11 +62,29 @@ def test_delivery_tracking_migration_handles_existing_active_run_on_postgresql()
         status="queued",
     )
 
-    executor = MigrationExecutor(connection)
-    executor.migrate([DELIVERY_TRACKING_TO])
-    new_apps = executor.loader.project_state([DELIVERY_TRACKING_TO]).apps
-    migrated_run = new_apps.get_model("automations", "AutomationRun").objects.get(pk=old_run.pk)
+    try:
+        executor = MigrationExecutor(connection)
+        executor.migrate([DELIVERY_TRACKING_TO])
+        new_apps = executor.loader.project_state([DELIVERY_TRACKING_TO]).apps
+        migrated_run = new_apps.get_model("automations", "AutomationRun").objects.get(pk=old_run.pk)
 
-    assert migrated_run.queued_at == migrated_run.created_at
-    assert migrated_run.dispatch_started_at == migrated_run.created_at
-    assert migrated_run.broker_published_at == migrated_run.created_at
+        assert migrated_run.queued_at == migrated_run.created_at
+        assert migrated_run.dispatch_started_at == migrated_run.created_at
+        assert migrated_run.broker_published_at == migrated_run.created_at
+    finally:
+        MigrationExecutor(connection).migrate([TRACEABILITY_LATEST])
+
+
+def test_traceability_migration_is_additive_without_fabricated_history() -> None:
+    migration_module = importlib.import_module(
+        "core.automations.migrations.0010_automation_run_event"
+    )
+
+    assert any(
+        isinstance(operation, migrations.CreateModel) and operation.name == "AutomationRunEvent"
+        for operation in migration_module.Migration.operations
+    )
+    assert not any(
+        isinstance(operation, migrations.RunPython)
+        for operation in migration_module.Migration.operations
+    )
