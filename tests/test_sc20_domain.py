@@ -9,7 +9,6 @@ from django.test import override_settings
 from freezegun import freeze_time
 
 from core.automations.checks import automation_settings_check
-from core.automations.management.commands import dispatch_due_schedules
 from core.automations.models import (
     AutomationFrequency,
     AutomationModule,
@@ -236,7 +235,10 @@ def test_monthly_dispatch_is_idempotent_and_anchored_to_competence(
 ) -> None:
     _configure_monthly_schedule(modules)
     dispatched: list[str] = []
-    monkeypatch.setattr(dispatch_due_schedules.run_sc20_task, "delay", dispatched.append)
+    monkeypatch.setattr(
+        "core.automations.dispatching.run_sc20_task.apply_async",
+        lambda *, args, task_id: dispatched.append(args[0]),
+    )
 
     call_command("dispatch_due_schedules", verbosity=0)
     call_command("dispatch_due_schedules", verbosity=0)
@@ -257,12 +259,16 @@ def test_monthly_dispatch_recovers_a_broker_failure_before_execution(
     _configure_monthly_schedule(modules)
     dispatched: list[str] = []
 
-    def dispatch(run_id: str) -> None:
-        dispatched.append(run_id)
+    def dispatch(*, args: tuple[str], task_id: str) -> None:
+        del task_id
+        dispatched.append(args[0])
         if len(dispatched) == 1:
             raise RuntimeError("broker unavailable")
 
-    monkeypatch.setattr(dispatch_due_schedules.run_sc20_task, "delay", dispatch)
+    monkeypatch.setattr(
+        "core.automations.dispatching.run_sc20_task.apply_async",
+        dispatch,
+    )
 
     with pytest.raises(RuntimeError, match="broker unavailable"):
         call_command("dispatch_due_schedules", verbosity=0)
@@ -289,7 +295,10 @@ def test_monthly_dispatch_waits_until_configured_hour_in_sao_paulo(
 ) -> None:
     _configure_monthly_schedule(modules)
     dispatched: list[str] = []
-    monkeypatch.setattr(dispatch_due_schedules.run_sc20_task, "delay", dispatched.append)
+    monkeypatch.setattr(
+        "core.automations.dispatching.run_sc20_task.apply_async",
+        lambda *, args, task_id: dispatched.append(args[0]),
+    )
 
     call_command("dispatch_due_schedules", verbosity=0)
 
@@ -314,7 +323,10 @@ def test_monthly_dispatch_runs_at_configured_hour_in_sao_paulo(
 ) -> None:
     _configure_monthly_schedule(modules)
     dispatched: list[str] = []
-    monkeypatch.setattr(dispatch_due_schedules.run_sc20_task, "delay", dispatched.append)
+    monkeypatch.setattr(
+        "core.automations.dispatching.run_sc20_task.apply_async",
+        lambda *, args, task_id: dispatched.append(args[0]),
+    )
 
     call_command("dispatch_due_schedules", verbosity=0)
 
@@ -330,7 +342,10 @@ def test_monthly_dispatch_force_bypasses_only_the_configured_hour(
 ) -> None:
     _configure_monthly_schedule(modules)
     dispatched: list[str] = []
-    monkeypatch.setattr(dispatch_due_schedules.run_sc20_task, "delay", dispatched.append)
+    monkeypatch.setattr(
+        "core.automations.dispatching.run_sc20_task.apply_async",
+        lambda *, args, task_id: dispatched.append(args[0]),
+    )
 
     call_command("dispatch_due_schedules", force=True, verbosity=0)
 
@@ -358,7 +373,10 @@ def test_monthly_dispatch_requires_enabled_monthly_module(
     module.frequency = frequency
     module.save(update_fields=("is_enabled", "frequency"))
     dispatched: list[str] = []
-    monkeypatch.setattr(dispatch_due_schedules.run_sc20_task, "delay", dispatched.append)
+    monkeypatch.setattr(
+        "core.automations.dispatching.run_sc20_task.apply_async",
+        lambda *, args, task_id: dispatched.append(args[0]),
+    )
 
     call_command("dispatch_due_schedules", force=True, verbosity=0)
 

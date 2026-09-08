@@ -28,6 +28,7 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from core.automations.context_processors import DEFAULT_PAGE_SIZE, PAGE_SIZE_CHOICES
+from core.automations.dispatching import dispatch_run
 from core.automations.forms import (
     BriefingStartForm,
     DashboardRunFilterForm,
@@ -96,7 +97,6 @@ from core.automations.sc06.services import (
     save_briefing_draft,
 )
 from core.automations.sc20.services import create_sc20_run
-from core.automations.tasks import run_sc04_task, run_sc05_task, run_sc20_task
 from core.identity.models import User
 
 
@@ -878,15 +878,11 @@ def _sc04_file_response(document: FiscalDocument, *, attachment: bool) -> HttpRe
 
 def _dispatch_sc04(request: HttpRequest, run: AutomationRun) -> None:
     try:
-        run_sc04_task.delay(str(run.id))
-    except Exception as exc:
-        AutomationRun.objects.filter(pk=run.pk).update(
-            status=RunStatus.FAILED,
-            summary="Não foi possível adicionar a triagem ao processamento.",
-            error_message="O serviço de execução está temporariamente indisponível.",
-            metadata={**run.metadata, "dispatch_error": type(exc).__name__},
-            finished_at=timezone.now(),
+        dispatch_run(
+            run,
+            failure_summary="Não foi possível adicionar a triagem ao processamento.",
         )
+    except Exception:
         messages.error(request, "A triagem não pôde ser iniciada. Tente novamente mais tarde.")
         return
     messages.success(request, "Triagem adicionada à fila com rastreabilidade.")
@@ -1159,20 +1155,17 @@ def _dispatch_sc05(
     resumed: bool = False,
 ) -> None:
     try:
-        run_sc05_task.delay(str(run.id))
-    except Exception as exc:
-        AutomationRun.objects.filter(pk=run.pk).update(
-            status=(RunStatus.PARTIALLY_FAILED if resumed else RunStatus.FAILED),
-            summary=(
+        dispatch_run(
+            run,
+            failure_status=(RunStatus.PARTIALLY_FAILED if resumed else RunStatus.FAILED),
+            failure_summary=(
                 "A retomada não entrou na fila; o estado residual foi preservado "
                 "para nova tentativa."
                 if resumed
                 else "Não foi possível adicionar o robô ao processamento."
             ),
-            error_message="O serviço de execução está temporariamente indisponível.",
-            metadata={**run.metadata, "dispatch_error": type(exc).__name__},
-            finished_at=timezone.now(),
         )
+    except Exception:
         messages.error(request, "A operação não pôde ser iniciada. Tente novamente mais tarde.")
         return
     label = "Retomada" if resumed else "Operação"
@@ -1712,15 +1705,11 @@ def _sc20_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
 
 def _dispatch_sc20(request: HttpRequest, run: AutomationRun) -> None:
     try:
-        run_sc20_task.delay(str(run.id))
-    except Exception as exc:
-        AutomationRun.objects.filter(pk=run.pk).update(
-            status=RunStatus.FAILED,
-            summary="Não foi possível adicionar a execução ao processamento.",
-            error_message="O serviço de execução está temporariamente indisponível.",
-            metadata={"dispatch_error": type(exc).__name__},
-            finished_at=timezone.now(),
+        dispatch_run(
+            run,
+            failure_summary="Não foi possível adicionar a execução ao processamento.",
         )
+    except Exception:
         messages.error(request, "A execução não pôde ser iniciada. Tente novamente mais tarde.")
         return
     messages.success(request, "Verificação adicionada à fila com rastreabilidade.")

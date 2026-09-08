@@ -191,6 +191,29 @@ class AutomationRun(models.Model):
     summary = models.TextField("resumo", blank=True)
     error_message = models.TextField("erro apresentado", blank=True)
     metadata = models.JSONField("metadados", default=dict, blank=True)
+    task_id = models.UUIDField(
+        "identificador da entrega",
+        unique=True,
+        null=True,
+        blank=True,
+        editable=False,
+    )
+    queued_at = models.DateTimeField("enfileirada em", null=True, blank=True)
+    dispatch_started_at = models.DateTimeField(
+        "publicação iniciada em",
+        null=True,
+        blank=True,
+    )
+    broker_published_at = models.DateTimeField(
+        "publicação confirmada em",
+        null=True,
+        blank=True,
+    )
+    heartbeat_at = models.DateTimeField("último sinal do worker", null=True, blank=True)
+    reconciliation_attempts = models.PositiveSmallIntegerField(
+        "tentativas de reconciliação",
+        default=0,
+    )
     created_at = models.DateTimeField("criada em", auto_now_add=True)
     started_at = models.DateTimeField("iniciada em", null=True, blank=True)
     finished_at = models.DateTimeField("finalizada em", null=True, blank=True)
@@ -200,6 +223,8 @@ class AutomationRun(models.Model):
         indexes = [
             models.Index(fields=("module", "-created_at"), name="run_module_created_idx"),
             models.Index(fields=("status", "-created_at"), name="run_status_created_idx"),
+            models.Index(fields=("status", "queued_at"), name="run_status_queued_idx"),
+            models.Index(fields=("status", "heartbeat_at"), name="run_status_heartbeat_idx"),
         ]
         verbose_name = "execução"
         verbose_name_plural = "execuções"

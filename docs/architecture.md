@@ -157,7 +157,23 @@ Cada transição é validada no backend. Exceções técnicas não são exibidas
 
 ### 6.2 Disparo agendado
 
-Um Railway Cron executa um pulso curto a cada 15 minutos. O comando consulta no PostgreSQL o que venceu segundo `APP_TIME_ZONE`, cria a chave idempotente e publica no Redis somente módulos habilitados com a frequência esperada: SC-04 diariamente após `SC04_DAILY_HOUR` e SC-20 no primeiro dia do mês após `SC20_MONTHLY_HOUR`. O agendador chama o mesmo serviço de aplicação usado pelo comando manual, com ator de sistema. Assim, o cron da plataforma não codifica a regra de cada cliente e uma oscilação de minutos não muda a competência.
+Um Railway Cron executa um pulso curto a cada 15 minutos. Antes de procurar novas competências, o pulso reconcilia um lote limitado de execuções órfãs. Depois, o comando consulta no PostgreSQL o que venceu segundo `APP_TIME_ZONE`, cria a chave idempotente e publica no Redis somente módulos habilitados com a frequência esperada: SC-04 diariamente após `SC04_DAILY_HOUR` e SC-20 no primeiro dia do mês após `SC20_MONTHLY_HOUR`. O agendador chama o mesmo serviço de aplicação usado pelo comando manual, com ator de sistema. Assim, o cron da plataforma não codifica a regra de cada cliente e uma oscilação de minutos não muda a competência.
+
+### 6.3 Entrega, fencing e reconciliação
+
+PostgreSQL conserva o identificador da entrega Celery antes de sua publicação, além de `queued_at`, `dispatch_started_at`, `broker_published_at`, `heartbeat_at` e o contador limitado de recuperações. Os dois marcos de publicação distinguem uma janela de crash antes da confirmação do broker de uma mensagem confirmada que apenas aguarda em backlog; idade, sozinha, não invalida uma fila confirmada. O worker compara o identificador persistido com `task.request.id` sob lock da execução. Uma entrega atrasada ou substituída encerra sem efeito, e a conclusão só pode alterar uma execução ainda `RUNNING` com o mesmo identificador. A publicação no Redis ocorre fora da transação do banco.
+
+Os tempos obedecem à ordem limite brando da tarefa < limite rígido < visibilidade do Redis < corte de execução órfã. Checks de inicialização recusam relações inseguras. O worker atualiza o heartbeat nos limites relevantes do processamento e cancela tarefas longas quando perde a conexão com o broker.
+
+A recuperação automática é deliberadamente limitada:
+
+| Estado | SC-04 | SC-05 | SC-20 |
+| --- | --- | --- | --- |
+| `QUEUED` sem consumo | troca o identificador e republica uma vez | troca o identificador e republica uma vez | troca o identificador e republica uma vez |
+| `RUNNING` sem heartbeat | encerra tentativas interrompidas e retoma uma vez | não republica; fecha tentativas e isola o estado externo para conferência | não republica; isola como `PARTIALLY_FAILED` para conferência humana |
+| limite esgotado | fecha itens e recompõe um resultado verdadeiro | falha uma publicação não confirmada ou mantém a quarentena do estado externo | falha a publicação não confirmada ou mantém a quarentena da comunicação ambígua |
+
+O SC-20 não repete automaticamente uma execução já iniciada: o provedor pode ter aceitado uma comunicação antes da interrupção, e SMTP não oferece confirmação idempotente suficiente para distinguir esse caso. A retomada automática desse cenário só poderá ser adotada após uma outbox transacional com confirmação durável do provedor.
 
 ## 7. Persistência
 
@@ -255,7 +271,7 @@ A orquestração implementada é uma saga persistida:
 9. finalizar como `FAILED` quando toda compensação restaurar o estado inicial ou como `PARTIALLY_FAILED` quando houver resíduo;
 10. permitir retomada explícita apenas da falha parcial, preservar o evento e cenário original e não repetir mutação já conforme.
 
-`SC05Client`, `SC05Operation` e `SC05PortalStep` formam a projeção operacional. `SC05StepAttempt` conserva as tentativas de inspeção, aplicação e compensação; tentativas finalizadas e artefatos rejeitam edição/exclusão pela instância, e o admin os expõe somente para leitura. `SC05Artifact` referencia o objeto privado com hash e tamanho, ambos verificados novamente no download. Cada imagem contém somente o cartão do cliente-alvo ou o alerta de falha. Entregas repetidas do broker encerram tentativas interrompidas de forma explícita antes de reconciliar, mas um caso já parcial só volta a executar após retomada autorizada.
+`SC05Client`, `SC05Operation` e `SC05PortalStep` formam a projeção operacional. `SC05StepAttempt` conserva as tentativas de inspeção, aplicação e compensação; tentativas finalizadas e artefatos rejeitam edição/exclusão pela instância, e o admin os expõe somente para leitura. `SC05Artifact` referencia o objeto privado com hash e tamanho, ambos verificados novamente no download. Cada imagem contém somente o cartão do cliente-alvo ou o alerta de falha. Uma redelivery que encontre trabalho já iniciado encerra as tentativas locais interrompidas e isola a execução, sem repetir ações externas ambíguas; a reinspeção só ocorre após retomada autorizada.
 
 O simulador privado implementa fluxo normal e três cenários controlados: falha na aplicação em Tarefas, timeout na aplicação do Contábil e falha combinada em Tarefas com falha de compensação em Arquivos. Somente o administrador escolhe falhas; o operador Tecnologia usa o caminho normal. URLs, credenciais, timeout e seletores não escapam para o serviço da saga, e a troca futura por sistemas reais permanece concentrada nos gateways. Em produção, suas credenciais existem somente nas variáveis do `worker` e o gateway usa o endereço loopback; em desenvolvimento, a URL aponta para o serviço Compose separado.
 

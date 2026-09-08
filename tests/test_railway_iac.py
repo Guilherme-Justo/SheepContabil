@@ -37,6 +37,10 @@ def test_scheduler_receives_explicit_schedule_hours() -> None:
         r'APP_TIME_ZONE\s*:\s*"America/Sao_Paulo"',
         r"DATABASE_URL\s*:\s*database\.env\.DATABASE_URL",
         r"REDIS_URL\s*:\s*broker\.env\.REDIS_URL",
+        r'CELERY_BROKER_VISIBILITY_TIMEOUT_SECONDS\s*:\s*"1200"',
+        r'AUTOMATION_QUEUED_STALE_AFTER_SECONDS\s*:\s*"1800"',
+        r'AUTOMATION_RUNNING_STALE_AFTER_SECONDS\s*:\s*"1800"',
+        r'AUTOMATION_RECONCILIATION_MAX_ATTEMPTS\s*:\s*"1"',
         r'SC04_DAILY_HOUR\s*:\s*"8"',
         r'SC20_MONTHLY_HOUR\s*:\s*"8"',
     ):
@@ -52,3 +56,23 @@ def test_scheduler_receives_explicit_schedule_hours() -> None:
         "SC05_",
     ):
         assert unrelated_setting not in scheduler_config
+
+
+def test_web_and_worker_share_the_reconciliation_safety_settings() -> None:
+    railway_config = (PROJECT_ROOT / ".railway" / "railway.ts").read_text(encoding="utf-8")
+    common_match = re.search(
+        r"const commonEnvironment = \{.*?\n\s*\};",
+        railway_config,
+        re.DOTALL,
+    )
+
+    assert common_match is not None
+    common_config = common_match.group()
+    for expected_setting in (
+        r'CELERY_BROKER_VISIBILITY_TIMEOUT_SECONDS\s*:\s*"1200"',
+        r'AUTOMATION_QUEUED_STALE_AFTER_SECONDS\s*:\s*"1800"',
+        r'AUTOMATION_RUNNING_STALE_AFTER_SECONDS\s*:\s*"1800"',
+        r'AUTOMATION_RECONCILIATION_MAX_ATTEMPTS\s*:\s*"1"',
+    ):
+        assert re.search(expected_setting, common_config)
+    assert railway_config.count("...commonEnvironment") == 2

@@ -98,7 +98,7 @@ Antes de restaurar, o robô inspeciona o portal novamente. Ele só aplica a comp
 
 A retomada é deliberadamente explícita e permitida somente para `PARTIALLY_FAILED`. A falha demonstrativa original permanece no histórico, enquanto a nova tentativa executa o fluxo normal; o contador e o evento de retomada são persistidos e os portais são reinspecionados. Um portal que já estiver conforme é marcado sem novo clique. Se a compensação da nova tentativa for integral, a projeção do cliente volta ao estado anterior em vez de ficar presa em `partial`.
 
-Redelivery do broker também é tratada: tentativas que ficaram `RUNNING` são encerradas como interrompidas e etapas presas são reconciliadas a partir do estado externo observado. Uma redelivery de caso já `PARTIALLY_FAILED` não contorna a retomada explícita. Falha ao publicar uma retomada preserva `PARTIALLY_FAILED`, permitindo tentar novamente; falha no primeiro despacho termina a execução sem deixá-la eternamente pendente.
+Redelivery do broker também é tratada: uma entrega que ainda encontra a execução `QUEUED` pode iniciar normalmente, mas uma entrega que encontra trabalho RPA já `RUNNING` encerra as tentativas locais presas e coloca o caso em `PARTIALLY_FAILED`, sem repetir ações externas ambíguas. A reinspeção dos portais só ocorre depois de uma retomada explícita. Uma redelivery de caso já parcial não contorna essa autorização. Falha ao publicar uma retomada preserva `PARTIALLY_FAILED`, permitindo tentar novamente; falha no primeiro despacho termina a execução sem deixá-la eternamente pendente.
 
 ## Domínio e evidências
 

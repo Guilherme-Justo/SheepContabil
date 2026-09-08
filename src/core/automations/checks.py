@@ -51,6 +51,38 @@ def automation_settings_check(
                 id="automations.E044",
             )
         )
+    visibility_timeout = int(settings.CELERY_BROKER_VISIBILITY_TIMEOUT_SECONDS)
+    hard_time_limit = int(settings.CELERY_TASK_TIME_LIMIT)
+    if visibility_timeout <= hard_time_limit:
+        errors.append(
+            Error(
+                "CELERY_BROKER_VISIBILITY_TIMEOUT_SECONDS precisa superar o limite rígido da task.",
+                id="automations.E045",
+            )
+        )
+    queued_stale_after = int(settings.AUTOMATION_QUEUED_STALE_AFTER_SECONDS)
+    if queued_stale_after <= 0:
+        errors.append(
+            Error(
+                "AUTOMATION_QUEUED_STALE_AFTER_SECONDS precisa ser maior que zero.",
+                id="automations.E046",
+            )
+        )
+    running_stale_after = int(settings.AUTOMATION_RUNNING_STALE_AFTER_SECONDS)
+    if running_stale_after <= visibility_timeout:
+        errors.append(
+            Error(
+                "AUTOMATION_RUNNING_STALE_AFTER_SECONDS precisa superar o visibility timeout.",
+                id="automations.E047",
+            )
+        )
+    if int(settings.AUTOMATION_RECONCILIATION_MAX_ATTEMPTS) < 1:
+        errors.append(
+            Error(
+                "AUTOMATION_RECONCILIATION_MAX_ATTEMPTS precisa ser ao menos 1.",
+                id="automations.E048",
+            )
+        )
     if str(settings.S3_ADDRESSING_STYLE) not in {"auto", "path", "virtual"}:
         errors.append(
             Error(

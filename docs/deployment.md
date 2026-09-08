@@ -117,8 +117,19 @@ O smoke autenticado bloqueou e desbloqueou Aurora, validou três portais, seis P
 
 ## Scheduler do SC-04 e SC-20
 
-A Railway executa `python src/manage.py dispatch_due_schedules` a cada 15 minutos em UTC. O comando converte as regras para `APP_TIME_ZONE`: `SC04_DAILY_HOUR` define o horário diário do SC-04 e `SC20_MONTHLY_HOUR` define o horário do primeiro dia do mês para o SC-20, ambos com padrão `8`. Cada processo só é publicado quando seu módulo está habilitado e mantém a frequência esperada. As chaves idempotentes são `sc04:scheduled:AAAA-MM-DD` e `sc20:scheduled:AAAA-MM`; a data-base mensal permanece ancorada no primeiro dia mesmo se o pulso atrasar. Como o cron pulsa a cada 15 minutos, a publicação pode ocorrer até 14 minutos e 59 segundos depois do horário configurado.
+A Railway executa `python src/manage.py dispatch_due_schedules` a cada 15 minutos em UTC. O comando primeiro reconcilia um lote limitado de execuções órfãs e depois converte as regras para `APP_TIME_ZONE`: `SC04_DAILY_HOUR` define o horário diário do SC-04 e `SC20_MONTHLY_HOUR` define o horário do primeiro dia do mês para o SC-20, ambos com padrão `8`. Cada processo só é publicado quando seu módulo está habilitado e mantém a frequência esperada. As chaves idempotentes são `sc04:scheduled:AAAA-MM-DD` e `sc20:scheduled:AAAA-MM`; a data-base mensal permanece ancorada no primeiro dia mesmo se o pulso atrasar. Como o cron pulsa a cada 15 minutos, a publicação pode ocorrer até 14 minutos e 59 segundos depois do horário configurado.
 
-O pulso termina sem executar a automação. Se a publicação no broker falhar antes de o worker iniciar, a execução registra a falha e o pulso seguinte pode republicar o mesmo UUID; qualquer execução já iniciada ou terminal continua protegida contra duplicidade. Para um ensaio operacional controlado fora do horário, use `python src/manage.py dispatch_due_schedules --force` apenas com dados sintéticos.
+O pulso termina sem executar a automação. Cada publicação usa um identificador persistido antes do envio ao Redis e registra separadamente o início da tentativa e a confirmação do broker; uma entrega substituída não pode iniciar nem finalizar a execução. Uma fila com confirmação do broker não é republicada apenas por estar antiga, pois pode representar backlog legítimo. Se a publicação inicial falhar, a execução recebe falha segura. Se uma republicação de recuperação falhar, a execução permanece enfileirada e auditada, sem exceder o limite automático. Para um ensaio operacional controlado fora do horário, use `python src/manage.py dispatch_due_schedules --force` apenas com dados sintéticos.
+
+As variáveis operacionais têm estes valores iniciais em web, worker e scheduler:
+
+| Variável | Valor | Regra |
+| --- | ---: | --- |
+| `CELERY_BROKER_VISIBILITY_TIMEOUT_SECONDS` | `1200` | maior que o limite rígido Celery de 900 s |
+| `AUTOMATION_QUEUED_STALE_AFTER_SECONDS` | `1800` | tempo até considerar uma publicação não consumida |
+| `AUTOMATION_RUNNING_STALE_AFTER_SECONDS` | `1800` | maior que a visibilidade do Redis |
+| `AUTOMATION_RECONCILIATION_MAX_ATTEMPTS` | `1` | uma única recuperação automática |
+
+O comando `python src/manage.py reconcile_automation_runs --dry-run` apenas informa o que faria. Sem `--dry-run`, recupera o lote padrão; `--batch-size N` limita explicitamente a inspeção. SC-04 fecha a tentativa interrompida antes de retomar. SC-05 e SC-20 já iniciados são colocados em `PARTIALLY_FAILED`, sem repetir ações externas; no SC-05 é necessário conferir os três portais e, no SC-20, o histórico do provedor antes de qualquer retomada manual.
 
 Referências oficiais: [IaC](https://docs.railway.com/infrastructure-as-code), [Django](https://docs.railway.com/guides/django), [pre-deploy](https://docs.railway.com/deployments/pre-deploy-command), [healthchecks](https://docs.railway.com/deployments/healthchecks), [cron](https://docs.railway.com/cron-jobs) e [buckets](https://docs.railway.com/storage-buckets).
