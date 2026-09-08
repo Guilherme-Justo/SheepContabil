@@ -18,6 +18,7 @@ from core.automations.models import (
     BriefingTemplate,
     BriefingTemplateVersion,
     BriefingVersionStatus,
+    RunEventType,
     RunStatus,
     SocietaryBriefing,
     SocietaryBriefingStatus,
@@ -442,7 +443,7 @@ def test_sc06_cases_filters_and_htmx_pagination(
     assert "Limpar" in html
 
 
-def test_cancel_empty_draft_discards_completely(
+def test_cancel_empty_draft_preserves_the_operational_trail(
     client: Client,
     modules: dict[str, AutomationModule],
     societary_operator: User,
@@ -460,13 +461,16 @@ def test_cancel_empty_draft_discards_completely(
     )
     client.force_login(societary_operator)
 
-    # Cancelar rascunho sem respostas faz descarte limpo (hard delete)
+    # O conteúdo vazio é descartado, mas a evidência da execução permanece imutável.
     response = client.post(detail_url, {"action": "cancel"})
     expected_redirect = reverse("automations:module-detail", kwargs={"slug": modules["SC-06"].slug})
     assert response.url == expected_redirect
 
-    assert not SocietaryBriefing.objects.filter(id=briefing.id).exists()
-    assert not AutomationRun.objects.filter(id=briefing.run_id).exists()
+    briefing.refresh_from_db()
+    briefing.run.refresh_from_db()
+    assert briefing.status == SocietaryBriefingStatus.CANCELLED
+    assert briefing.run.status == RunStatus.CANCELLED
+    assert briefing.run.events.filter(event_type=RunEventType.CANCELLED).exists()
 
 
 def test_abandon_new_briefing_leaves_no_database_residue(
@@ -522,7 +526,11 @@ def test_cleanup_empty_briefings_command(
     # Execução real
     out_real = StringIO()
     call_command("cleanup_empty_briefings", stdout=out_real)
-    assert "Total de 1 rascunho(s) vazio(s) descartado(s) com sucesso." in out_real.getvalue()
-    assert not SocietaryBriefing.objects.filter(id=empty_briefing.id).exists()
-    assert not AutomationRun.objects.filter(id=empty_briefing.run_id).exists()
+    assert (
+        "Total de 1 rascunho(s) vazio(s) cancelado(s) com trilha preservada." in out_real.getvalue()
+    )
+    empty_briefing.refresh_from_db()
+    empty_briefing.run.refresh_from_db()
+    assert empty_briefing.status == SocietaryBriefingStatus.CANCELLED
+    assert empty_briefing.run.status == RunStatus.CANCELLED
     assert SocietaryBriefing.objects.filter(id=filled_briefing.id).exists()

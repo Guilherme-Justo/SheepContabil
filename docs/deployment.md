@@ -132,4 +132,30 @@ As variáveis operacionais têm estes valores iniciais em web, worker e schedule
 
 O comando `python src/manage.py reconcile_automation_runs --dry-run` apenas informa o que faria. Sem `--dry-run`, recupera o lote padrão; `--batch-size N` limita explicitamente a inspeção. SC-04 fecha a tentativa interrompida antes de retomar. SC-05 e SC-20 já iniciados são colocados em `PARTIALLY_FAILED`, sem repetir ações externas; no SC-05 é necessário conferir os três portais e, no SC-20, o histórico do provedor antes de qualquer retomada manual.
 
+## Rastreabilidade e migration 0010
+
+A migration `0010_automation_run_event` cria somente a tabela, constraints e índices da trilha;
+ela não altera execuções existentes nem inventa eventos retroativos. O pre-deploy do serviço web
+deve aplicá-la antes de web, worker e scheduler operarem com o novo commit. Os três serviços
+precisam convergir para a mesma revisão.
+
+Não há segredo novo obrigatório. Railway fornece automaticamente nome do serviço, ambiente e SHA
+quando disponíveis; `APP_SERVICE_NAME`, `APP_ENVIRONMENT` e `APP_RELEASE` são substituições
+opcionais para outros provedores. O cabeçalho `X-Request-ID` pode ser enviado por um proxy, mas só
+UUIDs válidos são preservados.
+
+Após o deploy:
+
+1. confirme `/health/live` e `/health/ready` com HTTP 200;
+2. inicie uma execução sintética e confirme sequências contínuas na linha do tempo;
+3. como administrador, confira `request_id`/`task_id`; como operador, confirme que eles não aparecem;
+4. filtre os logs de web e worker pelo mesmo `run_id`;
+5. execute o pulso agendado e confirme um `pulse_id` único nos logs;
+6. verifique que uma execução histórica sem eventos mostra o aviso de ausência de backfill;
+7. no SC-20, trate tentativa `PENDING`/`integration_unknown` como conferência manual, nunca como
+   autorização de reenvio.
+
+O rollback do código deve preservar a tabela de eventos. Reverter a migration apaga evidência e
+não é um rollback operacional aceitável depois que produção registrar o primeiro evento.
+
 Referências oficiais: [IaC](https://docs.railway.com/infrastructure-as-code), [Django](https://docs.railway.com/guides/django), [pre-deploy](https://docs.railway.com/deployments/pre-deploy-command), [healthchecks](https://docs.railway.com/deployments/healthchecks), [cron](https://docs.railway.com/cron-jobs) e [buckets](https://docs.railway.com/storage-buckets).

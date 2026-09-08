@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import urllib.parse
 import uuid
+from collections.abc import Collection, Iterable
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -157,6 +158,45 @@ class RunStatus(models.TextChoices):
     CANCELLED = "cancelled", "Cancelada"
 
 
+class RunEventType(models.TextChoices):
+    CREATED = "created", "Criada"
+    QUEUED = "queued", "Enfileirada"
+    DISPATCH_STARTED = "dispatch_started", "Publicação iniciada"
+    DISPATCH_FAILED = "dispatch_failed", "Publicação falhou"
+    BROKER_PUBLISHED = "broker_published", "Publicação confirmada"
+    DELIVERY_RECEIVED = "delivery_received", "Entrega recebida"
+    DELIVERY_IGNORED = "delivery_ignored", "Entrega ignorada"
+    DELIVERY_FINISHED = "delivery_finished", "Entrega finalizada"
+    STARTED = "started", "Iniciada"
+    HEARTBEAT = "heartbeat", "Sinal de atividade"
+    REQUEUED = "requeued", "Reenfileirada"
+    QUARANTINED = "quarantined", "Isolada para reconciliação"
+    RESUMED = "resumed", "Retomada"
+    REVIEW_REQUIRED = "review_required", "Revisão necessária"
+    STEP_STARTED = "step_started", "Etapa iniciada"
+    STEP_FINISHED = "step_finished", "Etapa finalizada"
+    ATTEMPT_STARTED = "attempt_started", "Tentativa iniciada"
+    ATTEMPT_FINISHED = "attempt_finished", "Tentativa finalizada"
+    INTEGRATION_STARTED = "integration_started", "Integração iniciada"
+    INTEGRATION_FINISHED = "integration_finished", "Integração finalizada"
+    INTEGRATION_UNKNOWN = "integration_unknown", "Resultado da integração desconhecido"
+    RECONCILIATION_FAILED = "reconciliation_failed", "Reconciliação falhou"
+    SUCCEEDED = "succeeded", "Concluída"
+    SUCCEEDED_WITH_WARNINGS = "succeeded_with_warnings", "Concluída com alertas"
+    PARTIALLY_FAILED = "partially_failed", "Falha parcial"
+    FAILED = "failed", "Falhou"
+    CANCELLED = "cancelled", "Cancelada"
+
+
+class RunEventSource(models.TextChoices):
+    WEB = "web", "Portal"
+    WORKER = "worker", "Worker"
+    SCHEDULER = "scheduler", "Agendador"
+    RECONCILER = "reconciler", "Reconciliador"
+    ADMIN = "admin", "Administração técnica"
+    SYSTEM = "system", "Sistema"
+
+
 class AutomationRun(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     module = models.ForeignKey(
@@ -266,6 +306,172 @@ class AutomationRun(models.Model):
         if self.status in {RunStatus.FAILED, RunStatus.PARTIALLY_FAILED}:
             return "danger"
         if self.status == RunStatus.CANCELLED:
+            return "neutral"
+        return "active"
+
+
+class AutomationRunEventQuerySet(models.QuerySet["AutomationRunEvent"]):
+    """Evidence is created through traceability.record_run_event and never rewritten."""
+
+    def update(self, **kwargs: Any) -> int:
+        del kwargs
+        raise ValidationError("Eventos de execução são evidências append-only.")
+
+    def delete(self) -> tuple[int, dict[str, int]]:
+        raise ValidationError("Eventos de execução são evidências append-only.")
+
+    def bulk_create(
+        self,
+        objs: Iterable[AutomationRunEvent],
+        batch_size: int | None = None,
+        ignore_conflicts: bool = False,
+        update_conflicts: bool = False,
+        update_fields: Collection[str] | None = None,
+        unique_fields: Collection[str] | None = None,
+    ) -> list[AutomationRunEvent]:
+        del (
+            objs,
+            batch_size,
+            ignore_conflicts,
+            update_conflicts,
+            update_fields,
+            unique_fields,
+        )
+        raise ValidationError("Eventos devem ser criados pelo gravador de rastreabilidade.")
+
+    def bulk_update(
+        self,
+        objs: Iterable[AutomationRunEvent],
+        fields: Iterable[str],
+        batch_size: int | None = None,
+    ) -> int:
+        del objs, fields, batch_size
+        raise ValidationError("Eventos de execução são evidências append-only.")
+
+
+class AutomationRunEvent(models.Model):
+    """Immutable, explicitly recorded evidence for an automation run."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    run = models.ForeignKey(
+        AutomationRun,
+        on_delete=models.PROTECT,
+        related_name="events",
+        verbose_name="execução",
+    )
+    sequence = models.PositiveIntegerField("sequência")
+    event_type = models.CharField(
+        "tipo do evento",
+        max_length=40,
+        choices=RunEventType.choices,
+    )
+    source = models.CharField(
+        "origem do evento",
+        max_length=20,
+        choices=RunEventSource.choices,
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="automation_run_events",
+        verbose_name="ator",
+    )
+    previous_status = models.CharField(
+        "estado anterior",
+        max_length=32,
+        choices=RunStatus.choices,
+        blank=True,
+    )
+    current_status = models.CharField(
+        "estado atual",
+        max_length=32,
+        choices=RunStatus.choices,
+        blank=True,
+    )
+    request_id = models.CharField("requisição", max_length=100, blank=True)
+    task_id = models.UUIDField("entrega", null=True, blank=True)
+    pulse_id = models.UUIDField("pulso", null=True, blank=True)
+    entity_type = models.CharField("tipo da entidade", max_length=80, blank=True)
+    entity_id = models.CharField("identificador da entidade", max_length=180, blank=True)
+    step = models.CharField("etapa", max_length=80, blank=True)
+    attempt = models.PositiveSmallIntegerField("tentativa", null=True, blank=True)
+    outcome = models.CharField("resultado", max_length=64, blank=True)
+    error_code = models.CharField("código de erro", max_length=80, blank=True)
+    duration_ms = models.PositiveBigIntegerField("duração em ms", null=True, blank=True)
+    deduplication_key = models.CharField("chave de deduplicação", max_length=180)
+    message = models.CharField("mensagem segura", max_length=500, blank=True)
+    details = models.JSONField("detalhes minimizados", default=dict, blank=True)
+    occurred_at = models.DateTimeField("ocorrido em", default=timezone.now, editable=False)
+
+    objects = AutomationRunEventQuerySet.as_manager()
+
+    class Meta:
+        ordering = ("run_id", "sequence")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("run", "sequence"),
+                name="uniq_run_event_sequence",
+            ),
+            models.UniqueConstraint(
+                fields=("run", "deduplication_key"),
+                name="uniq_run_event_dedupe",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(sequence__gte=1),
+                name="run_event_sequence_positive",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(duration_ms__isnull=True) | models.Q(duration_ms__gte=0),
+                name="run_event_duration_nonnegative",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("run", "-occurred_at"),
+                name="run_event_run_time_idx",
+            ),
+            models.Index(
+                fields=("event_type", "-occurred_at"),
+                name="run_event_type_time_idx",
+            ),
+            models.Index(
+                fields=("entity_type", "entity_id"),
+                name="run_event_entity_idx",
+            ),
+            models.Index(fields=("task_id",), name="run_event_task_idx"),
+            models.Index(fields=("request_id",), name="run_event_request_idx"),
+        ]
+        verbose_name = "evento de execução"
+        verbose_name_plural = "eventos de execução"
+
+    def __str__(self) -> str:
+        return f"{self.run_id} · {self.sequence:04d} · {self.get_event_type_display()}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise ValidationError("Eventos de execução são evidências append-only.")
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        del args, kwargs
+        raise ValidationError("Eventos de execução são evidências append-only.")
+
+    @property
+    def current_status_tone(self) -> str:
+        if self.current_status == RunStatus.SUCCEEDED:
+            return "success"
+        if self.current_status in {
+            RunStatus.AWAITING_REVIEW,
+            RunStatus.SUCCEEDED_WITH_WARNINGS,
+            RunStatus.PENDING,
+        }:
+            return "warning"
+        if self.current_status in {RunStatus.FAILED, RunStatus.PARTIALLY_FAILED}:
+            return "danger"
+        if self.current_status == RunStatus.CANCELLED:
             return "neutral"
         return "active"
 

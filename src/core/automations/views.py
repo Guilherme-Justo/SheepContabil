@@ -329,6 +329,7 @@ def run_detail(request: HttpRequest, run_id: str) -> HttpResponse:
         if sc05_operation is not None
         else SC05PortalStep.objects.none()
     )
+    run_events = run.events.select_related("actor").all()
     return render(
         request,
         "automations/run_detail.html",
@@ -339,6 +340,12 @@ def run_detail(request: HttpRequest, run_id: str) -> HttpResponse:
             "document_items": document_items,
             "sc05_operation": sc05_operation,
             "sc05_steps": sc05_steps,
+            "run_events": run_events,
+            "show_technical_trace": getattr(
+                request.user,
+                "is_business_administrator",
+                False,
+            ),
         },
     )
 
@@ -493,7 +500,7 @@ def sc04_retry_route(request: HttpRequest, document_id: str) -> HttpResponse:
     _visible_sc04_module(request)
     document = _visible_sc04_document(request, document_id)
     try:
-        retry_document_route(document.id)
+        retry_document_route(document.id, requested_by=cast(User, request.user))
     except SC04Error as exc:
         messages.error(request, str(exc))
     else:
@@ -1091,7 +1098,10 @@ def _sc05_detail(request: HttpRequest, module: AutomationModule) -> HttpResponse
 def sc05_resume(request: HttpRequest, run_id: str) -> HttpResponse:
     operation = _visible_sc05_operation(request, run_id=run_id)
     try:
-        run = resume_sc05_run(operation.run_id)
+        run = resume_sc05_run(
+            operation.run_id,
+            requested_by=cast(User, request.user),
+        )
     except ValidationError as exc:
         messages.error(request, " ".join(exc.messages))
         return redirect("automations:run-detail", run_id=operation.run_id)
@@ -1193,8 +1203,11 @@ def sc06_briefing_detail(request: HttpRequest, briefing_id: str) -> HttpResponse
         if action == "cancel":
             module_slug = briefing.run.module.slug
             if is_briefing_empty(briefing):
-                discard_empty_briefing(briefing.id)
-                messages.info(request, "Rascunho vazio descartado sem resíduos.")
+                discard_empty_briefing(
+                    briefing.id,
+                    discarded_by=cast(User, request.user),
+                )
+                messages.info(request, "Rascunho vazio descartado e preservado na trilha.")
             else:
                 cancel_briefing(briefing.id, cancelled_by=cast(User, request.user))
                 messages.info(request, "Briefing societário cancelado e arquivado.")

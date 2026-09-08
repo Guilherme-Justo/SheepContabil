@@ -5,12 +5,19 @@ from uuid import UUID, uuid4
 from django.db import transaction
 from django.utils import timezone
 
-from core.automations.models import AutomationRun, RunStatus
+from core.automations.models import (
+    AutomationRun,
+    RunEventSource,
+    RunEventType,
+    RunStatus,
+    RunTrigger,
+)
 from core.automations.tasks import (
     run_sc04_task,
     run_sc05_task,
     run_sc20_task,
 )
+from core.automations.traceability import record_run_event
 
 ASYNC_MODULE_CODES = ("SC-04", "SC-05", "SC-20")
 
@@ -46,6 +53,22 @@ def dispatch_run(
                 "finished_at",
             )
         )
+        record_run_event(
+            run=locked,
+            event_type=RunEventType.DISPATCH_STARTED,
+            source=(
+                RunEventSource.SCHEDULER
+                if locked.trigger == RunTrigger.SCHEDULED
+                else RunEventSource.WEB
+            ),
+            actor=locked.triggered_by,
+            previous_status=RunStatus.QUEUED,
+            current_status=RunStatus.QUEUED,
+            task_id=task_id,
+            outcome="started",
+            deduplication_key=f"dispatch.started:{task_id}",
+            message="Publicação da execução iniciada.",
+        )
 
     try:
         task.apply_async(args=(str(run.id),), task_id=str(task_id))
@@ -67,7 +90,11 @@ def publish_claimed_run(*, module_code: str, run_id: UUID, task_id: UUID) -> Non
 
 
 def confirm_claimed_run(*, run_id: UUID, task_id: UUID) -> None:
-    _record_dispatch_success(run_id=run_id, task_id=task_id)
+    _record_dispatch_success(
+        run_id=run_id,
+        task_id=task_id,
+        source=RunEventSource.RECONCILER,
+    )
 
 
 def _task_for_module(module_code: str):  # type: ignore[no-untyped-def]
@@ -113,11 +140,49 @@ def _record_dispatch_failure(
                 "finished_at",
             )
         )
+        record_run_event(
+            run=run,
+            event_type=RunEventType.DISPATCH_FAILED,
+            source=(
+                RunEventSource.SCHEDULER
+                if run.trigger == RunTrigger.SCHEDULED
+                else RunEventSource.WEB
+            ),
+            actor=run.triggered_by,
+            previous_status=RunStatus.QUEUED,
+            current_status=status,
+            task_id=task_id,
+            outcome="failed",
+            error_code=type(exc).__name__,
+            deduplication_key=f"dispatch.failed:{task_id}",
+            message="A execução não pôde ser publicada no broker.",
+        )
 
 
-def _record_dispatch_success(*, run_id: UUID, task_id: UUID) -> None:
-    AutomationRun.objects.filter(
-        pk=run_id,
-        task_id=task_id,
-        broker_published_at__isnull=True,
-    ).update(broker_published_at=timezone.now())
+def _record_dispatch_success(
+    *,
+    run_id: UUID,
+    task_id: UUID,
+    source: str | None = None,
+) -> None:
+    with transaction.atomic():
+        run = AutomationRun.objects.select_for_update().filter(pk=run_id, task_id=task_id).first()
+        if run is None:
+            return
+        if run.broker_published_at is None:
+            run.broker_published_at = timezone.now()
+            run.save(update_fields=("broker_published_at",))
+        event_source = source or (
+            RunEventSource.SCHEDULER if run.trigger == RunTrigger.SCHEDULED else RunEventSource.WEB
+        )
+        record_run_event(
+            run=run,
+            event_type=RunEventType.BROKER_PUBLISHED,
+            source=event_source,
+            actor=run.triggered_by,
+            current_status=run.status,
+            task_id=task_id,
+            outcome="published",
+            deduplication_key=f"dispatch.published:{task_id}",
+            message="Publicação confirmada pelo broker.",
+        )

@@ -17,6 +17,8 @@ from django.utils import timezone
 from core.automations.models import (
     AutomationModule,
     AutomationRun,
+    RunEventSource,
+    RunEventType,
     RunStatus,
     RunTrigger,
     SC05Action,
@@ -36,6 +38,7 @@ from core.automations.run_tracking import (
     SupersededDelivery,
     bind_delivery,
     delivery_matches,
+    normalize_task_id,
     require_current_delivery,
     touch_run,
     with_reconciliation_event,
@@ -52,6 +55,7 @@ from core.automations.sc05.contracts import (
     ScreenshotStorage,
     StoredScreenshot,
 )
+from core.automations.traceability import record_run_event
 from core.identity.models import User
 
 BLOCKED_TASK_OWNER = "BLOQUEADO_INADIMPLENCIA"
@@ -158,10 +162,39 @@ def create_sc05_run_result(
                 for position, portal in enumerate(order, start=1)
             ]
         )
+        record_run_event(
+            run=run,
+            event_type=RunEventType.CREATED,
+            source=RunEventSource.WEB,
+            actor=triggered_by,
+            current_status=RunStatus.QUEUED,
+            task_id=run.task_id,
+            entity_type="sc05_operation",
+            entity_id=str(operation.id),
+            deduplication_key="run.created",
+            message="Execução RPA criada.",
+        )
+        record_run_event(
+            run=run,
+            event_type=RunEventType.QUEUED,
+            source=RunEventSource.WEB,
+            actor=triggered_by,
+            current_status=RunStatus.QUEUED,
+            task_id=run.task_id,
+            entity_type="sc05_operation",
+            entity_id=str(operation.id),
+            outcome="queued",
+            deduplication_key=f"run.queued:{run.task_id}",
+            message="Operação RPA adicionada à fila.",
+        )
     return SC05RunCreation(run=run, created=True)
 
 
-def resume_sc05_run(run_id: str | UUID) -> AutomationRun:
+def resume_sc05_run(
+    run_id: str | UUID,
+    *,
+    requested_by: User | None = None,
+) -> AutomationRun:
     with transaction.atomic():
         operation = (
             SC05Operation.objects.select_for_update()
@@ -225,6 +258,21 @@ def resume_sc05_run(run_id: str | UUID) -> AutomationRun:
             )
         )
         operation.save(update_fields=("resume_count", "updated_at"))
+        record_run_event(
+            run=run,
+            event_type=RunEventType.RESUMED,
+            source=RunEventSource.WEB,
+            actor=requested_by,
+            previous_status=RunStatus.PARTIALLY_FAILED,
+            current_status=RunStatus.QUEUED,
+            task_id=run.task_id,
+            entity_type="sc05_operation",
+            entity_id=str(operation.id),
+            attempt=operation.resume_count,
+            outcome="queued",
+            deduplication_key=f"run.resumed:{run.task_id}",
+            message="Retomada explícita da operação RPA adicionada à fila.",
+        )
     return run
 
 
@@ -267,7 +315,11 @@ def execute_sc05(
                 except SC05Error as exc:
                     failed_step = step
                     failure = exc
-                    _mark_step_failed(step, exc)
+                    _mark_step_failed(
+                        step,
+                        exc,
+                        expected_task_id=operation.run.task_id,
+                    )
                     break
             if failure is not None:
                 require_current_delivery(operation.run_id, task_id=operation.run.task_id)
@@ -329,13 +381,49 @@ def _prepare_operation(
         )
         run = operation.run
         if not bind_delivery(run, task_id):
+            supplied_task_id = normalize_task_id(task_id)
+            record_run_event(
+                run=run,
+                event_type=RunEventType.DELIVERY_IGNORED,
+                source=RunEventSource.WORKER,
+                current_status=run.status,
+                task_id=supplied_task_id,
+                outcome="superseded",
+                deduplication_key=f"delivery.ignored:{supplied_task_id or 'invalid'}",
+                message="Entrega substituída ignorada sem alterar a operação RPA.",
+            )
             return operation, False
         if run.status not in ACTIVE_RUN_STATUSES:
+            supplied_task_id = normalize_task_id(task_id)
+            record_run_event(
+                run=run,
+                event_type=RunEventType.DELIVERY_IGNORED,
+                source=RunEventSource.WORKER,
+                current_status=run.status,
+                task_id=supplied_task_id,
+                outcome="terminal",
+                deduplication_key=(
+                    f"delivery.ignored:{supplied_task_id or 'without-task'}:{run.status}"
+                ),
+                message="Entrega ignorada porque a operação RPA já estava encerrada.",
+            )
             return operation, False
         now = timezone.now()
         run.dispatch_started_at = run.dispatch_started_at or run.queued_at or now
         run.broker_published_at = run.broker_published_at or now
         if run.status == RunStatus.RUNNING and not resume_interrupted:
+            record_run_event(
+                run=run,
+                event_type=RunEventType.DELIVERY_IGNORED,
+                source=RunEventSource.WORKER,
+                current_status=RunStatus.RUNNING,
+                task_id=run.task_id,
+                outcome="already_running",
+                deduplication_key=(
+                    f"delivery.ignored:{run.task_id or 'without-task'}:already-running"
+                ),
+                message="Entrega repetida ignorada enquanto a operação RPA estava ativa.",
+            )
             return operation, False
         if run.status == RunStatus.RUNNING and resume_interrupted:
             _close_interrupted_sc05_attempts(operation=operation, now=now)
@@ -377,7 +465,24 @@ def _prepare_operation(
                     "heartbeat_at",
                 )
             )
+            record_run_event(
+                run=run,
+                event_type=RunEventType.QUARANTINED,
+                source=RunEventSource.WORKER,
+                previous_status=RunStatus.RUNNING,
+                current_status=RunStatus.PARTIALLY_FAILED,
+                task_id=previous_task_id,
+                entity_type="sc05_operation",
+                entity_id=str(operation.id),
+                attempt=run.reconciliation_attempts,
+                outcome="ambiguous_external_state",
+                deduplication_key=(
+                    f"run.quarantined:{previous_task_id or 'without-task'}:redelivery"
+                ),
+                message="Operação RPA isolada para reconciliação sem repetir ações externas.",
+            )
             return operation, False
+        previous_status = run.status
         run.status = RunStatus.RUNNING
         run.started_at = run.started_at or now
         run.finished_at = None
@@ -398,6 +503,19 @@ def _prepare_operation(
                 "reconciliation_attempts",
                 "metadata",
             )
+        )
+        record_run_event(
+            run=run,
+            event_type=RunEventType.STARTED,
+            source=RunEventSource.WORKER,
+            previous_status=previous_status,
+            current_status=RunStatus.RUNNING,
+            task_id=run.task_id,
+            entity_type="sc05_operation",
+            entity_id=str(operation.id),
+            outcome="started",
+            deduplication_key=f"run.started:{run.task_id or 'without-task'}",
+            message="Worker iniciou a operação RPA.",
         )
     return operation, True
 
@@ -480,6 +598,11 @@ def _apply_step(
         )
         step.finished_at = timezone.now()
         step.save(update_fields=("status", "finished_at", "updated_at"))
+        _record_step_finished(
+            step=step,
+            outcome=step.status,
+            expected_task_id=operation.run.task_id,
+        )
         return
 
     changed = _invoke(
@@ -505,6 +628,11 @@ def _apply_step(
     step.error_message = ""
     step.finished_at = timezone.now()
     step.save(update_fields=("status", "after_state", "error_message", "finished_at", "updated_at"))
+    _record_step_finished(
+        step=step,
+        outcome=step.status,
+        expected_task_id=operation.run.task_id,
+    )
 
 
 @transaction.atomic
@@ -522,6 +650,19 @@ def _start_step(
     step.finished_at = None
     step.error_message = ""
     step.save(update_fields=("status", "started_at", "finished_at", "error_message", "updated_at"))
+    record_run_event(
+        run=run,
+        event_type=RunEventType.STEP_STARTED,
+        source=RunEventSource.WORKER,
+        current_status=RunStatus.RUNNING,
+        task_id=expected_task_id,
+        entity_type="sc05_step",
+        entity_id=str(step.id),
+        step=step.portal,
+        outcome="started",
+        deduplication_key=(f"step.started:{step.id}:{expected_task_id or 'without-task'}"),
+        message="Etapa RPA iniciada.",
+    )
 
 
 def _desired_state(
@@ -740,27 +881,66 @@ def _start_attempt(
     if run.status != RunStatus.RUNNING or not delivery_matches(run, expected_task_id):
         raise SupersededDelivery
     latest = step.attempts.aggregate(value=Max("sequence"))["value"] or 0
-    return SC05StepAttempt.objects.create(
+    attempt = SC05StepAttempt.objects.create(
         step=step,
         sequence=int(latest) + 1,
         operation=operation,
         status=SC05AttemptStatus.RUNNING,
         state_before=deepcopy(step.after_state or step.before_state),
     )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.ATTEMPT_STARTED,
+        source=RunEventSource.WORKER,
+        current_status=RunStatus.RUNNING,
+        task_id=expected_task_id,
+        entity_type="sc05_attempt",
+        entity_id=str(attempt.id),
+        step=step.portal,
+        attempt=attempt.sequence,
+        outcome=str(operation),
+        deduplication_key=f"attempt.started:{attempt.id}",
+        message="Tentativa de interação com portal iniciada.",
+    )
+    return attempt
 
 
+@transaction.atomic
 def _succeed_attempt(attempt: SC05StepAttempt, state: PortalState) -> None:
+    expected_task_id = attempt.step.operation.run.task_id
+    run = AutomationRun.objects.select_for_update().get(pk=attempt.step.operation.run_id)
+    if run.status != RunStatus.RUNNING or not delivery_matches(run, expected_task_id):
+        raise SupersededDelivery
     attempt.status = SC05AttemptStatus.SUCCEEDED
     attempt.state_after = deepcopy(state)
     attempt.finished_at = timezone.now()
     attempt.save(update_fields=("status", "state_after", "finished_at"))
+    record_run_event(
+        run=run,
+        event_type=RunEventType.ATTEMPT_FINISHED,
+        source=RunEventSource.WORKER,
+        current_status=RunStatus.RUNNING,
+        task_id=expected_task_id,
+        entity_type="sc05_attempt",
+        entity_id=str(attempt.id),
+        step=attempt.step.portal,
+        attempt=attempt.sequence,
+        outcome="succeeded",
+        deduplication_key=f"attempt.finished:{attempt.id}",
+        message="Tentativa de interação com portal concluída.",
+    )
 
 
+@transaction.atomic
 def _fail_attempt(
     attempt: SC05StepAttempt,
     error: SC05Error,
     state: PortalState,
 ) -> None:
+    expected_task_id = attempt.step.operation.run.task_id
+    run = AutomationRun.objects.select_for_update().get(pk=attempt.step.operation.run_id)
+    if run.status != RunStatus.RUNNING or not delivery_matches(run, expected_task_id):
+        raise SupersededDelivery
     attempt.status = SC05AttemptStatus.FAILED
     attempt.state_after = deepcopy(state)
     attempt.error_code = error.code
@@ -775,13 +955,73 @@ def _fail_attempt(
             "finished_at",
         )
     )
+    record_run_event(
+        run=run,
+        event_type=RunEventType.ATTEMPT_FINISHED,
+        source=RunEventSource.WORKER,
+        current_status=RunStatus.RUNNING,
+        task_id=expected_task_id,
+        entity_type="sc05_attempt",
+        entity_id=str(attempt.id),
+        step=attempt.step.portal,
+        attempt=attempt.sequence,
+        outcome="failed",
+        error_code=error.code,
+        deduplication_key=f"attempt.finished:{attempt.id}",
+        message="Tentativa de interação com portal falhou de forma controlada.",
+    )
 
 
-def _mark_step_failed(step: SC05PortalStep, error: SC05Error) -> None:
+@transaction.atomic
+def _mark_step_failed(
+    step: SC05PortalStep,
+    error: SC05Error,
+    *,
+    expected_task_id: UUID | None,
+) -> None:
     step.status = SC05StepStatus.FAILED
     step.error_message = error.safe_message
     step.finished_at = timezone.now()
     step.save(update_fields=("status", "error_message", "finished_at", "updated_at"))
+    _record_step_finished(
+        step=step,
+        outcome=step.status,
+        error_code=error.code,
+        expected_task_id=expected_task_id,
+    )
+
+
+@transaction.atomic
+def _record_step_finished(
+    *,
+    step: SC05PortalStep,
+    outcome: str,
+    expected_task_id: UUID | None,
+    error_code: str = "",
+) -> None:
+    run = AutomationRun.objects.select_for_update().get(pk=step.operation.run_id)
+    if run.status != RunStatus.RUNNING or not delivery_matches(run, expected_task_id):
+        raise SupersededDelivery
+    record_run_event(
+        run=run,
+        event_type=RunEventType.STEP_FINISHED,
+        source=RunEventSource.WORKER,
+        current_status=run.status,
+        task_id=expected_task_id,
+        entity_type="sc05_step",
+        entity_id=str(step.id),
+        step=step.portal,
+        outcome=outcome,
+        error_code=error_code,
+        deduplication_key=(
+            f"step.finished:{step.id}:{expected_task_id or 'without-task'}:{outcome}"
+        ),
+        message=(
+            "Etapa RPA concluída."
+            if outcome != SC05StepStatus.FAILED
+            else "Etapa RPA encerrada com falha controlada."
+        ),
+    )
 
 
 def _compensate(
@@ -829,6 +1069,11 @@ def _compensate(
                         "updated_at",
                     )
                 )
+                _record_step_finished(
+                    step=step,
+                    outcome=step.status,
+                    expected_task_id=operation.run.task_id,
+                )
                 continue
             if not _states_equal(current.state, step.desired_state):
                 raise PortalStateConflictError()
@@ -864,6 +1109,11 @@ def _compensate(
                     "updated_at",
                 )
             )
+            _record_step_finished(
+                step=step,
+                outcome=step.status,
+                expected_task_id=operation.run.task_id,
+            )
         except SC05Error as exc:
             require_current_delivery(operation.run_id, task_id=operation.run.task_id)
             compensation_failed = True
@@ -871,6 +1121,12 @@ def _compensate(
             step.error_message = exc.safe_message
             step.finished_at = timezone.now()
             step.save(update_fields=("status", "error_message", "finished_at", "updated_at"))
+            _record_step_finished(
+                step=step,
+                outcome=step.status,
+                expected_task_id=operation.run.task_id,
+                error_code=exc.code,
+            )
     return compensation_failed
 
 
@@ -915,6 +1171,20 @@ def _finish_succeeded(
                 "finished_at",
                 "heartbeat_at",
             )
+        )
+        record_run_event(
+            run=run,
+            event_type=RunEventType.SUCCEEDED,
+            source=RunEventSource.WORKER,
+            previous_status=RunStatus.RUNNING,
+            current_status=RunStatus.SUCCEEDED,
+            task_id=expected_task_id,
+            entity_type="sc05_operation",
+            entity_id=str(locked.id),
+            outcome="succeeded",
+            deduplication_key=(f"run.terminal:{expected_task_id or 'without-task'}:succeeded"),
+            message="Operação RPA concluída com sucesso.",
+            details={"applied_count": applied, "unchanged_count": unchanged},
         )
 
 
@@ -973,6 +1243,28 @@ def _finish_failed(
                 "finished_at",
                 "heartbeat_at",
             )
+        )
+        record_run_event(
+            run=run,
+            event_type=(
+                RunEventType.PARTIALLY_FAILED
+                if run.status == RunStatus.PARTIALLY_FAILED
+                else RunEventType.FAILED
+            ),
+            source=RunEventSource.WORKER,
+            previous_status=RunStatus.RUNNING,
+            current_status=run.status,
+            task_id=expected_task_id,
+            entity_type="sc05_operation",
+            entity_id=str(locked.id),
+            outcome=run.status,
+            error_code=error.code,
+            deduplication_key=(f"run.terminal:{expected_task_id or 'without-task'}:{run.status}"),
+            message=(
+                "Operação RPA encerrada com estado residual para reconciliação."
+                if run.status == RunStatus.PARTIALLY_FAILED
+                else "Operação RPA encerrada com falha controlada."
+            ),
         )
 
 
