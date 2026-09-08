@@ -18,6 +18,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
 
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_USER: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -62,6 +77,11 @@ jobs:
 
       - name: Check migrations
         run: uv run python src/manage.py makemigrations --check --dry-run
+
+      - name: Test migrations on PostgreSQL with existing data
+        env:
+          TEST_DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+        run: uv run pytest tests/test_migration_contracts.py -q
 
       - name: Check production settings
         env:

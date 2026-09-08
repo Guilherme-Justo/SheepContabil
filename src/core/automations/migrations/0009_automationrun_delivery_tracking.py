@@ -84,7 +84,9 @@ class Migration(migrations.Migration):
                 verbose_name="identificador da entrega",
             ),
         ),
-        migrations.RunPython(backfill_active_run_timestamps, migrations.RunPython.noop),
+        # PostgreSQL must create these indexes before the data update below.
+        # Reversing the order leaves pending trigger events in this atomic
+        # migration and PostgreSQL refuses the subsequent CREATE INDEX.
         migrations.AddIndex(
             model_name="automationrun",
             index=models.Index(
@@ -99,4 +101,5 @@ class Migration(migrations.Migration):
                 name="run_status_heartbeat_idx",
             ),
         ),
+        migrations.RunPython(backfill_active_run_timestamps, migrations.RunPython.noop),
     ]
