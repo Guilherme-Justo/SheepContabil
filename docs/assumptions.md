@@ -4,7 +4,7 @@
 | --- | --- |
 | Status | Registro vivo iniciado no Dia 1 |
 | Data-base | 2026-08-27 |
-| Última atualização | 2026-09-01 — decisões do SC-05 congeladas no Dia 5 |
+| Última atualização | 2026-09-09 — revisão do Release Candidate `1.0.0` |
 | Escopo | SC-04, SC-05, SC-06 e SC-20 |
 
 ## 1. Como usar este documento
@@ -37,10 +37,10 @@ Se uma premissa mudar, o histórico desta tabela deve ser preservado no Git e a 
 | A-011 | Aceita para o desafio | A URL gerada pela Railway atende ao requisito público. | Domínio próprio é opcional e não bloqueia a entrega. |
 | A-012 | Aceita para o desafio | Arquivos originais e derivados ficam em storage compatível com S3. | O disco do contêiner não é usado como persistência. |
 | A-013 | Aceita para o desafio | O limite inicial de upload será 10 MiB por arquivo. | Arquivos maiores são recusados com mensagem operacional; o limite fica configurável. |
-| A-014 | Validar | PDFs, imagens JPEG/PNG e documentos textuais cobrem os cenários de SC-04. | Tipos adicionais só entram se o seed ou o documento do desafio exigir. |
+| A-014 | Aceita para o desafio | PDF, JPEG, PNG e TXT cobrem os cenários demonstrativos do SC-04. | Tipos adicionais exigem novo contrato de segurança e não entram na `1.0.0`. |
 | A-015 | Aceita para o desafio | O seed é idempotente e cria cenários de sucesso, revisão, duplicidade e falha. | A demonstração pode ser repetida sem edição manual do banco. |
 | A-016 | Aceita para o desafio | Credenciais públicas não serão commitadas no repositório. | Usuários são criados por comando usando variáveis; credenciais são entregues separadamente. |
-| A-017 | Fora do escopo | Alta disponibilidade multi-região e recuperação automática regional. | Backup e restauração bastam para o desafio; a limitação será informada. |
+| A-017 | Fora do escopo | Alta disponibilidade multi-região e recuperação automática regional. | A ausência de backup/restauração comprovados é aceita apenas no ambiente sintético; operação com dados reais exige os controles de A-OPS-02. |
 | A-018 | Fora do escopo | Dados reais, integrações produtivas e homologação jurídica/fiscal. | A interface deixa claro que regras e massas são demonstrativas. |
 
 ## 3. SC-04 — Triagem inteligente
@@ -51,12 +51,12 @@ Se uma premissa mudar, o histórico desta tabela deve ser preservado no Git e a 
 | A-04-02 | Aceita para o desafio | CNPJ/CPF sintético, razão social e aliases são sinais possíveis de identificação de cliente. | Correspondência exata tem precedência sobre inferência do modelo. |
 | A-04-03 | Aceita para o desafio | OpenAI será o primeiro adapter de classificação. | A chave e o modelo vêm de ambiente; o domínio não importa o SDK. |
 | A-04-04 | Aceita para o desafio | A resposta do modelo será JSON estruturado e validado. | Texto livre, schema inválido ou tipo desconhecido não produz roteamento automático. |
-| A-04-05 | Validar | O limiar inicial para arquivamento automático será 0,85 para tipo e cliente. | Abaixo do limiar o documento entra em revisão; o valor ficará configurável e será calibrado com o seed. |
+| A-04-05 | Aceita para o desafio | O limiar inicial para arquivamento automático é 0,85 para tipo e cliente. | Abaixo do limiar o documento entra em revisão; o valor permanece configurável por ambiente. |
 | A-04-06 | Confirmada | Casos ambíguos não serão classificados silenciosamente. | A fila de revisão é parte do fluxo principal, não um cenário excepcional oculto. |
 | A-04-07 | Aceita para o desafio | Correção humana não retreina o modelo automaticamente durante a semana. | A correção é registrada como feedback versionado para evolução posterior. |
 | A-04-08 | Aceita para o desafio | Indisponibilidade da OpenAI não será escondida por um fake em produção. | A execução falha de forma compreensível ou encaminha para revisão conforme a etapa alcançada. |
 | A-04-09 | Aceita para o desafio | Somente conteúdo sintético e minimizado será enviado ao provedor. | Logs não guardam corpo integral nem resposta sensível; guardam IDs, versão e métricas. |
-| A-04-10 | Validar | OCR será necessário para pelo menos um documento de demonstração. | A imagem do worker deve conter a dependência escolhida e um teste de qualidade básico. |
+| A-04-10 | Confirmada | Imagens sintéticas podem usar OCR no fluxo demonstrativo. | A imagem do worker contém Tesseract; falha ou extração insuficiente segue para revisão sem sucesso fabricado. |
 
 ## 4. SC-05 — Bloqueio e desbloqueio
 
@@ -114,10 +114,10 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 | A-20-01 | Confirmada | A janela principal é de 60 dias e a periodicidade é mensal. | Não alterar para varredura diária por conveniência técnica. |
 | A-20-02 | Aceita para o desafio | A execução ocorre no primeiro dia do mês às 08:00 de São Paulo. | Cron e idempotência usam competência `AAAA-MM`; horário fica configurável. |
 | A-20-03 | Aceita para o desafio | Uma comunicação é deduplicada por certificado, data de validade, canal e política. | Reexecução no mesmo período não produz spam. |
-| A-20-04 | Validar | Um único aviso ao entrar na janela de 60 dias é suficiente para a primeira versão. | Faixas adicionais de 30/15/7 dias só serão adotadas como regra documentada. |
-| A-20-05 | Aceita para o desafio | O canal de comunicação é simulado e registra destinatário, conteúdo resumido, horário e resultado. | “Enviado” só existe após sucesso retornado pelo adapter. |
+| A-20-04 | Aceita para o desafio | Um único aviso ao entrar na janela de 60 dias é suficiente para a `1.0.0`. | Faixas adicionais de 30/15/7 dias só serão adotadas após confirmação formal da regra. |
+| A-20-05 | Aceita para o desafio | O canal padrão é simulado; e-mail SMTP é configurável e WhatsApp permanece assistido por link. | “Enviado” só existe após sucesso do adapter; sandbox e dados sintéticos impedem contato real acidental. |
 | A-20-06 | Aceita para o desafio | Falha no canal não altera o fato de o certificado estar em risco. | Resultado separa seleção correta de falha de entrega e permite retentativa. |
-| A-20-07 | Validar | Certificados substituídos ou revogados deixam de gerar comunicação. | O modelo precisa representar estado e manter o histórico anterior. |
+| A-20-07 | Confirmada | Certificados substituídos ou revogados deixam de gerar comunicação. | O modelo conserva o estado e o histórico anterior, e a seleção considera somente certificados ativos. |
 
 ## 7. Segurança, privacidade e operação
 
@@ -129,7 +129,7 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 | A-SEC-04 | Aceita para o desafio | Extensão, MIME, tamanho e nome de upload serão validados. | Conteúdo ativo não será renderizado diretamente no navegador. |
 | A-SEC-05 | Fora do escopo | Antivírus completo no upload. | Dados são sintéticos; a limitação e o ponto de extensão serão documentados. |
 | A-OPS-01 | Aceita para o desafio | Logs estruturados da Railway e histórico interno bastam para operação inicial. | Sentry é opcional; stack própria de métricas não entra na semana. |
-| A-OPS-02 | Aceita para o desafio | Um backup diário de PostgreSQL e um ensaio de restauração são suficientes. | RPO/RTO formais ficam fora do desafio. |
+| A-OPS-02 | Fora do escopo | Backup diário e ensaio de restauração do PostgreSQL não foram comprovados no ambiente demonstrativo. | Antes de dados reais, definir RPO/RTO, retenção, criptografia e ensaiar `pg_restore`. |
 | A-OPS-03 | Aceita para o desafio | Cada pulso do scheduler é curto e termina após publicar os vencidos. | Sobreposição é evitada pela plataforma e duplicidade adicional pelo banco. |
 | A-OPS-04 | Aceita para o desafio | Celery e o WSGI sintético formam uma única unidade de disponibilidade na Railway. | O supervisor só inicia Celery após readiness do simulador e encerra ambos quando qualquer processo termina, permitindo reinício coerente pela plataforma. |
 
@@ -150,15 +150,20 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 | Ambiente público suspenso | Média em plano gratuito | Alto | Recurso sem suspensão e monitor de uptime | URL permanece acessível |
 | Escopo consumir o prazo | Alta | Alto | Congelamento dos quatro fluxos, sem tecnologias evitadas | Cada módulo possui caminho ponta a ponta antes de extras |
 
-## 9. Itens que bloqueiam congelamento funcional, não o início técnico
+## 9. Decisões no congelamento funcional da `1.0.0`
 
-1. Confirmar tipos documentais e clientes sintéticos do SC-04.
-2. Calibrar o limiar de revisão com a massa sintética.
-3. Confirmar se SC-20 terá apenas o aviso de 60 dias ou faixas adicionais.
-4. Confirmar o canal simulado e o conteúdo mínimo das comunicações.
-5. Confirmar a conta Railway, orçamento e período de permanência pública.
-6. Confirmar disponibilidade de credencial OpenAI para o ambiente demonstrável.
+| Tema | Resolução da release |
+| --- | --- |
+| Tipos e massa do SC-04 | PDF, JPEG, PNG e TXT com clientes exclusivamente sintéticos |
+| Limiar de revisão | 0,85 para tipo e cliente, configurável por ambiente |
+| Política do SC-20 | Um aviso na janela de 60 dias; faixas adicionais ficam fora da release |
+| Canais do SC-20 | Simulador por padrão, SMTP configurável e WhatsApp assistido |
+| Hospedagem | Railway demonstrativa ativa; continuidade depende do plano mantido pelo proprietário |
+| OpenAI | Adapter e variáveis ficam somente no worker; indisponibilidade resulta em revisão/falha honesta |
 
-Nenhum desses itens justifica criar microsserviços ou adiar autenticação, histórico, fila, storage e estrutura modular.
-
-A antiga pendência de definir ordem, pré-condições e compensações do SC-05 foi encerrada no Dia 5 e permanece registrada em A-05-08 e na tabela 4.1. A versão 0.5.0 foi incorporada à `main` e implantada em web, worker e scheduler após CI verde, mas o quarto serviço previsto para o simulador excedeu o limite do plano Railway. O ajuste co-localizado registrado em A-05-14/A-05-15 passou por PR, dois CIs, deploy automático, readiness e smoke público; portanto, não resta pendência operacional para a entrega demonstrativa. Permanece o risco arquitetural consciente de compartilhar contêiner, UID e ciclo de disponibilidade, que exige voltar a uma fronteira dedicada numa produção real.
+A ordem e as compensações do SC-05 permanecem congeladas em A-05-08 e na tabela 4.1. As evidências
+da `0.5.0` continuam preservadas como marco histórico do Dia 5. A candidata `1.0.0` acrescenta
+reconciliação assíncrona, validação de migration em PostgreSQL e rastreabilidade ponta a ponta;
+seus gates externos permanecem abertos até CI, deploy, smoke, tag e GitHub Release. A co-localização
+do simulador, a ausência de monitor externo contínuo, de rate limit de login e de ensaio de restauração
+do banco são limitações explícitas do ambiente demonstrativo, não capacidades produtivas implícitas.

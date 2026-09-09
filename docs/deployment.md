@@ -35,7 +35,7 @@ railway config plan
 railway config apply
 ```
 
-Revise o plano antes de aplicar. `.railway/railway.ts` cria web, worker, scheduler, PostgreSQL, Redis e bucket; valores `preserve()` nunca revelam nem substituem um segredo já existente. O plano Railway disponível não comporta um quarto serviço de aplicação, portanto não existe recurso `simulator` na IaC. A revisão final anterior à publicação indicou `0` recursos novos, `10` ajustes e `0` remoções.
+Revise o plano antes de aplicar. `.railway/railway.ts` cria web, worker, scheduler, PostgreSQL, Redis e bucket; valores `preserve()` nunca revelam nem substituem um segredo já existente. O plano Railway disponível não comporta um quarto serviço de aplicação, portanto não existe recurso `simulator` na IaC. Como evidência histórica da publicação `0.5.0` em 01/09/2026, a revisão daquele plano indicou `0` recursos novos, `10` ajustes e `0` remoções. Em 09/09/2026, a candidata `1.0.0` foi reavaliada com a CLI `5.49.6`, que informou `Your Railway configuration is already up to date`; nenhuma aplicação ou alteração de infraestrutura foi necessária.
 
 Depois de aplicar:
 
@@ -81,7 +81,9 @@ O comando do worker é `sh scripts/run_worker_with_simulator.sh`. O supervisor a
 
 O deploy de `main` só deve ocorrer depois do CI verde. Migrations precisam ser retrocompatíveis com a versão anterior durante a troca. Para falha de aplicação, redeploy da última versão saudável; para migração destrutiva, não avançar sem backup e procedimento reversível.
 
-O healthcheck da Railway é de ativação de deploy, não monitoramento contínuo. Um monitor externo de uptime pode ser adicionado antes da entrega final.
+O healthcheck da Railway é de ativação de deploy, não monitoramento contínuo. A candidata `1.0.0`
+mantém a ausência de monitor externo como limitação explícita do ambiente demonstrativo; antes de uma
+operação real, disponibilidade contínua e alertas devem ser configurados fora da própria plataforma.
 
 ### Recuperação do deploy automático após merge
 

@@ -2,6 +2,7 @@
 
 - **Status:** Aceita
 - **Data:** 2026-08-27
+- **Última revisão:** 2026-09-09
 - **Decisores:** Engenharia/Arquitetura SheepContabil
 
 ## Contexto
@@ -22,22 +23,28 @@ Autorização combina:
 
 Toda autorização é verificada no servidor em páginas, comandos, fragments HTMX, downloads e ações administrativas. A navegação reflete permissões, mas não é o mecanismo de controle.
 
-Controles:
+Controles adotados na entrega demonstrativa:
 
 - cookie de sessão `HttpOnly`, `Secure` e `SameSite=Lax`;
 - CSRF;
 - hash de senha forte;
 - expiração e logout;
-- limitação de tentativas de login;
-- rotação de credenciais;
 - criação de contas demo por comando idempotente e segredo de ambiente;
-- eventos de login e ações críticas auditáveis.
+- ações críticas das automações auditáveis pela trilha append-only do ADR-0010.
+
+Limitação de tentativas, rotação/troca obrigatória e auditoria específica de tentativas de login são
+controles requeridos antes de identidades reais, mas não são apresentados como implementados nesta
+entrega sintética.
 
 O papel administrativo do produto usa a interface SheepContabil. Django Admin, caso habilitado, fica restrito à manutenção técnica.
 
 ### Estado de implementação
 
-No Dia 1 estão implementados o modelo próprio, sessão, CSRF, hash Argon2, expiração, logout por POST e RBAC por área no servidor. Limitação de tentativas, rotação/troca obrigatória e trilha append-only continuam como controles obrigatórios da entrega final; o campo `force_password_change` apenas reserva o contrato de dados e não deve ser apresentado como enforcement enquanto o fluxo não existir.
+Na candidata `1.0.0` estão implementados o modelo próprio, sessão, CSRF, hash Argon2, expiração,
+logout por POST, RBAC por área no servidor e a trilha append-only das execuções descrita no ADR-0010.
+Limitação de tentativas, rotação/troca obrigatória e auditoria específica do login permanecem fora do
+ambiente demonstrativo; o campo `force_password_change` apenas reserva o contrato de dados e não deve
+ser apresentado como enforcement enquanto o fluxo não existir.
 
 ## Consequências positivas
 

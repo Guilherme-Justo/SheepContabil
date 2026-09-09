@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 | --- | --- |
-| Status | Baseline vigente, atualizada com a implementação do Dia 5 |
+| Status | Baseline da candidata à release estável `1.0.0` |
 | Data da baseline | 2026-08-27 |
-| Última atualização | 2026-09-08 |
+| Última atualização | 2026-09-09 |
 | Escopo funcional | SC-04, SC-05, SC-06 e SC-20 |
-| Horizonte | Entrega pública e demonstrável em uma semana |
+| Horizonte | Release pública e demonstrável do desafio |
 
 ## 1. Objetivo
 
@@ -191,7 +191,8 @@ Downloads passam por autorização e usam URL assinada de curta duração ou pro
 
 ## 8. Identidade, autenticação e autorização
 
-Django fornece autenticação por usuário e senha, sessão em cookie e proteção CSRF. Será criado um modelo de usuário próprio desde a primeira migração, mesmo que inicialmente tenha poucos campos.
+Django fornece autenticação por usuário e senha, sessão em cookie e proteção CSRF. O projeto usa um
+modelo de usuário próprio desde a primeira migração.
 
 RBAC combina:
 
@@ -201,15 +202,19 @@ RBAC combina:
 
 Ocultar navegação é apenas experiência visual; nunca substitui autorização. A interface administrativa do produto é SheepContabil. Django Admin, se habilitado, é ferramenta de manutenção e não a experiência principal.
 
-Controles mínimos:
+Controles implementados:
 
 - cookie `HttpOnly`, `Secure` e `SameSite=Lax`;
 - expiração de sessão e logout;
 - hash de senha forte;
 - CSRF;
-- limitação de tentativas de login;
 - segredos apenas em variáveis da plataforma;
 - credenciais de demonstração fora do repositório.
+
+Limitação de tentativas e troca obrigatória de senha não fazem parte do ambiente sintético do
+desafio. Antes de contas ou dados reais, esses controles devem ser implementados ou delegados a um
+provedor corporativo de identidade. Durante a avaliação, as credenciais devem ser fortes, rotacionadas
+fora do Git e revogadas ao término do acesso público.
 
 ## 9. Frontend
 
@@ -370,7 +375,7 @@ Ambientes:
 
 ## 15. Implantação Railway
 
-Um projeto Railway conterá:
+O projeto Railway contém:
 
 - serviço web público;
 - worker privado, com Celery e processo auxiliar WSGI do SC-05 no mesmo contêiner;
@@ -381,9 +386,17 @@ Um projeto Railway conterá:
 
 O PR `#5` incorporou a 0.5.0 à `main`; os CIs do PR e do push em `main` ficaram verdes e a integração nativa concluiu deployments de `web`, `worker` e `scheduler` condicionados ao **Wait for CI**. Como o plano não permitiu um quarto serviço de aplicação, a IaC foi reduzida aos três serviços existentes e o WSGI sintético foi co-localizado no worker. Esse ajuste passou pelo PR `#6`, pelos CIs do PR e de `main`, pelo deploy automático e pelo smoke no ambiente público de bloqueio, desbloqueio, evidência privada, falha parcial, retomada e RBAC. A limitação de isolamento permanece consciente, mas a automação SC-05 possui evidência operacional ponta a ponta no ambiente publicado.
 
+A base funcional da candidata `1.0.0` acrescenta reconciliação de filas, cercamento de workers
+atrasados, validação de migrations em PostgreSQL e rastreabilidade unificada. Os detalhes de promoção
+da release ficam centralizados em [`release-v1.0.0.md`](release-v1.0.0.md), sem reescrever as
+evidências históricas do Dia 5.
+
 O web recebe o domínio HTTPS gerado pela plataforma. Domínio próprio é opcional e só será configurado se já estiver sob controle do projeto. O serviço permanecerá em plano sem suspensão durante toda a avaliação.
 
-Deploy da branch `main` ocorre somente após validação no CI. A etapa de release executa migrations; depois, um smoke test consulta `health/ready` e autenticação. Backups do banco e restauração documentada fazem parte da preparação final.
+Deploy da branch `main` ocorre somente após validação no CI. A etapa de release executa migrations;
+depois, um smoke test consulta `health/ready` e autenticação. Backup diário e ensaio de restauração do
+PostgreSQL ainda não possuem evidência neste ambiente demonstrativo e são obrigatórios antes de
+armazenar dados reais.
 
 ## 16. Testes mínimos
 
@@ -393,7 +406,16 @@ Deploy da branch `main` ocorre somente após validação no CI. A etapa de relea
 - E2E: login/RBAC e um caminho crítico por módulo;
 - resiliência: timeout, entrada inválida, duplicidade, falha parcial e retomada.
 
-No Dia 5, 37 testes focados exercitam ordem e idempotência da saga, bloqueio e undo tardio, preservação de restrições anteriores, compensação total e parcial, proteção contra estado divergente, retomada, RBAC, integridade de evidência e falha de broker. Quatro testes de contrato iniciam um servidor real e conduzem Chromium sobre bloqueio, desbloqueio, falha visual e retomada parcial nos três portais HTML. A suíte consolidada aprovou 124 testes com 83,85% de cobertura; lint, formatação, tipagem, sintaxe do supervisor, checks Django, migrations, assets e Compose também passaram. O build de contêiner foi confirmado pelos CIs verdes dos PRs `#5` e `#6` e de seus pushes em `main`. O deploy atualizado do worker e os smoke tests públicos também foram aprovados, encerrando os gates do SC-05.
+Como evidência histórica do Dia 5, 37 testes focados exercitaram ordem e idempotência da saga,
+bloqueio e undo tardio, preservação de restrições anteriores, compensação total e parcial, proteção
+contra estado divergente, retomada, RBAC, integridade de evidência e falha de broker. Quatro testes de
+contrato iniciaram um servidor real e conduziram Chromium sobre bloqueio, desbloqueio, falha visual e
+retomada parcial nos três portais HTML. Naquele marco, a suíte consolidada aprovou 124 testes com
+83,85% de cobertura e os CIs dos PRs `#5` e `#6` confirmaram a imagem.
+
+O baseline final da `1.0.0`, incluindo o resultado consolidado da suíte, migrations em PostgreSQL e
+imagem de produção, é registrado separadamente em [`release-v1.0.0.md`](release-v1.0.0.md) para não
+confundir a evolução posterior com a evidência datada do Dia 5.
 
 ## 17. Decisões explicitamente fora do escopo
 
