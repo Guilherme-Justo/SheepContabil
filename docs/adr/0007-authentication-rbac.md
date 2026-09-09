@@ -40,7 +40,7 @@ O papel administrativo do produto usa a interface SheepContabil. Django Admin, c
 
 ### Estado de implementação
 
-Na candidata `1.0.0` estão implementados o modelo próprio, sessão, CSRF, hash Argon2, expiração,
+Na release `1.0.0` estão implementados o modelo próprio, sessão, CSRF, hash Argon2, expiração,
 logout por POST, RBAC por área no servidor e a trilha append-only das execuções descrita no ADR-0010.
 Limitação de tentativas, rotação/troca obrigatória e auditoria específica do login permanecem fora do
 ambiente demonstrativo; o campo `force_password_change` apenas reserva o contrato de dados e não deve

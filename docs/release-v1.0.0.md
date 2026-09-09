@@ -4,13 +4,17 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | Release Candidate validado; tag e GitHub Release pendentes |
+| Estado | Release estável publicada |
 | Versão | `1.0.0` |
 | Data de preparação | 09/09/2026 |
 | Base anterior | `e1e968a32cd56625a31083a938456599f4c92d39` |
 | Commit funcional validado | `09fa855ee8039be2dce402050cd43acaa6756268` |
+| Commit da tag | [`a8e50a9`](https://github.com/Guilherme-Justo/SheepContabil/commit/a8e50a9731e7afb8b23f13e422394f0ef5bb852f) |
 | PR de promoção | [#46](https://github.com/Guilherme-Justo/SheepContabil/pull/46) |
+| PR de evidências | [#47](https://github.com/Guilherme-Justo/SheepContabil/pull/47) |
 | Branch de preparação | `codex/release-v1.0.0` |
+| Tag | [`v1.0.0`](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.0.0) |
+| GitHub Release | [SheepContabil v1.0.0](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.0.0) |
 | URL pública | [web-production-8f055.up.railway.app](https://web-production-8f055.up.railway.app) |
 
 ## Objetivo
@@ -33,7 +37,7 @@ PostgreSQL como fonte de verdade e Redis como broker. Na Railway demonstrativa, 
 continua co-localizado fisicamente no worker, com ambiente reduzido e acesso somente por loopback.
 Essa limitação está aceita apenas para o desafio e não transforma o simulador em código de domínio.
 
-## Gates do Release Candidate
+## Gates da publicação
 
 ### Integridade do artefato
 
@@ -72,8 +76,8 @@ PostgreSQL e imagem foram então aprovados nos CIs do PR e da `main`.
 - [x] Deploy automático de `web`, `worker` e `scheduler` em `SUCCESS`.
 - [x] `/health/live` e `/health/ready` respondem HTTP 200 e preservam `X-Request-ID`.
 - [x] Smoke autenticado usa somente dados sintéticos e confirma RBAC e trilha de execução.
-- [ ] Tag anotada `v1.0.0` aponta para o commit exato validado em produção.
-- [ ] GitHub Release publicado com evidências e limitações conhecidas.
+- [x] Tag anotada `v1.0.0` aponta para o commit exato validado em produção.
+- [x] GitHub Release publicado com evidências e limitações conhecidas.
 
 ## Evidência externa de 09/09/2026
 
@@ -103,6 +107,12 @@ sintético `a584dfcd-037c-4c13-8582-68e91d9b9d8b`, imediatamente cancelado. Sua
 `cancelled`. O administrador recebeu HTTP 200 com a coluna técnica de correlação; o operador
 societário recebeu HTTP 200 sem essa coluna; o operador fiscal recebeu HTTP 404. Nenhum documento,
 mensagem ou contato real foi usado e nenhuma integração externa foi acionada.
+
+A tag anotada `v1.0.0` foi publicada depois desses gates e resolve para
+`a8e50a9731e7afb8b23f13e422394f0ef5bb852f`. A
+[GitHub Release](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.0.0) foi publicada
+em 09/09/2026 às 15:13:54 UTC, como release estável — não draft e não prerelease — com escopo,
+validações, deployments, smoke e limitações conhecidas.
 
 ## Regra de publicação
 

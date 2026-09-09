@@ -2,8 +2,8 @@
 
 Portal único para quatro automações contábeis do desafio Sheep Technology. O projeto parte de pouco contexto, registra as premissas adotadas e mantém a lógica real atrás de fronteiras externas simuladas.
 
-> Estado do código: **candidata à release estável `1.0.0`** — os quatro processos selecionados estão
-> implementados, implantados e validados no ambiente público. A base inclui PostgreSQL, Celery/Redis,
+> Estado do código: **release estável [`v1.0.0`](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.0.0) publicada** — os quatro processos
+> selecionados estão implementados, implantados e validados no ambiente público. A base inclui PostgreSQL, Celery/Redis,
 > RPA Playwright real sobre três portais sintéticos, classificação por IA atrás de adapter, storage
 > privado e rastreabilidade ponta a ponta com eventos imutáveis e IDs correlacionados.
 
@@ -162,7 +162,7 @@ Como marco histórico do Dia 5, a suíte então existente aprovou `124` testes c
 cobertura, e os CIs dos PRs `#5` e `#6` confirmaram a imagem. A evidência daquele marco, incluindo
 os UUIDs de execução e screenshots privadas, permanece em [`docs/day-5.md`](docs/day-5.md).
 
-No Release Candidate `1.0.0`, foram coletados `308` testes: `307` passaram localmente, inclusive os
+Na preparação da release `1.0.0`, foram coletados `308` testes: `307` passaram localmente, inclusive os
 oito casos Playwright com Chromium real, e um contrato de migration reservado ao PostgreSQL ficou
 para o ambiente efêmero do CI. A cobertura foi de `85,86%`. Ruff, formatação, Mypy, checks Django,
 ausência de migrations novas, sintaxe POSIX, locks Python/Node, assets e Compose ficaram verdes;

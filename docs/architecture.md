@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 | --- | --- |
-| Status | Baseline da candidata à release estável `1.0.0` |
+| Status | Baseline da release estável `1.0.0` publicada |
 | Data da baseline | 2026-08-27 |
 | Última atualização | 2026-09-09 |
 | Escopo funcional | SC-04, SC-05, SC-06 e SC-20 |
@@ -386,7 +386,7 @@ O projeto Railway contém:
 
 O PR `#5` incorporou a 0.5.0 à `main`; os CIs do PR e do push em `main` ficaram verdes e a integração nativa concluiu deployments de `web`, `worker` e `scheduler` condicionados ao **Wait for CI**. Como o plano não permitiu um quarto serviço de aplicação, a IaC foi reduzida aos três serviços existentes e o WSGI sintético foi co-localizado no worker. Esse ajuste passou pelo PR `#6`, pelos CIs do PR e de `main`, pelo deploy automático e pelo smoke no ambiente público de bloqueio, desbloqueio, evidência privada, falha parcial, retomada e RBAC. A limitação de isolamento permanece consciente, mas a automação SC-05 possui evidência operacional ponta a ponta no ambiente publicado.
 
-A base funcional da candidata `1.0.0` acrescenta reconciliação de filas, cercamento de workers
+A base funcional da release `1.0.0` acrescenta reconciliação de filas, cercamento de workers
 atrasados, validação de migrations em PostgreSQL e rastreabilidade unificada. Os detalhes de promoção
 da release ficam centralizados em [`release-v1.0.0.md`](release-v1.0.0.md), sem reescrever as
 evidências históricas do Dia 5.
