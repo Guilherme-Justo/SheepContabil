@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import smtplib
 from datetime import timedelta
 from typing import cast
@@ -223,6 +224,94 @@ def test_django_email_gateway_handles_network_timeout() -> None:
 
     assert result.delivered is False
     assert "Tempo limite de conexão esgotado" in result.error_message
+
+
+def test_django_email_gateway_does_not_log_refused_recipient(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    secret_recipient = "financeiro-confidencial@example.test"
+    provider_detail = b"mailbox financeiro-confidencial@example.test unavailable"
+    gateway = DjangoEmailNotificationGateway()
+    message = NotificationMessage(
+        recipient=secret_recipient,
+        channel="email",
+        subject="Teste recusa",
+        body="Corpo sintético",
+        idempotency_key="key-refused:1",
+    )
+
+    with (
+        caplog.at_level(logging.ERROR, logger="core.automations.sc20.gateways"),
+        patch("django.core.mail.EmailMultiAlternatives.send") as mock_send,
+    ):
+        mock_send.side_effect = smtplib.SMTPRecipientsRefused(
+            {secret_recipient: (550, provider_detail)}
+        )
+        result = gateway.send(message)
+
+    rendered_logs = "\n".join(record.getMessage() for record in caplog.records)
+    assert result.error_message == "O servidor de e-mail recusou o destinatário configurado."
+    assert secret_recipient not in rendered_logs
+    assert provider_detail.decode() not in rendered_logs
+    assert all(record.exc_info is None for record in caplog.records)
+    assert caplog.records[-1].error_code == "sc20_smtp_recipient_refused"
+
+
+def test_django_email_gateway_does_not_expose_unexpected_provider_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    secret_detail = "authorization=Bearer provider-secret-value"
+    gateway = DjangoEmailNotificationGateway()
+    message = NotificationMessage(
+        recipient="destino@example.test",
+        channel="email",
+        subject="Teste erro inesperado",
+        body="Corpo sintético",
+        idempotency_key="key-provider-error:1",
+    )
+
+    with (
+        caplog.at_level(logging.ERROR, logger="core.automations.sc20.gateways"),
+        patch("django.core.mail.EmailMultiAlternatives.send") as mock_send,
+    ):
+        mock_send.side_effect = RuntimeError(secret_detail)
+        result = gateway.send(message)
+
+    rendered_logs = "\n".join(record.getMessage() for record in caplog.records)
+    assert result.error_message == "Falha inesperada no backend de e-mail."
+    assert secret_detail not in rendered_logs
+    assert all(record.exc_info is None for record in caplog.records)
+    assert caplog.records[-1].error_code == "sc20_smtp_delivery_failed"
+
+
+def test_django_email_gateway_does_not_log_template_exception_details(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    secret_detail = "template context contained cliente@example.test"
+    gateway = DjangoEmailNotificationGateway()
+    message = NotificationMessage(
+        recipient="destino@example.test",
+        channel="email",
+        subject="Teste fallback",
+        body="Corpo sintético",
+        idempotency_key="key-template-error:1",
+    )
+
+    with (
+        caplog.at_level(logging.WARNING, logger="core.automations.sc20.gateways"),
+        patch(
+            "core.automations.sc20.gateways.render_to_string",
+            side_effect=RuntimeError(secret_detail),
+        ),
+        patch("django.core.mail.EmailMultiAlternatives.send", return_value=1),
+    ):
+        result = gateway.send(message)
+
+    rendered_logs = "\n".join(record.getMessage() for record in caplog.records)
+    assert result.delivered is True
+    assert secret_detail not in rendered_logs
+    assert all(record.exc_info is None for record in caplog.records)
+    assert caplog.records[-1].error_code == "sc20_email_template_render_failed"
 
 
 def test_get_sc20_gateway_factory() -> None:

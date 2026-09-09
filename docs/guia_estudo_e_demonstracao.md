@@ -18,7 +18,7 @@ O objetivo aqui é provar que a ferramenta não é apenas um protótipo visual (
 | **RPA e Automação Web** | Playwright Chromium nativo com Page Objects e Saga Compensável |
 | **Inteligência Artificial** | OpenAI Adapter com validação estrita via Pydantic e Structured Outputs JSON |
 | **Acessibilidade** | WCAG 2.1 Nível AA com suporte total a tema escuro e teclado |
-| **Cobertura de Testes** | 224 testes automatizados (unitários, integração e E2E Playwright) |
+| **Suíte automatizada** | 308 testes coletados: 307 aprovados localmente e 1 contrato PostgreSQL exercitado no CI |
 | **Ambiente em Produção** | Publicado no Railway: `https://web-production-8f055.up.railway.app` |
 
 ---
@@ -187,7 +187,7 @@ Aba 2: Repositório GitHub com o CI e a documentação aberta
 ### ETAPA 1: Abertura e Visão Geral da Plataforma (2 minutos)
 
 1. **Apresentação Inicial (O que falar):**
-   > *"Olá! Hoje vou apresentar o portal SheepContabil, desenvolvido para atender ao desafio de automação contábil. Nossa premissa fundamental foi construir uma solução que não fosse apenas uma maquete conceitual, mas uma plataforma modular completa, com persistência real em PostgreSQL, mensageria com Celery/Redis, conformidade estrita de acessibilidade WCAG 2.1 AA e 224 testes automatizados."*
+   > *"Olá! Hoje vou apresentar o portal SheepContabil, desenvolvido para atender ao desafio de automação contábil. Nossa premissa fundamental foi construir uma solução que não fosse apenas uma maquete conceitual, mas uma plataforma modular completa, com persistência real em PostgreSQL, mensageria com Celery/Redis, conformidade estrita de acessibilidade WCAG 2.1 AA e 308 testes automatizados."*
 2. **Mostrar o Dashboard Principal:**
    - Aponte para os 4 cards de automação:
      - **SC-04** (Fiscal · IA)
@@ -280,7 +280,7 @@ Aba 2: Repositório GitHub com o CI e a documentação aberta
 ### ETAPA 6: Encerramento e Conclusão Técnica (1 minuto)
 
 1. **Resumo das Entregas:**
-   > *"Para resumir: cobrimos todas as naturezas do desafio (IA, RPA e Controles Sistematizados) em um monólito limpo, sustentável e pronto para evoluir. O repositório conta com CI/CD no GitHub Actions, tipagem rigorosa no Mypy, auditoria de código no Ruff e 224 testes automatizados."*
+   > *"Para resumir: cobrimos todas as naturezas do desafio (IA, RPA e Controles Sistematizados) em um monólito limpo, sustentável e pronto para evoluir. O repositório conta com CI/CD no GitHub Actions, tipagem rigorosa no Mypy, auditoria de código no Ruff e 308 testes automatizados."*
 2. **Abrir para Perguntas dos Avaliadores.**
 
 ---
@@ -315,4 +315,6 @@ Aba 2: Repositório GitHub com o CI e a documentação aberta
 - [ ] Acessar `https://web-production-8f055.up.railway.app` e confirmar que a página de login carrega instantaneamente.
 - [ ] Efetuar login com usuário `admin` e verificar se a sessão está ativa.
 - [ ] Garantir que o zoom do navegador está em 100% (resolução recomendada: 1440x900 ou superior).
-- [ ] Ter a aba do GitHub com os 224 testes e o arquivo `docs/architecture.md` aberta para consulta técnica se solicitado.
+- [ ] Ter a execução final do CI da `v1.0.0`, com 308 testes coletados, e o arquivo `docs/architecture.md` abertos para consulta técnica se solicitado.
+- [ ] Confirmar a tag `v1.0.0`, os health checks e a linha do tempo de uma execução antes de iniciar.
+- [ ] Lembrar que somente o administrador vê IDs técnicos; operadores veem a mesma trilha sem esses campos.

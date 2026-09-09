@@ -117,10 +117,10 @@ class DjangoEmailNotificationGateway:
                 "automations/emails/sc20_certificate_expiry.txt",
                 template_context,
             )
-        except Exception as template_err:
+        except Exception:
             logger.warning(
-                "Falha ao renderizar template de e-mail SC-20 (%s). Usando texto simples.",
-                template_err,
+                "Falha ao renderizar template de e-mail SC-20. Usando texto simples.",
+                extra={"error_code": "sc20_email_template_render_failed"},
             )
             text_content = message.body
             html_content = None
@@ -145,8 +145,9 @@ class DjangoEmailNotificationGateway:
             )
             return DeliveryResult(delivered=True, provider_message_id=str(message_id))
         except smtplib.SMTPAuthenticationError:
-            logger.exception(
-                "Falha de autenticação SMTP ao enviar aviso SC-20 para %s", destination_email
+            logger.error(
+                "Falha de autenticação SMTP ao enviar aviso SC-20.",
+                extra={"error_code": "sc20_smtp_authentication_failed"},
             )
             return DeliveryResult(
                 delivered=False,
@@ -158,7 +159,10 @@ class DjangoEmailNotificationGateway:
                 ),
             )
         except TimeoutError:
-            logger.exception("Timeout de rede ao enviar e-mail SC-20 para %s", destination_email)
+            logger.error(
+                "Timeout de rede ao enviar aviso SC-20.",
+                extra={"error_code": "sc20_smtp_timeout"},
+            )
             return DeliveryResult(
                 delivered=False,
                 error_message=(
@@ -166,17 +170,23 @@ class DjangoEmailNotificationGateway:
                     "(smtp.gmail.com:587)."
                 ),
             )
-        except smtplib.SMTPRecipientsRefused as recip_err:
-            logger.exception("Destinatário recusado pelo SMTP: %s", recip_err)
-            return DeliveryResult(
-                delivered=False,
-                error_message=f"O servidor de e-mail recusou o destinatário {destination_email}.",
+        except smtplib.SMTPRecipientsRefused:
+            logger.error(
+                "Destinatário configurado recusado pelo SMTP.",
+                extra={"error_code": "sc20_smtp_recipient_refused"},
             )
-        except Exception as exc:
-            logger.exception("Erro ao disparar e-mail SC-20 via Django Email Backend: %s", exc)
             return DeliveryResult(
                 delivered=False,
-                error_message=f"Erro de entrega via SMTP: {exc}",
+                error_message="O servidor de e-mail recusou o destinatário configurado.",
+            )
+        except Exception:
+            logger.error(
+                "Falha inesperada ao enviar aviso SC-20 pelo backend SMTP.",
+                extra={"error_code": "sc20_smtp_delivery_failed"},
+            )
+            return DeliveryResult(
+                delivered=False,
+                error_message="Falha inesperada no backend de e-mail.",
             )
 
 

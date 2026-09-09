@@ -2,7 +2,10 @@
 
 Portal único para quatro automações contábeis do desafio Sheep Technology. O projeto parte de pouco contexto, registra as premissas adotadas e mantém a lógica real atrás de fronteiras externas simuladas.
 
-> Estado do código: **versão 0.5.0 incorporada à `main`, implantada e validada em produção** — os quatro processos selecionados estão implementados. O Dia 5 acrescenta o SC-05 com RPA Playwright real sobre três portais HTML sintéticos, saga compensável, retomada explícita e evidência visual privada. O arranjo co-localizado no worker passou por PR, dois CIs públicos, deploy automático condicionado ao CI e smoke test ponta a ponta.
+> Estado do código: **candidata à release estável `1.0.0`** — os quatro processos selecionados estão
+> implementados, implantados e validados no ambiente público. A base inclui PostgreSQL, Celery/Redis,
+> RPA Playwright real sobre três portais sintéticos, classificação por IA atrás de adapter, storage
+> privado e rastreabilidade ponta a ponta com eventos imutáveis e IDs correlacionados.
 
 ## Ambientes publicados
 
@@ -18,7 +21,17 @@ Em 2026-09-01, o [PR `#5`](https://github.com/Guilherme-Justo/SheepContabil/pull
 
 O [PR `#6`](https://github.com/Guilherme-Justo/SheepContabil/pull/6) incorporou esse ajuste no commit [`4ab7af3`](https://github.com/Guilherme-Justo/SheepContabil/commit/4ab7af38ccd0259d89c80a00b82679d3754d5ac3). O [CI do PR](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33556800150) e o [CI de `main`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33557162559) ficaram verdes antes da publicação. Os deployments automáticos de `web` (`4c35c556-9f52-4ee9-b0c7-a092a703f1b8`), `worker` (`8101f6cb-4401-489e-850e-02f62075e8e3`) e `scheduler` (`348d9edf-8bf4-45de-b8ed-e955f3ff3934`) foram promovidos; o seed controlado posterior gerou o deployment web final `cfe0a20c-e358-44ef-870f-5aec6271a24d` e voltou a ficar desativado. O smoke público confirmou bloqueio, desbloqueio, seis screenshots privadas, falha parcial, retomada da mesma execução, RBAC por área e restauração do cliente ao estado ativo.
 
-As credenciais do ambiente publicado são sintéticas e devem ser entregues aos avaliadores fora do repositório. O projeto Railway está no período `Trial`; a mudança para um plano pago depende da decisão de billing do proprietário antes do fim do período de avaliação.
+Em 2026-09-08, o [PR `#44`](https://github.com/Guilherme-Justo/SheepContabil/pull/44)
+incorporou a trilha unificada de execução no commit
+[`0547da0`](https://github.com/Guilherme-Justo/SheepContabil/commit/0547da0218f4664d4e07a1c16e53270b1dc16e30).
+O [PR `#45`](https://github.com/Guilherme-Justo/SheepContabil/pull/45) registrou a validação
+autenticada em produção e confirmou novamente o deploy automático de `web`, `worker` e `scheduler`.
+O contrato e as evidências técnicas estão em [`docs/traceability.md`](docs/traceability.md).
+
+As credenciais do ambiente publicado são sintéticas e devem ser entregues aos avaliadores fora do
+repositório. Na validação de 08/09/2026, os deployments ainda informavam o plano Railway `Trial`;
+a permanência da URL durante toda a avaliação depende de o proprietário manter capacidade e billing
+válidos.
 
 ## Processos selecionados
 
@@ -145,7 +158,16 @@ docker compose config --quiet
 
 O pipeline em `.github/workflows/ci.yml` instala o Chromium headless e repete lint, tipagem, testes — inclusive contrato RPA com navegador real —, cobertura, conferência de migrations, build dos assets e build da imagem de produção.
 
-No estado final local do Dia 5, a suíte completa aprovou `124` testes com `83,85%` de cobertura; os `37` testes focados do SC-05 também passaram. Ruff, verificação de formatação, Mypy, sintaxe do supervisor POSIX, checks Django, conferência de migrations, build dos assets e validação do Compose ficaram verdes. O build da imagem `0.5.0`, indisponível localmente com o Docker Desktop desligado, foi aprovado pelos jobs `Container build` dos CIs do [PR `#5`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33538813847), de seu [push em `main`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33539137377), do [PR `#6`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33556800150) e do [push final em `main`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33557162559). A evidência operacional no ambiente público inclui os quatro UUIDs de execução registrados em [`docs/day-5.md`](docs/day-5.md), download autenticado de PNG privado com integridade e negação `404` para usuário de outra área.
+Como marco histórico do Dia 5, a suíte então existente aprovou `124` testes com `83,85%` de
+cobertura, e os CIs dos PRs `#5` e `#6` confirmaram a imagem. A evidência daquele marco, incluindo
+os UUIDs de execução e screenshots privadas, permanece em [`docs/day-5.md`](docs/day-5.md).
+
+No Release Candidate `1.0.0`, foram coletados `308` testes: `307` passaram localmente, inclusive os
+oito casos Playwright com Chromium real, e um contrato de migration reservado ao PostgreSQL ficou
+para o ambiente efêmero do CI. A cobertura foi de `85,86%`. Ruff, formatação, Mypy, checks Django,
+ausência de migrations novas, sintaxe POSIX, locks Python/Node, assets e Compose ficaram verdes;
+`npm ci` reportou zero vulnerabilidades e `uv pip check` confirmou dependências compatíveis. O Docker
+Desktop local estava desligado, portanto a imagem do RC permanece como gate obrigatório do CI.
 
 ## Estrutura
 
@@ -186,6 +208,8 @@ tests/                       autenticação, autorização e saúde
 - [`docs/assumptions.md`](docs/assumptions.md): premissas, dúvidas e riscos.
 - [`docs/deployment.md`](docs/deployment.md): implantação e operação Railway.
 - [`docs/traceability.md`](docs/traceability.md): contrato, segurança, diagnóstico e checklist da trilha unificada.
+- [`docs/release-v1.0.0.md`](docs/release-v1.0.0.md): escopo, gates e evidências da release estável.
 - [`docs/adr/`](docs/adr/): decisões arquiteturais versionadas.
+- [`CHANGELOG.md`](CHANGELOG.md): histórico consolidado das releases.
 
 O repositório e o portal acima são os endereços canônicos do projeto. Detalhes de operação, smoke test e rollback estão em [`docs/deployment.md`](docs/deployment.md).
