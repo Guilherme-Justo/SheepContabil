@@ -4,10 +4,12 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | Release Candidate em validação |
+| Estado | Release Candidate validado; tag e GitHub Release pendentes |
 | Versão | `1.0.0` |
 | Data de preparação | 09/09/2026 |
-| Base funcional | `e1e968a32cd56625a31083a938456599f4c92d39` |
+| Base anterior | `e1e968a32cd56625a31083a938456599f4c92d39` |
+| Commit funcional validado | `09fa855ee8039be2dce402050cd43acaa6756268` |
+| PR de promoção | [#46](https://github.com/Guilherme-Justo/SheepContabil/pull/46) |
 | Branch de preparação | `codex/release-v1.0.0` |
 | URL pública | [web-production-8f055.up.railway.app](https://web-production-8f055.up.railway.app) |
 
@@ -50,28 +52,57 @@ Essa limitação está aceita apenas para o desafio e não transforma o simulado
 - [x] Mypy aprovado.
 - [x] Django, settings de produção e simulador aprovados.
 - [x] Ausência de migrations não versionadas.
-- [ ] Migration `0010` validada sobre PostgreSQL com dados preexistentes.
+- [x] Migration `0010` validada sobre PostgreSQL com dados preexistentes.
 - [x] Suíte completa e cobertura mínima de 75% aprovadas.
 - [x] Assets do navegador recompilados sem diferença inesperada.
 - [x] Configuração do Docker Compose validada.
-- [ ] Imagem de produção construída pelo CI.
+- [x] Imagem de produção construída pelo CI.
 
 Resultado local de 09/09/2026: `308` testes coletados, `307 passed`, `1 skipped` por exigir
 PostgreSQL e cobertura de `85,86%`. Os oito testes Playwright passaram com Chromium real.
 `uv lock --check`, `uv sync --locked --all-groups`, `npm ci --ignore-scripts`, `uv pip check`, build de assets,
 Ruff, formatação, Mypy, checks Django, migrations, sintaxe POSIX e Compose também passaram. O npm
 auditou 47 pacotes sem vulnerabilidades. O Docker Desktop estava desligado; por isso, migration em
-PostgreSQL e imagem continuam como gates do CI do PR.
+PostgreSQL e imagem foram então aprovados nos CIs do PR e da `main`.
 
 ### Promoção externa
 
-- [ ] PR da release aprovado por todos os jobs obrigatórios.
-- [ ] Merge realizado na `main` sem bypass do CI.
-- [ ] Deploy automático de `web`, `worker` e `scheduler` em `SUCCESS`.
-- [ ] `/health/live` e `/health/ready` respondem HTTP 200 e preservam `X-Request-ID`.
-- [ ] Smoke autenticado usa somente dados sintéticos e confirma RBAC e trilha de execução.
+- [x] PR da release aprovado por todos os jobs obrigatórios.
+- [x] Merge realizado na `main` sem bypass do CI.
+- [x] Deploy automático de `web`, `worker` e `scheduler` em `SUCCESS`.
+- [x] `/health/live` e `/health/ready` respondem HTTP 200 e preservam `X-Request-ID`.
+- [x] Smoke autenticado usa somente dados sintéticos e confirma RBAC e trilha de execução.
 - [ ] Tag anotada `v1.0.0` aponta para o commit exato validado em produção.
 - [ ] GitHub Release publicado com evidências e limitações conhecidas.
+
+## Evidência externa de 09/09/2026
+
+O [PR #46](https://github.com/Guilherme-Justo/SheepContabil/pull/46) aprovou `Quality and tests` e
+`Container build` na execução
+[34364266517](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/34364266517). O merge sem
+bypass gerou o commit
+[`09fa855`](https://github.com/Guilherme-Justo/SheepContabil/commit/09fa855ee8039be2dce402050cd43acaa6756268),
+e o CI de `main`
+[34364726394](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/34364726394) repetiu os dois
+jobs com sucesso antes da promoção automática.
+
+Os três deployments do mesmo SHA terminaram em `SUCCESS`:
+
+- `web`: `8304904e-931c-4e13-94d5-5845a599882d`;
+- `worker`: `907198bb-ff7a-49a2-9639-70ec8e22e242`;
+- `scheduler`: `da96abcb-8128-4051-bbab-873f92ca2a36`.
+
+`/health/live` e `/health/ready` responderam HTTP 200 e preservaram, respectivamente, os UUIDs
+`af36d302-7700-44ab-8976-9b3dbbf9e038` e `f161ab4d-89a7-4b8b-8d94-483c918d5604` enviados em
+`X-Request-ID`. A rota canônica `/conta/entrar/` também respondeu 200 com o formulário esperado.
+
+O smoke autenticado consultou os quatro módulos como administrador e criou o briefing exclusivamente
+sintético `a584dfcd-037c-4c13-8582-68e91d9b9d8b`, imediatamente cancelado. Sua
+[execução](https://web-production-8f055.up.railway.app/execucoes/d23bd1fb-2a69-4f21-ac7a-aeb46354c3ed/)
+`d23bd1fb-2a69-4f21-ac7a-aeb46354c3ed` preserva os eventos contínuos `created` → `started` →
+`cancelled`. O administrador recebeu HTTP 200 com a coluna técnica de correlação; o operador
+societário recebeu HTTP 200 sem essa coluna; o operador fiscal recebeu HTTP 404. Nenhum documento,
+mensagem ou contato real foi usado e nenhuma integração externa foi acionada.
 
 ## Regra de publicação
 
