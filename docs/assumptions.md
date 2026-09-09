@@ -4,7 +4,7 @@
 | --- | --- |
 | Status | Registro vivo iniciado no Dia 1 |
 | Data-base | 2026-08-27 |
-| Última atualização | 2026-09-09 — revisão do Release Candidate `1.0.0` |
+| Última atualização | 2026-09-09 — publicação da release estável `1.0.0` |
 | Escopo | SC-04, SC-05, SC-06 e SC-20 |
 
 ## 1. Como usar este documento
@@ -162,8 +162,8 @@ Os nomes abaixo são aliases arquiteturais para facilitar implementação; não 
 | OpenAI | Adapter e variáveis ficam somente no worker; indisponibilidade resulta em revisão/falha honesta |
 
 A ordem e as compensações do SC-05 permanecem congeladas em A-05-08 e na tabela 4.1. As evidências
-da `0.5.0` continuam preservadas como marco histórico do Dia 5. A candidata `1.0.0` acrescenta
+da `0.5.0` continuam preservadas como marco histórico do Dia 5. A release `1.0.0` acrescenta
 reconciliação assíncrona, validação de migration em PostgreSQL e rastreabilidade ponta a ponta;
-seus gates externos permanecem abertos até CI, deploy, smoke, tag e GitHub Release. A co-localização
+seus gates externos foram encerrados por CI, deploy, smoke, tag e GitHub Release. A co-localização
 do simulador, a ausência de monitor externo contínuo, de rate limit de login e de ensaio de restauração
 do banco são limitações explícitas do ambiente demonstrativo, não capacidades produtivas implícitas.
