@@ -152,6 +152,42 @@ sem exportar o artefato autenticado. Externamente, `/health/live`, `/health/read
 `/conta/entrar/` responderam `200`, enquanto o PDF sem sessão respondeu `302` para o login com o
 caminho original preservado em `next`.
 
+### Ensaio integral cronometrado dos quatro fluxos
+
+Em 10/09/2026, depois da preparação acima, a interface pública foi percorrida em uma única sessão
+administrativa e com resolução `1440 x 1000`. O ensaio usou exclusivamente a massa sintética,
+manteve `SC20_NOTIFICATION_BACKEND=simulated`, não abriu links externos e não alterou a preferência
+de contato. A etapa final contínua do verificador levou `256.220 ms` (`4 min 16,220 s`), sem erro de
+console ou de página. O ciclo assíncrono do SC-04 havia sido iniciado antes desse trecho e levou
+`3 min 15 s`, incluindo a revisão humana.
+
+A consulta somente leitura à Railway confirmou que o runtime exercitado correspondia ao commit
+[`281ce3c`](https://github.com/Guilherme-Justo/SheepContabil/commit/281ce3c37d9933d2c25566345ba4aa54ef1f4a6f).
+Os deployments `web` (`3a451b4a-f869-4086-9db1-8589b49adfad`), `worker`
+(`3753c6cb-6502-41f0-aa55-a5266afe0c5e`) e `scheduler`
+(`930adcee-1c30-464e-be72-86ae3c345e50`) estavam em `SUCCESS`; o scheduler havia encerrado
+normalmente seu pulso cron, enquanto web e worker permaneciam ativos.
+
+| Processo | Evidência de produção | Resultado observado |
+| --- | --- | --- |
+| SC-04 | [`23e40799-97f0-425b-a6d4-6d17a4751bbe`](https://web-production-8f055.up.railway.app/execucoes/23e40799-97f0-425b-a6d4-6d17a4751bbe/) | `Concluída`: 5 itens, 4 encaminhados, 0 em revisão, 1 duplicado e 0 falhas. `relatorio-sem-cliente.txt` foi resolvido por decisão humana explicitamente sintética. |
+| SC-05, bloqueio | [`d7032e08-dc81-4453-9ed7-405e74e65d2d`](https://web-production-8f055.up.railway.app/execucoes/d7032e08-dc81-4453-9ed7-405e74e65d2d/) | `Concluída`: arquivos e contabilidade passaram de `Ativo` para `Bloqueado`; as 2 tarefas abertas receberam o marcador. Seis capturas privadas responderam `200 image/png`. |
+| SC-05, desbloqueio | [`9260670d-230b-4891-a46b-de323669a7cf`](https://web-production-8f055.up.railway.app/execucoes/9260670d-230b-4891-a46b-de323669a7cf/) | `Concluída`: ordem inversa confirmada, marcador removido das 2 tarefas e Aurora restaurada a `Ativo`. Outras seis capturas privadas responderam `200 image/png`. |
+| SC-06 | [`e4657aa1-2e40-4e1c-8035-1f5ee9abf462`](https://web-production-8f055.up.railway.app/briefings-societarios/e4657aa1-2e40-4e1c-8035-1f5ee9abf462/) | Os blocos interestadual, sócio casado e regime foram exibidos; três pendências impediram a conclusão e o atendimento transitório não foi persistido. O briefing concluído da Aurora e seu PDF de 14.011 bytes responderam normalmente. |
+| SC-20, primeira verificação | [`a1548a90-0964-4c80-8b83-159a00a53350`](https://web-production-8f055.up.railway.app/execucoes/a1548a90-0964-4c80-8b83-159a00a53350/) | `Concluída`: 7 certificados na janela, 1 aviso simulado registrado, 0 falhas e 6 avisos já existentes. |
+| SC-20, repetição | [`25f32a32-289d-47d6-9f8b-5c0e03489b55`](https://web-production-8f055.up.railway.app/execucoes/25f32a32-289d-47d6-9f8b-5c0e03489b55/) | `Concluída`: 0 avisos novos, 0 falhas e 7 avisos deduplicados; nenhuma tentativa adicional foi criada. |
+
+Dois bloqueios preventivos do verificador interromperam o roteiro antes de mutações subsequentes:
+um comparador local tratava a caixa do nome duplicado como significativa e um seletor de formulário
+encontrou dois campos homônimos. O ensaio retomou a mesma execução SC-04, sem criar outro ciclo, e
+o segundo bloqueio ocorreu antes de modificar o SC-05. Esses eventos pertenciam somente ao
+instrumento de ensaio; não foram falhas da aplicação. A validação visual posterior confirmou as
+telas terminais, a restauração do SC-05, os erros de campo do SC-06 e as duas respostas do SC-20.
+
+As credenciais foram injetadas apenas no processo efêmero de validação e não aparecem no script,
+nos relatórios ou nas capturas. As imagens completas do navegador permaneceram como artefatos
+locais de QA; a evidência durável é a trilha autenticada preservada nas URLs acima.
+
 ### Publicação da 0.5.0 e ajuste do SC-05
 
 O [PR `#5`](https://github.com/Guilherme-Justo/SheepContabil/pull/5) foi incorporado no commit [`d5b71b384340f4f3cd66e07f801309529790b39f`](https://github.com/Guilherme-Justo/SheepContabil/commit/d5b71b384340f4f3cd66e07f801309529790b39f). O [CI do PR `33538813847`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33538813847) e o [CI do push em `main` `33539137377`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33539137377) ficaram verdes, inclusive no build da imagem. A Railway esperou o CI e concluiu os deployments 0.5.0:

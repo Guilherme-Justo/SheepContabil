@@ -209,7 +209,18 @@ As evidências validadas em produção em 09/09/2026 continuam disponíveis como
 - SC-20, comunicação com falha controlada: `9f88c44c-dc21-4132-8221-bd66e22aac08`;
 - SC-20, reexecução deduplicada: `36a413cd-5508-40ea-8508-31402a84488d`.
 
-Esses identificadores pertencem ao ambiente atual; o procedimento durável é usar os candidatos mais recentes informados por `prepare_demo`.
+O ensaio integral de 10/09/2026 revalidou estes candidatos mais recentes e preferenciais:
+
+- SC-04: `23e40799-97f0-425b-a6d4-6d17a4751bbe`;
+- SC-05, bloqueio: `d7032e08-dc81-4453-9ed7-405e74e65d2d`;
+- SC-05, desbloqueio: `9260670d-230b-4891-a46b-de323669a7cf`;
+- SC-06, briefing concluído: `e4657aa1-2e40-4e1c-8035-1f5ee9abf462`;
+- SC-20, primeira comunicação simulada: `a1548a90-0964-4c80-8b83-159a00a53350`;
+- SC-20, reexecução integralmente deduplicada: `25f32a32-289d-47d6-9f8b-5c0e03489b55`.
+
+Esses identificadores pertencem ao ambiente atual; o procedimento durável é usar os candidatos
+mais recentes informados por `prepare_demo`. O resultado completo e os cuidados de integridade estão em
+[`deployment.md`](deployment.md#ensaio-integral-cronometrado-dos-quatro-fluxos).
 
 Rotas canônicas, úteis para preparar as abas sem depender da posição dos cards:
 

@@ -36,6 +36,13 @@ ficou verde antes de a Railway promover os três serviços. O seed estrutural pa
 sem rotação de credenciais ou datas e `prepare_demo` terminou em `Resultado: READY`, preservando e
 localizando as seis evidências funcionais de contingência.
 
+Ainda em 10/09/2026, um [ensaio integral dos quatro fluxos](docs/deployment.md#ensaio-integral-cronometrado-dos-quatro-fluxos)
+percorreu a interface pública em uma sessão administrativa: o SC-04 concluiu a triagem e a revisão
+humana, o SC-05 bloqueou e desbloqueou a Aurora com restauração integral, o SC-06 recusou um caso
+condicional incompleto sem persistir o atendimento transitório e o SC-20 comprovou a deduplicação
+em uma segunda verificação. O navegador não registrou erros de página ou console, nenhum contato
+externo foi aberto e o backend de avisos permaneceu simulado.
+
 As credenciais do ambiente publicado são sintéticas e devem ser entregues aos avaliadores fora do
 repositório. Na validação de 08/09/2026, os deployments ainda informavam o plano Railway `Trial`;
 a permanência da URL durante toda a avaliação depende de o proprietário manter capacidade e billing
