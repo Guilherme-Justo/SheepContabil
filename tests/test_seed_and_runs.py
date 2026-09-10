@@ -5,6 +5,7 @@ from django.core.management import call_command
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
+from freezegun import freeze_time
 
 from core.automations.models import (
     AutomationComplexity,
@@ -43,7 +44,7 @@ def test_demo_seed_is_complete_and_idempotent(monkeypatch: pytest.MonkeyPatch) -
         "SC-20",
     }
     assert AutomationRun.objects.count() == 5
-    assert DigitalCertificate.objects.count() == 7
+    assert DigitalCertificate.objects.count() == 8
     assert FiscalClient.objects.count() == 4
     assert User.objects.count() == 5
     assert SC05Client.objects.count() == 3
@@ -104,6 +105,11 @@ def test_demo_seed_is_complete_and_idempotent(monkeypatch: pytest.MonkeyPatch) -
     completed_briefing = SocietaryBriefing.objects.get(status=SocietaryBriefingStatus.COMPLETED)
     assert completed_briefing.completed_by == admin
     assert completed_briefing.run.metadata["completed_by_id"] == admin.pk
+    dual_channel_certificate = DigitalCertificate.objects.get(serial_number="DEMO-CERT-008")
+    assert dual_channel_certificate.client_name == "Mariana Souza Demo"
+    assert dual_channel_certificate.contact_email.endswith(".example.test")
+    assert dual_channel_certificate.contact_phone == "+55 11 98888-8080"
+    assert dual_channel_certificate.preferred_channel == "email"
     assert operator.role == UserRole.OPERATOR
     assert operator.check_password("safe-seed-operator-password")
     assert AreaMembership.objects.filter(user=operator, area__code="processos").exists()
@@ -116,6 +122,42 @@ def test_demo_seed_is_complete_and_idempotent(monkeypatch: pytest.MonkeyPatch) -
         user=technology_operator,
         area__code="tecnologia",
     ).exists()
+
+
+@freeze_time("2026-09-09 12:00:00")
+def test_seed_preserves_existing_credentials_and_certificate_dates_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEMO_ADMIN_PASSWORD", "initial-admin-password")
+    monkeypatch.setenv("DEMO_OPERATOR_PASSWORD", "initial-operator-password")
+    call_command("seed_demo", verbosity=0)
+    initial_validity = DigitalCertificate.objects.get(serial_number="DEMO-CERT-001").valid_until
+
+    monkeypatch.setenv("DEMO_ADMIN_PASSWORD", "rotated-admin-password")
+    with freeze_time("2026-09-12 12:00:00"):
+        call_command("seed_demo", verbosity=0)
+
+    admin = User.objects.get(username="admin")
+    assert admin.check_password("initial-admin-password")
+    assert not admin.check_password("rotated-admin-password")
+    assert (
+        DigitalCertificate.objects.get(serial_number="DEMO-CERT-001").valid_until
+        == initial_validity
+    )
+
+    with freeze_time("2026-09-12 12:00:00"):
+        call_command(
+            "seed_demo",
+            sync_credentials=True,
+            refresh_certificate_dates=True,
+            verbosity=0,
+        )
+
+    admin.refresh_from_db()
+    assert admin.check_password("rotated-admin-password")
+    assert DigitalCertificate.objects.get(
+        serial_number="DEMO-CERT-001"
+    ).valid_until == initial_validity + timedelta(days=3)
 
 
 def test_run_exposes_duration_and_safe_status_tone(

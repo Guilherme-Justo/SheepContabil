@@ -5,7 +5,29 @@ As mudanças relevantes do SheepContabil são registradas neste arquivo. O proje
 
 ## [Não publicado]
 
-Nenhuma mudança registrada.
+### Adicionado
+
+- Comando `prepare_demo`, somente leitura por padrão, para conferir o estado operacional dos
+  quatro processos, validar o PDF do SC-06 e localizar evidências funcionais de contingência.
+- Ciclos sintéticos próprios no SC-04 para permitir novos ensaios sem apagar documentos ou
+  confundir idempotência entre lotes.
+- Massa oficial de certificado com e-mail e WhatsApp para demonstrar o duplo contato do SC-20.
+
+### Alterado
+
+- `seed_demo` preserva credenciais e datas já persistidas por padrão; rotações e
+  reposicionamentos exigem opções explícitas.
+- Guia de demonstração acompanha os controles, rótulos, rotas e estados realmente exibidos pelo
+  portal e exige execuções funcionais com evidências filhas.
+- Os três serviços de aplicação Railway compartilham uma única constante de região e continuam
+  condicionados ao CI verde da branch `main`.
+
+### Segurança
+
+- Downloads PDF do SC-06 passam a declarar cache privado e sem armazenamento, preservando o RBAC,
+  o download como anexo e a proteção contra inferência de conteúdo.
+- O preparo operacional nunca apaga execuções, eventos, comunicações, briefings ou artefatos e
+  recusa estados SC-05 ativos ou divergentes.
 
 ## [1.0.0] — 2026-09-09
 

@@ -76,3 +76,25 @@ def test_web_and_worker_share_the_reconciliation_safety_settings() -> None:
     ):
         assert re.search(expected_setting, common_config)
     assert railway_config.count("...commonEnvironment") == 2
+
+
+def test_application_services_share_one_current_region() -> None:
+    railway_config = (PROJECT_ROOT / ".railway" / "railway.ts").read_text(encoding="utf-8")
+
+    assert re.search(r'const APPLICATION_REGION\s*=\s*["\']us-east4-eqdc4a["\'];', railway_config)
+    assert railway_config.count("replicas: { [APPLICATION_REGION]: 1 }") == 3
+    assert railway_config.count('replicas: { "us-east4-eqdc4a": 1 }') == 0
+
+
+def test_all_application_services_follow_main_after_ci() -> None:
+    railway_config = (PROJECT_ROOT / ".railway" / "railway.ts").read_text(encoding="utf-8")
+    source_blocks = re.findall(
+        r'github\("Guilherme-Justo/SheepContabil",\s*\{(.*?)\}\)',
+        railway_config,
+        re.DOTALL,
+    )
+
+    assert len(source_blocks) == 3
+    for source_block in source_blocks:
+        assert re.search(r'branch\s*:\s*["\']main["\']', source_block)
+        assert re.search(r"checkSuites\s*:\s*true", source_block)

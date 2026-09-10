@@ -18,7 +18,7 @@ O objetivo aqui é provar que a ferramenta não é apenas um protótipo visual (
 | **RPA e Automação Web** | Playwright Chromium nativo com Page Objects e Saga Compensável |
 | **Inteligência Artificial** | OpenAI Adapter com validação estrita via Pydantic e Structured Outputs JSON |
 | **Acessibilidade** | WCAG 2.1 Nível AA com suporte total a tema escuro e teclado |
-| **Suíte automatizada** | 308 testes coletados: 307 aprovados localmente e 1 contrato PostgreSQL exercitado no CI |
+| **Suíte automatizada** | Testes de domínio, integração, segurança, views, RPA, infraestrutura e contratos PostgreSQL executados pelo CI |
 | **Ambiente em Produção** | Publicado no Railway: `https://web-production-8f055.up.railway.app` |
 
 ---
@@ -147,7 +147,7 @@ O certificado digital (e-CNPJ A1/A3) é vital para qualquer empresa. Se expirar,
      - **Atenção** (≤ 30 dias)
      - **Preventivo** (≤ 60 dias)
 2. **Deduplicação Inteligente (Proteção Anti-Spam):**
-   - Registra comunicações sob a chave `(certificado, validade, canal, política)`. Mesmo que o operador aperte o botão de verificar 10 vezes seguidas, o sistema **não reenvia avisos duplicados** para o mesmo cliente na mesma competência.
+   - Registra cada comunicação sob a chave `(certificado, validade considerada, canal, política)`. Enquanto esses quatro elementos permanecerem iguais, novas verificações reconhecem o aviso já registrado e **não criam outro envio**. Uma nova validade, outro canal ou uma nova política pode gerar uma nova comunicação; a competência mensal controla o agendamento, não a identidade da comunicação.
 3. **Régua Multicanal de Alta Conveniência (E-mail e WhatsApp):**
    - **WhatsApp:**
      - Gera URL oficial com mensagem pré-formatada pronta.
@@ -158,7 +158,7 @@ O certificado digital (e-CNPJ A1/A3) é vital para qualquer empresa. Se expirar,
      - Botão pill turquesa `[ E-mail ]` gerando link direto `mailto:` com **Assunto** e **Corpo** profissionais preenchidos (alertando prazo, situação e instruções de renovação preventiva junto à Autoridade Certificadora).
      - Integração opcional com envio direto via SMTP/Gmail.
    - **Exibição Estruturada de Contatos:**
-     - Quando o cliente tem ambos os canais cadastrados (ex.: Mariana Souza), exibe as duas opções na mesma célula e sinaliza discretamente a tag **`PREFERENCIAL`** no canal da rotina não assistida.
+     - Quando o cliente tem ambos os canais cadastrados (ex.: **Mariana Souza Demo**, incluída na massa oficial), exibe as duas opções na mesma célula. A estrela preenchida identifica o canal preferencial da rotina não assistida; a estrela vazia permite alterar essa preferência.
 4. **Auditoria e Reenvio Manual no Histórico:**
    - Histórico completo de tentativas (com status `Enviada` ou `Falhou`, mensagem de erro e data/hora).
    - Botão para **retentar envio de falhas** com 1 clique.
@@ -182,12 +182,48 @@ Aba 1: Portal SheepContabil logado como admin
 Aba 2: Repositório GitHub com o CI e a documentação aberta
 ```
 
+### Preparação obrigatória do ensaio
+
+Faça esta preparação antes de compartilhar a tela, nunca durante a apresentação:
+
+1. Execute `python src/manage.py seed_demo` para assegurar o catálogo e a massa sintética estrutural. Esse comando é idempotente por chaves conhecidas, mas **não é um reset operacional**, não apaga evidências, não reabre briefings e não limpa comunicações anteriores.
+2. Execute `python src/manage.py prepare_demo`. Sem opção adicional, o comando é somente leitura: confere os quatro módulos, o modo simulado e a janela ativa de 60 dias do SC-20, a Aurora do SC-05, o PDF consolidado e localiza execuções funcionais de contingência. Se os certificados controlados tiverem envelhecido para fora da janela, decida conscientemente se deve reposicioná-los com `python src/manage.py seed_demo --refresh-certificate-dates`; isso altera a validade que participa da identidade de deduplicação e, por isso, nunca é feito implicitamente.
+3. Se o relatório indicar apenas projeções conhecidas da Aurora a restaurar, execute `python src/manage.py prepare_demo --apply` e rode a conferência novamente. O comando recusa operação ativa, estado parcial ou estado desconhecido; nesses casos, investigue ou retome a saga em vez de esconder a divergência.
+4. Confirme que o relatório termina em `Resultado: READY`. Mantenha abertos os caminhos de execução que ele imprimir.
+5. Confirme no Railway que `web`, `worker`, `scheduler`, PostgreSQL e Redis estão operacionais e que `SC20_NOTIFICATION_BACKEND` permanece em `simulated`.
+6. Execute as automações em série. O worker demonstrativo usa concorrência 1; espere cada execução chegar a um estado terminal antes de iniciar a seguinte.
+
+> **Regra de evidência:** não use os cabeçalhos legados `demo-sc04-review`,
+> `demo-sc05-success` ou `demo-sc20-warning` como prova funcional. Abra execuções
+> produzidas pelo fluxo real e confirme que possuem linha do tempo e evidências
+> filhas. Mantenha como contingência uma execução funcional do SC-04, o par
+> bloqueio/desbloqueio do SC-05, o briefing concluído do SC-06 e o par primeira
+> execução/reexecução deduplicada do SC-20.
+
+As evidências validadas em produção em 09/09/2026 continuam disponíveis como contingência datada:
+
+- SC-04: `63a2e3b3-286d-4aad-8ac7-5cdc3dcbe547`;
+- SC-05, bloqueio: `beac504e-8578-40fb-b28a-356aaa162dd6`;
+- SC-05, desbloqueio: `e450a7aa-ea67-4b6c-b2c8-80246733a927`;
+- SC-06, briefing concluído: `e4657aa1-2e40-4e1c-8035-1f5ee9abf462`;
+- SC-20, comunicação com falha controlada: `9f88c44c-dc21-4132-8221-bd66e22aac08`;
+- SC-20, reexecução deduplicada: `36a413cd-5508-40ea-8508-31402a84488d`.
+
+Esses identificadores pertencem ao ambiente atual; o procedimento durável é usar os candidatos mais recentes informados por `prepare_demo`.
+
+Rotas canônicas, úteis para preparar as abas sem depender da posição dos cards:
+
+- SC-04: `/modulos/triagem-caixa-arquivos/`;
+- SC-05: `/modulos/bloqueio-clientes-inadimplentes/`;
+- SC-06: `/modulos/briefing-societario/`;
+- SC-20: `/modulos/vencimento-certificado-digital/`.
+
 ---
 
 ### ETAPA 1: Abertura e Visão Geral da Plataforma (2 minutos)
 
 1. **Apresentação Inicial (O que falar):**
-   > *"Olá! Hoje vou apresentar o portal SheepContabil, desenvolvido para atender ao desafio de automação contábil. Nossa premissa fundamental foi construir uma solução que não fosse apenas uma maquete conceitual, mas uma plataforma modular completa, com persistência real em PostgreSQL, mensageria com Celery/Redis, conformidade estrita de acessibilidade WCAG 2.1 AA e 308 testes automatizados."*
+   > *"Olá! Hoje vou apresentar o portal SheepContabil, desenvolvido para atender ao desafio de automação contábil. Nossa premissa fundamental foi construir uma solução que não fosse apenas uma maquete conceitual, mas uma plataforma modular completa, com persistência real em PostgreSQL, mensageria com Celery/Redis, conformidade estrita de acessibilidade WCAG 2.1 AA e uma suíte automatizada executada integralmente pelo CI."*
 2. **Mostrar o Dashboard Principal:**
    - Aponte para os 4 cards de automação:
      - **SC-04** (Fiscal · IA)
@@ -202,14 +238,18 @@ Aba 2: Repositório GitHub com o CI e a documentação aberta
 
 1. **Acessar o módulo SC-04:**
    - Clique em **SC-04 - Triagem da caixa de arquivos**.
-2. **Mostrar a Tabela de Documentos:**
-   - Mostre os documentos já triados: a coluna de **Confiança da IA** (ex.: 98%, 95%), o tipo documental identificado (Extrato Bancário, NF-e, Comprovante) e o cliente vinculado.
-3. **Explicar o Limiar de Segurança (Threshold):**
+2. **Produzir um ciclo funcional novo:**
+   - Clique em **Processar caixa agora**. Cada disparo manual recebe um identificador sintético de ciclo novo, preservando os ciclos anteriores e mantendo, dentro do próprio lote, a cópia usada para demonstrar deduplicação por conteúdo.
+   - Aguarde a execução chegar a um estado terminal e abra seu detalhe para mostrar a linha do tempo do portal, broker e worker.
+3. **Mostrar a Tabela de Documentos:**
+   - Em **Arquivos recebidos**, mostre os documentos triados, a confiança da IA, o tipo documental identificado e o cliente vinculado.
+4. **Explicar o Limiar de Segurança (Threshold):**
    > *"Observem que a automação não classifica no escuro. Se a confiança for maior ou igual a 85%, o documento é roteado automaticamente. Mas se a IA tiver incerteza ou o documento for ambíguo, ele vai para a Fila de Revisão Humana."*
-4. **Demonstrar a Fila de Revisão:**
-   - Clique na aba **Fila de Revisão**.
-   - Mostre um documento pendente de confirmação humana.
-   - Demonstre a validação e o arquivamento manual, explicando que o feedback do operador fica registrado de forma auditável.
+5. **Demonstrar a revisão humana:**
+   - Na seção **Arquivos recebidos**, selecione **Aguardando revisão** no filtro **Estado** e clique em **Filtrar**.
+   - Abra **Detalhes** de um documento pendente.
+   - Mostre o motivo, a sugestão, as confianças e as evidências curtas; confirme ou corrija tipo e cliente.
+   - Clique em **Confirmar e encaminhar** e destaque que a decisão final fica atribuída ao usuário autenticado.
 
 ---
 
@@ -219,11 +259,12 @@ Aba 2: Repositório GitHub com o CI e a documentação aberta
 1. **Acessar o módulo SC-05:**
    - Clique em **SC-05 - Bloqueio e desbloqueio de clientes**.
 2. **Explicar o Desafio do Negócio:**
-   > *"Aqui resolvemos a inadimplência sem gerar passivo. O escritório precisa bloquear o cliente inadimplente em três sistemas: Portal de Arquivos, Sistema Contábil e Sistema de Tarefas da equipe. Nosso robô Playwright Chromium opera os três sistemas reais em tela."*
-3. **Mostrar a Lista de Clientes e Disparar um Bloqueio:**
-   - Selecione um cliente ativo (ex.: *Horizonte Comércio Sintético*).
-   - Clique em **Bloquear**.
-   - O sistema enfileira o trabalho no Celery e inicia a saga.
+   > *"Aqui resolvemos a inadimplência sem gerar passivo. O escritório precisa bloquear o cliente em três sistemas. Nosso robô Playwright Chromium opera, pela interface visível, três portais HTML sintéticos realmente executados no ambiente demonstrativo. A regra, a navegação, os formulários, o estado, a saga e as evidências são reais; apenas a fronteira dos sistemas legados foi sintetizada."*
+3. **Selecionar o caso demonstrativo e disparar o bloqueio:**
+   - No painel **Operar os três sistemas**, escolha **Aurora Demonstração Ltda.** (`aurora-demo`).
+   - Selecione a ação **Bloquear** e o cenário **Fluxo normal**.
+   - Clique em **Executar sequência**.
+   - Aguarde a execução chegar a um estado terminal antes de iniciar qualquer outra automação.
 4. **Abrir a Página da Execução (`run_detail.html`):**
    - Mostre as três etapas concluídas com sucesso:
      1. Portal de Arquivos -> Bloqueado
@@ -233,6 +274,7 @@ Aba 2: Repositório GitHub com o CI e a documentação aberta
 5. **Demonstrar o Desbloqueio (Ordem Inversa e Restauração dos Responsáveis):**
    - Mostre que o cliente agora está com status `Bloqueado`.
    - Clique em **Desbloquear**.
+   - Aguarde a execução terminar antes de prosseguir.
    - Acompanhe a execução e mostre que as tarefas foram restauradas exatamente para os colaboradores originais a partir do snapshot!
 6. **Mencionar a Tolerância a Falhas:**
    - Explique que se houver timeout ou erro em um dos portais, a saga executa a compensação reversa automática ou sinaliza `PARTIALLY_FAILED`, permitindo a retomada explícita sem deixar o cliente em estado inconsistente.
@@ -244,7 +286,7 @@ Aba 2: Repositório GitHub com o CI e a documentação aberta
 1. **Acessar o módulo SC-06:**
    - Clique em **SC-06 - Briefing societário**.
 2. **Iniciar um Novo Briefing:**
-   - Preencha o nome de um cliente fictício e clique em **Iniciar Briefing**.
+   - Preencha o nome e um CPF ou CNPJ estritamente sintético e clique em **Iniciar Briefing**.
 3. **Demonstrar a Reatividade Condicional ao Vivo:**
    - No campo de Estado (UF), selecione **Rio de Janeiro (RJ)** ou qualquer estado diferente de SP:
      - **Efeito visual:** O formulário expande instantaneamente o **Bloco de Regularidade Interestadual**, solicitando Junta Comercial de origem e registro!
@@ -252,8 +294,10 @@ Aba 2: Repositório GitHub com o CI e a documentação aberta
      - **Efeito visual:** O formulário revela os campos obrigatórios de identificação do cônjuge e seleção do **Regime de Bens**.
 4. **Destacar a Validação de Backend:**
    > *"Essa reatividade visual é proporcionada por Alpine.js e HTMX, mas toda a integridade lógica é garantida por uma DSL no backend Django. Nenhum dado inconsistente é gravado no banco."*
-5. **Finalizar e Gerar o PDF:**
-   - Conclua o briefing e faça o download do **PDF consolidado**, mostrando o documento pronto para arquivamento ou protocolo.
+5. **Demonstrar obrigatoriedade e resultado final:**
+   - Tente concluir com um campo condicional obrigatório vazio e mostre a recusa tanto na interface quanto no contrato do backend.
+   - Cancele esse atendimento transitório para não deixar um rascunho inesperado.
+   - Abra o briefing concluído da **Aurora Participações Demo** e baixe seu **PDF consolidado**, mostrando o documento pronto para arquivamento ou protocolo.
 
 ---
 
@@ -264,23 +308,25 @@ Aba 2: Repositório GitHub com o CI e a documentação aberta
 2. **Apresentar o Painel de Controle:**
    - Mostre os contadores executivos no topo: *Monitorados, Próximos do vencimento (janela de 60 dias), Vencidos e Avisos com falha*.
 3. **Destacar a Tabela de Certificados e a Exibição de Contatos:**
-   - Mostre a linha de **Mariana Souza** (caso com duplo contato):
-     - Linha de E-mail com ícone outline de envelope + endereço + tag `[ PREFERENCIAL ]` + botão pill `[ E-mail ]`.
-     - Linha de WhatsApp com ícone outline vetorial do WhatsApp + número canônico `+55 (11) 98765-4321` + botão pill `[ WhatsApp ]`.
+   - Mostre a linha de **Mariana Souza Demo**, criada pela massa oficial com e-mail e WhatsApp.
+   - Explique que a estrela preenchida identifica o canal preferencial da automação; a estrela vazia permite mudar a preferência.
+   - O e-mail e o número são os próprios links assistidos na carteira. Os botões textuais **E-mail** e **WhatsApp** também aparecem nas ações do histórico.
 4. **Demonstrar a Ação Rápida de Envio:**
-   - Clique no botão `[ WhatsApp ]`: mostre que a URL gerada abre o WhatsApp Web com o texto corporativo pré-preenchido, dados da empresa, vencimento e aviso preventivo.
-   - Clique no botão `[ E-mail ]`: mostre que o link `mailto:` abre o cliente de e-mail padrão do operador com Assunto e Corpo completos formatados.
+   - Mostre que o link de WhatsApp contém texto corporativo pré-preenchido, dados da empresa, vencimento e aviso preventivo. Não conclua nenhum envio externo durante a demonstração.
+   - Mostre que o link `mailto:` contém assunto e corpo completos. O envio assistido continua dependendo da ação explícita do operador no cliente de e-mail.
 5. **Demonstrar a Proteção Anti-Spam e o Histórico:**
-   - Clique em **Verificar vencimentos agora**.
-   - Mostre que os certificados já comunicados não geram avisos duplicados na mesma competência.
-   - Na tabela **Histórico de avisos**, mostre a rastreabilidade completa (Canal com ícones respectivos, status e opção de retentativa para eventuais falhas).
+   - Confirme primeiro que o ambiente utiliza o backend de entrega **simulado**.
+   - Clique em **Verificar vencimentos agora** e aguarde a execução terminar.
+   - Execute novamente e mostre no resumo que os avisos elegíveis aparecem como **já registrados**, sem novas tentativas.
+   - Explique que a deduplicação considera certificado, validade, canal e política — e não simplesmente o mês da execução.
+   - No **Histórico de avisos**, mostre canal, estado, horário, falha controlada e retentativa.
 
 ---
 
 ### ETAPA 6: Encerramento e Conclusão Técnica (1 minuto)
 
 1. **Resumo das Entregas:**
-   > *"Para resumir: cobrimos todas as naturezas do desafio (IA, RPA e Controles Sistematizados) em um monólito limpo, sustentável e pronto para evoluir. O repositório conta com CI/CD no GitHub Actions, tipagem rigorosa no Mypy, auditoria de código no Ruff e 308 testes automatizados."*
+   > *"Para resumir: cobrimos todas as naturezas do desafio (IA, RPA e Controles Sistematizados) em um monólito limpo, sustentável e pronto para evoluir. O repositório conta com CI/CD no GitHub Actions, tipagem rigorosa no Mypy, auditoria de código no Ruff e testes automatizados de domínio, integração e contratos operacionais."*
 2. **Abrir para Perguntas dos Avaliadores.**
 
 ---
@@ -299,9 +345,9 @@ Aba 2: Repositório GitHub com o CI e a documentação aberta
 > **Resposta:**  
 > *"Essa foi uma decisão de negócio crítica explicitada no desafio. Se desativássemos o cliente no sistema de tarefas, o histórico de horas e trabalhos já entregues ficaria inacessível ou corrompido para o faturamento e para a equipe contábil. Por isso, implementamos a substituição seletiva: apenas tarefas em aberto recebem o marcador `BLOQUEADO_INADIMPLENCIA`, e o snapshot original permite devolver cada tarefa exatamente para o seu colaborador original quando houver o pagamento."*
 
-### P4: "Como garantem que o robô do SC-20 não vai enviar e-mails e WhatsApp repetidos todo dia?"
+### P4: "Como garantem que o SC-20 não envia avisos repetidos?"
 > **Resposta:**  
-> *"Através de uma restrição de unicidade lógica no banco de dados: cada comunicação é indexada por uma chave composta por `(certificado, validade, canal, política_vigente)`. Mesmo que a rotina execute diariamente, o PostgreSQL rejeita a criação de uma comunicação duplicada para aquela competência mensal."*
+> *"Cada comunicação possui uma identidade lógica composta por certificado, validade considerada, canal e política. Há uma restrição de unicidade correspondente no PostgreSQL e o serviço consulta essa identidade antes da entrega. Por isso, reexecutar a rotina não cria outro aviso enquanto esses elementos permanecerem iguais. A competência mensal controla o agendamento; ela não é a chave de deduplicação."*
 
 ### P5: "Como foi tratada a acessibilidade do portal?"
 > **Resposta:**  
@@ -315,6 +361,10 @@ Aba 2: Repositório GitHub com o CI e a documentação aberta
 - [ ] Acessar `https://web-production-8f055.up.railway.app` e confirmar que a página de login carrega instantaneamente.
 - [ ] Efetuar login com usuário `admin` e verificar se a sessão está ativa.
 - [ ] Garantir que o zoom do navegador está em 100% (resolução recomendada: 1440x900 ou superior).
-- [ ] Ter a execução final do CI da `v1.0.0`, com 308 testes coletados, e o arquivo `docs/architecture.md` abertos para consulta técnica se solicitado.
+- [ ] Executar `python src/manage.py prepare_demo` e confirmar `Resultado: READY`.
+- [ ] Confirmar que a Aurora está ativa, não existem execuções SC-05 parciais/ativas e o SC-20 usa entrega simulada.
+- [ ] Ter a execução mais recente do CI verde e o arquivo `docs/architecture.md` abertos para consulta técnica se solicitado.
 - [ ] Confirmar a tag `v1.0.0`, os health checks e a linha do tempo de uma execução antes de iniciar.
 - [ ] Lembrar que somente o administrador vê IDs técnicos; operadores veem a mesma trilha sem esses campos.
+- [ ] Baixar o PDF concluído da Aurora em um navegador convencional e confirmar que o arquivo abre.
+- [ ] Manter as seis execuções funcionais de contingência indicadas por `prepare_demo` em abas preparadas.
