@@ -28,6 +28,14 @@ O [PR `#45`](https://github.com/Guilherme-Justo/SheepContabil/pull/45) registrou
 autenticada em produção e confirmou novamente o deploy automático de `web`, `worker` e `scheduler`.
 O contrato e as evidências técnicas estão em [`docs/traceability.md`](docs/traceability.md).
 
+Em 2026-09-10, o [PR `#49`](https://github.com/Guilherme-Justo/SheepContabil/pull/49)
+incorporou o hardening do ensaio repetível no commit
+[`6bad042`](https://github.com/Guilherme-Justo/SheepContabil/commit/6bad04212a71ffa9a1ac82487448e17a5df9a1c6).
+O [CI de `main`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/34491736060)
+ficou verde antes de a Railway promover os três serviços. O seed estrutural padrão foi executado
+sem rotação de credenciais ou datas e `prepare_demo` terminou em `Resultado: READY`, preservando e
+localizando as seis evidências funcionais de contingência.
+
 As credenciais do ambiente publicado são sintéticas e devem ser entregues aos avaliadores fora do
 repositório. Na validação de 08/09/2026, os deployments ainda informavam o plano Railway `Trial`;
 a permanência da URL durante toda a avaliação depende de o proprietário manter capacidade e billing

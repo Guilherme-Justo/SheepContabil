@@ -116,6 +116,42 @@ A validação controlada usou o [PR `#3`](https://github.com/Guilherme-Justo/She
 
 O portal respondeu `200` em `/health/ready`, encerrando o teste de recuperação. A associação com `main`, o deploy automático e `Wait for CI` devem permanecer ativos nesses três serviços já comprovados. Não existe quarta fonte para o simulador: na topologia ajustada ele acompanha exatamente o commit e o deploy do worker. Se `GitHub Repo not found` reaparecer, reautorize a integração e reassocie apenas a fonte afetada; um workflow com token Railway continua sendo fallback de último recurso.
 
+### Hardening do ensaio e nova comprovação do autodeploy
+
+Em 10/09/2026, o [PR `#49`](https://github.com/Guilherme-Justo/SheepContabil/pull/49)
+incorporou o hardening de prontidão demonstrativa no commit
+[`6bad042`](https://github.com/Guilherme-Justo/SheepContabil/commit/6bad04212a71ffa9a1ac82487448e17a5df9a1c6).
+O [CI do PR](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/34491278899)
+e o [CI do push em `main`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/34491736060)
+aprovaram qualidade, contrato PostgreSQL, testes e imagem de produção.
+
+A Railway criou os três deployments no instante do merge e os manteve em `WAITING` enquanto o CI
+de `main` estava em andamento. Após os dois jobs ficarem verdes, os mesmos deployments avançaram
+por `BUILDING` e `DEPLOYING` até `SUCCESS`, todos correlacionados ao SHA completo
+`6bad04212a71ffa9a1ac82487448e17a5df9a1c6`:
+
+- `web`: `539869af-2abb-424a-85a3-d7b5c64b2e49`;
+- `worker`: `277b1ff1-e13c-4409-847c-5d3818a89f81`;
+- `scheduler`: `277696d9-a6e7-4d58-a165-5e998e3fb666`.
+
+O plano oficial executado contra `production` informou que a IaC já estava atualizada. Depois da
+promoção, o seed estrutural padrão foi executado uma vez: nenhuma opção de sincronização de senha
+ou reposicionamento de validade foi usada. A conferência `prepare_demo`, novamente em modo somente
+leitura, confirmou:
+
+- SC-20 simulado e os certificados controlados dentro da janela ativa de 60 dias;
+- Aurora do SC-05 no estado inicial seguro;
+- PDF do SC-06 válido, com 14.011 bytes e duas páginas;
+- as seis evidências funcionais de contingência listadas no guia;
+- `Resultado: READY`.
+
+No runtime promovido, a view do PDF respondeu `200`, `application/pdf`, download como `attachment`,
+`Cache-Control: private, no-store` e `X-Content-Type-Options: nosniff`; o parser confirmou duas
+páginas e o cliente sintético esperado. Essa conferência ocorreu em memória dentro do contêiner,
+sem exportar o artefato autenticado. Externamente, `/health/live`, `/health/ready` e
+`/conta/entrar/` responderam `200`, enquanto o PDF sem sessão respondeu `302` para o login com o
+caminho original preservado em `next`.
+
 ### Publicação da 0.5.0 e ajuste do SC-05
 
 O [PR `#5`](https://github.com/Guilherme-Justo/SheepContabil/pull/5) foi incorporado no commit [`d5b71b384340f4f3cd66e07f801309529790b39f`](https://github.com/Guilherme-Justo/SheepContabil/commit/d5b71b384340f4f3cd66e07f801309529790b39f). O [CI do PR `33538813847`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33538813847) e o [CI do push em `main` `33539137377`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/33539137377) ficaram verdes, inclusive no build da imagem. A Railway esperou o CI e concluiu os deployments 0.5.0:
