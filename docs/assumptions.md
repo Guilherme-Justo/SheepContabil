@@ -38,7 +38,7 @@ Se uma premissa mudar, o histórico desta tabela deve ser preservado no Git e a 
 | A-012 | Aceita para o desafio | Arquivos originais e derivados ficam em storage compatível com S3. | O disco do contêiner não é usado como persistência. |
 | A-013 | Aceita para o desafio | O limite inicial de upload será 10 MiB por arquivo. | Arquivos maiores são recusados com mensagem operacional; o limite fica configurável. |
 | A-014 | Aceita para o desafio | PDF, JPEG, PNG e TXT cobrem os cenários demonstrativos do SC-04. | Tipos adicionais exigem novo contrato de segurança e não entram na `1.0.0`. |
-| A-015 | Aceita para o desafio | O seed é idempotente e cria cenários de sucesso, revisão, duplicidade e falha. | A demonstração pode ser repetida sem edição manual do banco. |
+| A-015 | Confirmada com separação operacional | O `seed_demo` assegura o catálogo e a massa estrutural por chaves conhecidas; `prepare_demo` verifica a prontidão e só restaura, com `--apply`, projeções sintéticas allowlisted do SC-05. | A preparação não apaga nem reescreve execuções, comunicações, decisões, tentativas ou artefatos; estados parciais/ativos exigem tratamento explícito. |
 | A-016 | Aceita para o desafio | Credenciais públicas não serão commitadas no repositório. | Usuários são criados por comando usando variáveis; credenciais são entregues separadamente. |
 | A-017 | Fora do escopo | Alta disponibilidade multi-região e recuperação automática regional. | A ausência de backup/restauração comprovados é aceita apenas no ambiente sintético; operação com dados reais exige os controles de A-OPS-02. |
 | A-018 | Fora do escopo | Dados reais, integrações produtivas e homologação jurídica/fiscal. | A interface deixa claro que regras e massas são demonstrativas. |

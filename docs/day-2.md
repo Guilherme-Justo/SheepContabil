@@ -76,13 +76,18 @@ Se o broker falhar antes de o worker iniciar, a execução fica marcada com falh
 
 ## Massa de demonstração
 
-O `seed_demo` permanece idempotente e agora cria sete certificados relativos ao dia da execução:
+No marco original do Dia 2, o `seed_demo` criava sete certificados relativos ao dia da execução:
 
 - dois ativos dentro da janela com entrega bem-sucedida, incluindo os dois canais;
 - um ativo exatamente no limite de 60 dias com falha transitória deliberada;
 - um ativo com 61 dias, fora da janela;
 - um ativo já vencido;
 - um revogado e um substituído dentro da janela temporal, ambos inelegíveis.
+
+O hardening posterior do roteiro acrescentou `DEMO-CERT-008` (`Mariana Souza Demo`),
+com e-mail e WhatsApp sintéticos no mesmo registro, para tornar a escolha visual do
+canal preferencial reproduzível. O seed atual preserva a validade já persistida por
+padrão; o reposicionamento relativo exige `--refresh-certificate-dates` explícito.
 
 Não há CPF, CNPJ, telefone, e-mail ou certificado real na carga de demonstração.
 

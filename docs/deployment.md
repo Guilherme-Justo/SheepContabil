@@ -18,6 +18,14 @@ templates de PostgreSQL e Redis do ambiente `Trial` foram criados em Amsterdã
 antes da implementação dos fluxos reais, a região permanente deve ser decidida
 e os volumes só podem ser movidos com backup e aprovação explícita.
 
+Em 10/09/2026, `us-east4-eqdc4a` continuava sendo o identificador oficial da
+região **US East Metal** e os três serviços de aplicação estavam ativos nessa
+região. Um aviso isolado do painel não autoriza trocar a região na IaC: confira
+primeiro se existe uma alteração staged obsoleta e descarte-a ou selecione
+novamente US East Metal. A constante `APPLICATION_REGION` mantém web, worker e
+scheduler alinhados. Migrar aplicação, banco, Redis ou bucket para outra região
+continua exigindo plano revisado e, quando houver volume, janela e backup.
+
 ## Pré-requisitos
 
 1. Repositório GitHub público com `main` verde no CI.
@@ -49,6 +57,17 @@ Depois de aplicar:
    volte a variável para `false` sem novo deploy. O script executa as migrations
    em toda publicação e só executa o seed idempotente quando a flag está ativa.
 8. Registre a URL e as credenciais de avaliação fora do repositório.
+
+O seed comum preserva senhas e validades já persistidas. Rotação de credenciais
+exige `seed_demo --sync-credentials`; reposicionar datas relativas dos
+certificados exige `seed_demo --refresh-certificate-dates`. Antes de uma
+apresentação, use `python src/manage.py prepare_demo` em modo somente leitura e
+exija `Resultado: READY`. Use `--apply` apenas para restaurar a projeção
+allowlisted da Aurora no SC-05; o comando não apaga evidências e recusa operação
+ativa, estado parcial, estado desconhecido ou backend SC-20 não simulado. O
+preparo também recusa certificados controlados fora da janela ativa de 60 dias;
+nesse caso, `seed_demo --refresh-certificate-dates` deve ser uma decisão
+consciente, porque cria uma nova identidade funcional para deduplicação.
 
 O comando do worker é `sh scripts/run_worker_with_simulator.sh`. O supervisor aguarda o schema aplicado pelo web, inicia `config.simulator_wsgi` com ambiente reconstruído por allowlist, confirma liveness e então inicia Celery com concorrência 1. Um marcador efêmero só libera `/health/ready` depois que Celery permanece vivo; a Railway usa esse endpoint para promover o deploy. O subprocesso WSGI recebe runtime Python, segredo Django próprio, fuso, PostgreSQL e a credencial sintética, mas não herda `REDIS_URL`, S3, `OPENAI_API_KEY` nem `OPENAI_MODEL`. No shutdown, Celery recebe `TERM` primeiro e conserva o simulador durante o encerramento gracioso de até 300 segundos.
 

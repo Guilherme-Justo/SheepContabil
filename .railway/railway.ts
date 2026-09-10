@@ -11,6 +11,8 @@ import {
   service,
 } from "railway/iac";
 
+const APPLICATION_REGION = "us-east4-eqdc4a";
+
 export default defineRailway(() => {
   const database = postgres("Postgres", { region: "ams" });
   const broker = redis("Redis", { region: "ams" });
@@ -48,7 +50,7 @@ export default defineRailway(() => {
     preDeploy: "sh scripts/predeploy.sh",
     healthcheck: "/health/ready",
     healthcheckTimeout: 300,
-    replicas: { "us-east4-eqdc4a": 1 },
+    replicas: { [APPLICATION_REGION]: 1 },
     env: {
       ...commonEnvironment,
       DEMO_ADMIN_PASSWORD: preserve(),
@@ -70,7 +72,7 @@ export default defineRailway(() => {
     deploy: { drainingSeconds: 300 },
     healthcheck: "/health/ready",
     healthcheckTimeout: 300,
-    replicas: { "us-east4-eqdc4a": 1 },
+    replicas: { [APPLICATION_REGION]: 1 },
     env: {
       ...commonEnvironment,
       OPENAI_API_KEY: preserve(),
@@ -95,7 +97,7 @@ export default defineRailway(() => {
       cronSchedule: "*/15 * * * *",
       restartPolicyType: "NEVER",
     },
-    replicas: { "us-east4-eqdc4a": 1 },
+    replicas: { [APPLICATION_REGION]: 1 },
     env: {
       DJANGO_SETTINGS_MODULE: "config.settings.production",
       DJANGO_SECRET_KEY: web.env.DJANGO_SECRET_KEY,

@@ -249,6 +249,11 @@ def test_completion_exposes_read_only_result_run_evidence_and_pdf(
         "automations:sc06-briefing-pdf",
         kwargs={"briefing_id": briefing.id},
     )
+    anonymous_pdf = client.get(pdf_url)
+
+    assert anonymous_pdf.status_code == 302
+    assert anonymous_pdf.url == f"{reverse('identity:login')}?next={pdf_url}"
+
     client.force_login(societary_operator)
 
     completed_response = client.post(detail_url, _sp_opening_payload())
@@ -268,6 +273,7 @@ def test_completion_exposes_read_only_result_run_evidence_and_pdf(
     assert "Briefing societário vinculado" in run_page.content.decode()
     assert pdf_response.status_code == 200
     assert pdf_response["Content-Type"] == "application/pdf"
+    assert pdf_response["Cache-Control"] == "private, no-store"
     assert pdf_response["X-Content-Type-Options"] == "nosniff"
     assert "attachment" in pdf_response["Content-Disposition"]
     reader = PdfReader(BytesIO(pdf_response.content))
@@ -276,6 +282,11 @@ def test_completion_exposes_read_only_result_run_evidence_and_pdf(
     assert societary_operator.label in text
     assert "Horizonte Demo Ltda." in text
     assert "Comunhão" not in text
+
+    client.force_login(administrator)
+    administrator_pdf = client.get(pdf_url)
+    assert administrator_pdf.status_code == 200
+    assert administrator_pdf["Cache-Control"] == "private, no-store"
 
     client.force_login(processes_operator)
     assert client.get(detail_url).status_code == 404

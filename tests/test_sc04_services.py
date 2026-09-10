@@ -45,6 +45,7 @@ from core.automations.sc04.contracts import (
     StoredObject,
     ValidatedDocument,
 )
+from core.automations.sc04.inbox import SyntheticDocumentInbox
 from core.automations.sc04.services import (
     create_manual_sc04_inbox_run,
     create_manual_sc04_run,
@@ -583,6 +584,20 @@ def test_scheduled_run_is_unique_per_daily_competence(
     assert first.idempotency_key == "sc04:scheduled:2026-08-31"
     assert first.trigger == RunTrigger.SCHEDULED
     assert first.status == RunStatus.QUEUED
+    assert first.parameters["demo_cycle"] == "scheduled-2026-08-31"
+
+
+def test_synthetic_inbox_cycle_is_repeatable_and_additive() -> None:
+    first_cycle = SyntheticDocumentInbox(cycle_key="ensaio final/01").list_attachments()
+    repeated_cycle = SyntheticDocumentInbox(cycle_key="ensaio final/01").list_attachments()
+    next_cycle = SyntheticDocumentInbox(cycle_key="ensaio-final-02").list_attachments()
+
+    assert first_cycle == repeated_cycle
+    assert first_cycle[0].source_reference.startswith("inbox:fiscal-demo:ensaio-final-01:")
+    assert first_cycle[0].content == first_cycle[2].content
+    assert first_cycle[0].source_reference != first_cycle[2].source_reference
+    assert first_cycle[0].content != next_cycle[0].content
+    assert first_cycle[0].source_reference != next_cycle[0].source_reference
 
 
 def test_manual_inbox_and_scheduler_use_the_same_idempotent_pipeline(
@@ -605,6 +620,7 @@ def test_manual_inbox_and_scheduler_use_the_same_idempotent_pipeline(
     classifier = RecordingClassifier(prediction=_prediction(client=fiscal_client))
     extractor = FixedExtractor("NOTA FISCAL. CNPJ 12.345.678/0001-90. Aurora Participações Demo.")
     manual_run = create_manual_sc04_inbox_run(triggered_by=administrator)
+    assert str(manual_run.parameters["demo_cycle"]).startswith("manual-")
 
     manual_result = execute_sc04(
         manual_run.id,

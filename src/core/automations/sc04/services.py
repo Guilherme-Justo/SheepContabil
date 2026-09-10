@@ -172,12 +172,16 @@ def create_manual_sc04_run(
 @transaction.atomic
 def create_manual_sc04_inbox_run(*, triggered_by: User) -> AutomationRun:
     token = uuid.uuid4().hex
+    demo_cycle = f"manual-{token}"
     run = AutomationRun.objects.create(
         module=AutomationModule.objects.get(code="SC-04"),
         trigger=RunTrigger.MANUAL,
         status=RunStatus.QUEUED,
         triggered_by=triggered_by,
-        parameters={"source": DocumentSource.SIMULATED_INBOX},
+        parameters={
+            "source": DocumentSource.SIMULATED_INBOX,
+            "demo_cycle": demo_cycle,
+        },
         idempotency_key=f"sc04:manual-inbox:{token}",
         summary="Caixa sintética adicionada à fila de triagem.",
         task_id=uuid.uuid4(),
@@ -220,6 +224,7 @@ def prepare_scheduled_sc04_run(*, base_date: date) -> tuple[AutomationRun, bool]
             "parameters": {
                 "source": DocumentSource.SIMULATED_INBOX,
                 "base_date": competence,
+                "demo_cycle": f"scheduled-{competence}",
             },
             "summary": "Triagem diária adicionada à fila.",
             "task_id": uuid.uuid4(),
@@ -318,7 +323,10 @@ def execute_sc04(
             require_current_delivery(run.id, task_id=run.task_id)
             ingestion_failures = _ingest_inbox(
                 run=run,
-                inbox=inbox or build_document_inbox(),
+                inbox=inbox
+                or build_document_inbox(
+                    cycle_key=str(run.parameters.get("demo_cycle") or "baseline")
+                ),
                 storage=selected_storage,
             )
             if ingestion_failures:

@@ -1366,6 +1366,7 @@ def sc06_briefing_pdf(request: HttpRequest, briefing_id: str) -> HttpResponse:
         return HttpResponseBadRequest("Conclua o briefing antes de gerar o PDF.")
     response = HttpResponse(build_briefing_pdf(briefing), content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="briefing-sc06-{briefing.id}.pdf"'
+    response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"
     return response
 

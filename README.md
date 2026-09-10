@@ -140,7 +140,9 @@ Abra no navegador `http://localhost:8000`:
 - **Administrador**: usuário `admin` / senha definida em `DEMO_ADMIN_PASSWORD` (ex: `admin123`).
 - **Operador**: usuário `operador.processos` (ou `operador.fiscal`, `operador.societario`, `operador.tecnologia`) / senha definida em `DEMO_OPERATOR_PASSWORD` (ex: `operator123`).
 
-O comando `seed_demo` é idempotente: pode ser executado a qualquer momento para restaurar os dados de demonstração sem duplicar registros.
+O comando `seed_demo` assegura a massa estrutural por chaves conhecidas sem duplicar registros. Ele não é um reset operacional: preserva execuções, evidências, comunicações e o estado já exercitado do SC-05. Por segurança, também preserva senhas e validades de certificados existentes; use `--sync-credentials` ou `--refresh-certificate-dates` somente quando essa alteração for intencional.
+
+Antes de uma apresentação, execute primeiro `python src/manage.py prepare_demo`. O comando é somente leitura por padrão, valida o modo simulado e a janela ativa de 60 dias do SC-20, gera e inspeciona o PDF da Aurora, confere o estado sintético do SC-05 e informa as execuções funcionais recomendadas. Se ele apontar apenas projeções conhecidas da Aurora a restaurar, repita com `--apply`; operações ativas e estados parciais ou desconhecidos são recusados para que uma divergência real não seja mascarada. Se os certificados controlados tiverem envelhecido, o comando exige a decisão explícita de executar `seed_demo --refresh-certificate-dates`, pois a validade faz parte da identidade de deduplicação.
 
 > **Nota para execução completa do SC-05**: O caminho acima sobe o portal web completo com todos os módulos (SC-04, SC-06 e SC-20 prontos para uso). Para executar a automação de RPA do SC-05 de ponta a ponta, também são necessários Redis, worker Celery e o WSGI privado do simulador (`config.simulator_wsgi`). Para subir toda essa infraestrutura em um único comando, recomenda-se o uso do **Docker Compose** descrito acima.
 

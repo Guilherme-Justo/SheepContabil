@@ -341,8 +341,28 @@ SC06_SCHEMA_V1 = {
 class Command(BaseCommand):
     help = "Cria massa sintética idempotente para a demonstração do portal."
 
+    def add_arguments(self, parser: Any) -> None:
+        parser.add_argument(
+            "--sync-credentials",
+            action="store_true",
+            help=(
+                "Atualiza as senhas dos usuários demonstrativos já existentes a partir "
+                "das variáveis de ambiente. Sem esta opção, senhas existentes são preservadas."
+            ),
+        )
+        parser.add_argument(
+            "--refresh-certificate-dates",
+            action="store_true",
+            help=(
+                "Reposiciona explicitamente as validades dos certificados em relação à data "
+                "atual. Sem esta opção, validades já persistidas são preservadas."
+            ),
+        )
+
     @transaction.atomic
     def handle(self, *args: object, **options: object) -> None:
+        sync_credentials = bool(options["sync_credentials"])
+        refresh_certificate_dates = bool(options["refresh_certificate_dates"])
         areas: dict[str, Area] = {}
         for code, name, description in AREAS:
             areas[code], _ = Area.objects.update_or_create(
@@ -367,6 +387,7 @@ class Command(BaseCommand):
             password=os.getenv("DEMO_ADMIN_PASSWORD", ""),
             display_name="Administrador SheepContabil",
             role=UserRole.ADMINISTRATOR,
+            sync_credentials=sync_credentials,
         )
         operator = self._upsert_user(
             username=os.getenv("DEMO_OPERATOR_USERNAME", "operador.processos"),
@@ -377,6 +398,7 @@ class Command(BaseCommand):
             password=os.getenv("DEMO_OPERATOR_PASSWORD", ""),
             display_name="Operador de Processos",
             role=UserRole.OPERATOR,
+            sync_credentials=sync_credentials,
         )
         societary_operator = self._upsert_user(
             username=os.getenv("DEMO_SOCIETARY_OPERATOR_USERNAME", "operador.societario"),
@@ -391,6 +413,7 @@ class Command(BaseCommand):
             or "",
             display_name="Operador Societário",
             role=UserRole.OPERATOR,
+            sync_credentials=sync_credentials,
         )
         fiscal_operator = self._upsert_user(
             username=os.getenv("DEMO_FISCAL_OPERATOR_USERNAME", "operador.fiscal"),
@@ -405,6 +428,7 @@ class Command(BaseCommand):
             or "",
             display_name="Operador Fiscal",
             role=UserRole.OPERATOR,
+            sync_credentials=sync_credentials,
         )
         technology_operator = self._upsert_user(
             username=os.getenv("DEMO_TECHNOLOGY_OPERATOR_USERNAME", "operador.tecnologia"),
@@ -417,6 +441,7 @@ class Command(BaseCommand):
             or "",
             display_name="Operador de Tecnologia",
             role=UserRole.OPERATOR,
+            sync_credentials=sync_credentials,
         )
         if operator:
             AreaMembership.objects.get_or_create(user=operator, area=areas["processos"])
@@ -439,7 +464,7 @@ class Command(BaseCommand):
         if admin:
             self._seed_runs(modules, admin)
             self._seed_sc06_briefings(modules, admin, template_version)
-        self._seed_certificates()
+        self._seed_certificates(refresh_dates=refresh_certificate_dates)
         self._seed_fiscal_clients()
         self._seed_sc05_clients()
 
@@ -466,16 +491,18 @@ class Command(BaseCommand):
         password: str,
         display_name: str,
         role: str,
+        sync_credentials: bool,
     ) -> User | None:
         if not password:
             return None
-        user, _ = User.objects.get_or_create(username=username, defaults={"email": email})
+        user, created = User.objects.get_or_create(username=username, defaults={"email": email})
         user.email = email
         user.display_name = display_name
         user.role = role
         user.is_active = True
         user.is_staff = role == UserRole.ADMINISTRATOR
-        user.set_password(password)
+        if created or sync_credentials:
+            user.set_password(password)
         user.save()
         return user
 
@@ -666,7 +693,7 @@ class Command(BaseCommand):
             },
         )
 
-    def _seed_certificates(self) -> None:
+    def _seed_certificates(self, *, refresh_dates: bool) -> None:
         today = timezone.localdate()
         examples: tuple[dict[str, Any], ...] = (
             {
@@ -746,10 +773,29 @@ class Command(BaseCommand):
                 "valid_until": today + timedelta(days=25),
                 "status": CertificateStatus.REPLACED,
             },
+            {
+                "serial_number": "DEMO-CERT-008",
+                "client_name": "Mariana Souza Demo",
+                "client_document": "22233344455",
+                "responsible_name": "Mariana Souza",
+                "contact_email": "mariana.souza@contatos.example.test",
+                "contact_phone": "+55 11 98888-8080",
+                "preferred_channel": CommunicationChannel.EMAIL,
+                "valid_until": today + timedelta(days=45),
+                "status": CertificateStatus.ACTIVE,
+            },
         )
         for definition in examples:
             payload = dict(definition)
             serial_number = str(payload.pop("serial_number"))
+            if not refresh_dates:
+                persisted_validity = (
+                    DigitalCertificate.objects.filter(serial_number=serial_number)
+                    .values_list("valid_until", flat=True)
+                    .first()
+                )
+                if persisted_validity is not None:
+                    payload["valid_until"] = persisted_validity
             DigitalCertificate.objects.update_or_create(
                 serial_number=serial_number,
                 defaults=payload,
