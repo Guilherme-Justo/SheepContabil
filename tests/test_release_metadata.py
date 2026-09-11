@@ -30,3 +30,16 @@ def test_project_versions_are_consistent() -> None:
 
     assert len(set(versions.values())) == 1, versions
     assert SEMVER.fullmatch(next(iter(versions.values()))) is not None
+
+
+def test_current_version_has_release_artifacts() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    version = pyproject["project"]["version"]
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    release_path = ROOT / "docs" / f"release-v{version}.md"
+
+    assert release_path.is_file()
+    assert f"# Release v{version}" in release_path.read_text(encoding="utf-8")
+    assert f"## [{version}]" in changelog
+    assert f"v{version}" in readme
