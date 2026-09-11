@@ -375,7 +375,7 @@ Rotas canônicas, úteis para preparar as abas sem depender da posição dos car
 - [ ] Executar `python src/manage.py prepare_demo` e confirmar `Resultado: READY`.
 - [ ] Confirmar que a Aurora está ativa, não existem execuções SC-05 parciais/ativas e o SC-20 usa entrega simulada.
 - [ ] Ter a execução mais recente do CI verde e o arquivo `docs/architecture.md` abertos para consulta técnica se solicitado.
-- [ ] Confirmar a tag `v1.0.0`, os health checks e a linha do tempo de uma execução antes de iniciar.
+- [ ] Confirmar a tag `v1.1.0`, os health checks e a linha do tempo de uma execução antes de iniciar.
 - [ ] Lembrar que somente o administrador vê IDs técnicos; operadores veem a mesma trilha sem esses campos.
 - [ ] Baixar o PDF concluído da Aurora em um navegador convencional e confirmar que o arquivo abre.
 - [ ] Manter as seis execuções funcionais de contingência indicadas por `prepare_demo` em abas preparadas.
