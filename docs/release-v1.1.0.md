@@ -4,13 +4,15 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | Release Candidate em validação |
+| Estado | Release Candidate validado; tag e GitHub Release pendentes |
 | Versão | `1.1.0` |
 | Data de preparação | 11/09/2026 |
 | Tag anterior | [`v1.0.0`](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.0.0) |
 | Commit anterior à preparação | [`7c44bf1`](https://github.com/Guilherme-Justo/SheepContabil/commit/7c44bf103d5428030bc1f1ed1af7feb794ce75e6) |
 | Branch de preparação | `codex/release-v1.1.0` |
-| Tag candidata | `v1.1.0` — pendente de validação externa |
+| PR de promoção | [#52](https://github.com/Guilherme-Justo/SheepContabil/pull/52) |
+| Commit funcional validado | [`c584237`](https://github.com/Guilherme-Justo/SheepContabil/commit/c584237e1148c0c207ad4ebd682d175f8d818829) |
+| Tag candidata | `v1.1.0` — pendente de publicação |
 | URL pública | [web-production-8f055.up.railway.app](https://web-production-8f055.up.railway.app) |
 
 ## Objetivo
@@ -73,27 +75,61 @@ compatíveis com a `1.0.0`.
 - [x] Contratos Playwright aprovados com Chromium real.
 - [x] Assets do navegador recompilados sem diferença inesperada.
 - [x] Configuração do Docker Compose validada.
-- [ ] Imagem de produção construída pelo CI.
+- [x] Imagem de produção construída pelo CI.
 
 Resultado local de 11/09/2026: `320` testes coletados, `319 passed`, `1 skipped` por exigir o
 PostgreSQL efêmero do CI e cobertura de `86,04%`, acima do piso de `75%`. Os oito contratos
 Playwright passaram com Chromium real. `uv 0.12.6` aprovou o lock, sincronizou `sheepcontabil==1.1.0`
 em modo frozen e confirmou `84` pacotes compatíveis. O npm reinstalou e auditou `47` pacotes sem
 vulnerabilidades. Build dos assets, Ruff, formatação de `126` arquivos, Mypy em `75` fontes, checks
-Django, ausência de migrations, sintaxe POSIX, Compose e `git diff --check` também passaram. A
-migration em PostgreSQL com dados preexistentes e a construção da imagem permanecem gates
-obrigatórios do CI.
+Django, ausência de migrations, sintaxe POSIX, Compose e `git diff --check` também passaram. O CI
+repetiu os gates e aprovou tanto a migration em PostgreSQL com dados preexistentes quanto a
+construção da imagem de produção.
 
 ### Promoção externa
 
-- [ ] PR da release aprovado por todos os jobs obrigatórios.
-- [ ] Merge realizado na `main` sem bypass do CI.
-- [ ] Deploy automático de `web`, `worker` e `scheduler` em `SUCCESS` no mesmo SHA.
-- [ ] `/health/live`, `/health/ready` e a tela de login respondem HTTP 200.
-- [ ] Preflight autenticado confirma os quatro módulos sem erro de console ou página.
-- [ ] Evidência final de CI, deploy e smoke incorporada ao documento.
+- [x] PR da release aprovado por todos os jobs obrigatórios.
+- [x] Merge realizado na `main` sem bypass do CI.
+- [x] Deploy automático de `web`, `worker` e `scheduler` em `SUCCESS` no mesmo SHA.
+- [x] `/health/live`, `/health/ready` e a tela de login respondem HTTP 200.
+- [x] Preflight autenticado confirma os quatro módulos sem erro de console ou página.
+- [x] Evidência final de CI, deploy e smoke incorporada ao documento.
 - [ ] Tag anotada `v1.1.0` aponta para o commit exato validado em produção.
 - [ ] GitHub Release publicada a partir da mesma tag, sem ser draft ou prerelease.
+
+## Evidência externa de 11/09/2026
+
+A PR [#52](https://github.com/Guilherme-Justo/SheepContabil/pull/52) foi integrada somente após o
+workflow [CI `34629635295`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/34629635295)
+aprovar `Quality and tests` em 2min08s e `Container build` em 1min28s. O push resultante para a
+`main`, no commit [`c584237`](https://github.com/Guilherme-Justo/SheepContabil/commit/c584237e1148c0c207ad4ebd682d175f8d818829),
+disparou um segundo workflow, [CI `34630024704`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/34630024704),
+que aprovou `Quality and tests` em 2min14s e `Container build` em 56s. O gate funcional incluiu a
+migration contra PostgreSQL com dados preexistentes; nenhum job foi ignorado.
+
+O Railway criou automaticamente os três deployments em `WAITING` às 17:51:21 UTC, imediatamente
+após o merge, sem comando de deploy manual. Eles transitaram por construção e implantação até
+`SUCCESS`, todos vinculados exatamente a `c584237e1148c0c207ad4ebd682d175f8d818829`:
+
+| Serviço | Deployment | Estado final |
+| --- | --- | --- |
+| `web` | `f501989f-c153-440b-b2f9-f6b0bbd40ca7` | `SUCCESS` |
+| `worker` | `a67e7b25-66eb-44f4-b116-c658c5a942f7` | `SUCCESS` |
+| `scheduler` | `a5b5bf4f-f625-43d2-abc8-aefa0745433f` | `SUCCESS` |
+
+Depois do deploy, as três consultas públicas retornaram HTTP 200:
+
+| Rota | `X-Request-ID` |
+| --- | --- |
+| `/health/live` | `f8240b21-31ce-430a-86c6-5ae12b35b7ed` |
+| `/health/ready` | `ed5c58a8-1394-459f-9f08-000e4e38e351` |
+| `/conta/entrar/` | `59876812-b999-43d5-8ba5-3c3c3b170de1` |
+
+O preflight autenticado terminou em 23,58s: o login administrativo sintético foi aceito, as rotas
+canônicas de SC-04, SC-05, SC-06 e SC-20 responderam HTTP 200 e não houve erro de console nem de
+página. Esse smoke foi deliberadamente somente leitura. Ele não disparou automação, não alterou
+preferência ou estado, não persistiu atendimento e não abriu integração externa. Nenhum dado ou
+contato real foi utilizado.
 
 ## Evidência operacional anterior à promoção
 
