@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 | --- | --- |
-| Estado | Release Candidate validado; tag e GitHub Release pendentes |
+| Estado | Release estável publicada |
 | Versão | `1.1.0` |
 | Data de preparação | 11/09/2026 |
 | Tag anterior | [`v1.0.0`](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.0.0) |
@@ -12,7 +12,10 @@
 | Branch de preparação | `codex/release-v1.1.0` |
 | PR de promoção | [#52](https://github.com/Guilherme-Justo/SheepContabil/pull/52) |
 | Commit funcional validado | [`c584237`](https://github.com/Guilherme-Justo/SheepContabil/commit/c584237e1148c0c207ad4ebd682d175f8d818829) |
-| Tag candidata | `v1.1.0` — pendente de publicação |
+| PR de evidências | [#53](https://github.com/Guilherme-Justo/SheepContabil/pull/53) |
+| Commit da tag | [`4df1f40`](https://github.com/Guilherme-Justo/SheepContabil/commit/4df1f40b9397ff6085ef46ae97cbc8f0d33211ad) |
+| Tag | [`v1.1.0`](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.1.0) |
+| GitHub Release | [SheepContabil v1.1.0](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.1.0) |
 | URL pública | [web-production-8f055.up.railway.app](https://web-production-8f055.up.railway.app) |
 
 ## Objetivo
@@ -52,14 +55,14 @@ compatíveis com a `1.0.0`.
 - Scripts que dependiam da rotação implícita de senhas ou do reposicionamento implícito de
   validades devem passar as novas opções deliberadamente; a execução padrão agora é conservadora.
 
-## Gates do Release Candidate
+## Gates da publicação
 
 ### Integridade do artefato
 
 - [x] A branch parte da `main` limpa e sincronizada.
 - [x] `pyproject.toml`, `uv.lock`, `package.json` e `package-lock.json` declaram `1.1.0`.
 - [x] O changelog congela o delta completo desde `v1.0.0`.
-- [x] README identifica a candidata sem declarar antecipadamente a tag como publicada.
+- [x] README identifica a release estável publicada sem reescrever o histórico anterior.
 - [x] O documento histórico da `v1.0.0` permanece inalterado.
 - [x] Nenhum segredo ou dado pessoal foi acrescentado ao repositório.
 - [x] `railway config plan`, com CLI `5.49.6`, confirma ausência de mudança na infraestrutura.
@@ -94,8 +97,8 @@ construção da imagem de produção.
 - [x] `/health/live`, `/health/ready` e a tela de login respondem HTTP 200.
 - [x] Preflight autenticado confirma os quatro módulos sem erro de console ou página.
 - [x] Evidência final de CI, deploy e smoke incorporada ao documento.
-- [ ] Tag anotada `v1.1.0` aponta para o commit exato validado em produção.
-- [ ] GitHub Release publicada a partir da mesma tag, sem ser draft ou prerelease.
+- [x] Tag anotada `v1.1.0` aponta para o commit exato validado em produção.
+- [x] GitHub Release publicada a partir da mesma tag, sem ser draft ou prerelease.
 
 ## Evidência externa de 11/09/2026
 
@@ -131,6 +134,31 @@ página. Esse smoke foi deliberadamente somente leitura. Ele não disparou autom
 preferência ou estado, não persistiu atendimento e não abriu integração externa. Nenhum dado ou
 contato real foi utilizado.
 
+O fechamento documental passou pela PR
+[#53](https://github.com/Guilherme-Justo/SheepContabil/pull/53): o workflow
+[CI `34631068531`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/34631068531)
+aprovou `Quality and tests` em 2min05s e `Container build` em 54s. Seu merge gerou o commit final
+[`4df1f40`](https://github.com/Guilherme-Justo/SheepContabil/commit/4df1f40b9397ff6085ef46ae97cbc8f0d33211ad),
+e o workflow de `main`
+[CI `34631404194`](https://github.com/Guilherme-Justo/SheepContabil/actions/runs/34631404194)
+repetiu os jobs em 2min26s e 1min04s, respectivamente.
+
+O mesmo merge criou automaticamente e concluiu em `SUCCESS` os deployments finais de `web`
+(`aa9b44dd-b08c-4d1f-9658-841f2f007026`), `worker`
+(`eb05a78c-3f24-4bfc-b56a-7af67f5c5615`) e `scheduler`
+(`e8cf218c-2964-4958-aec1-60e03b6e3a6d`), todos no SHA `4df1f40`. O smoke final retornou HTTP 200
+com os `X-Request-ID` `a4bfb225-0a59-4fbb-82ef-4169a7696718` em `/health/live`,
+`6ebc8c2b-0396-4f29-8157-29b41fb2d60f` em `/health/ready` e
+`c8dfc74a-500c-4faa-9be3-3a8513e2b736` em `/conta/entrar/`. O preflight autenticado repetido no
+deployment final carregou os quatro módulos em 21,81s, novamente sem erro de console ou página e
+sem mutação.
+
+A tag anotada [`v1.1.0`](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.1.0)
+resolve para `4df1f40b9397ff6085ef46ae97cbc8f0d33211ad`. A
+[GitHub Release](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.1.0) foi publicada
+em 11/09/2026 às 18:15:33 UTC como estável — não draft e não prerelease — com escopo, validações,
+deployments, smoke e limitações conhecidas.
+
 ## Evidência operacional anterior à promoção
 
 O baseline funcional `7c44bf1` já foi exercitado integralmente em produção em 10/09/2026. O roteiro
@@ -139,8 +167,8 @@ terminou em `PASSED`, sem erro de console ou página, e está registrado em
 restaurado a `Ativo`, o atendimento inválido do SC-06 não foi persistido, a segunda execução do
 SC-20 não criou tentativa adicional e nenhum link externo foi aberto.
 
-Essa evidência reduz o risco do candidato, mas não substitui a validação do commit final. Depois do
-merge do PR da release, os três deployments, os health checks e o preflight autenticado devem ser
+Essa evidência reduziu o risco da candidata, mas não substituiu a validação do commit final. Depois
+do merge do PR da release, os três deployments, os health checks e o preflight autenticado foram
 confirmados novamente antes da tag.
 
 ## Regra de publicação

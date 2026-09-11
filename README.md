@@ -2,8 +2,7 @@
 
 Portal único para quatro automações contábeis do desafio Sheep Technology. O projeto parte de pouco contexto, registra as premissas adotadas e mantém a lógica real atrás de fronteiras externas simuladas.
 
-> Estado do código: **candidata à release `v1.1.0`**, construída sobre a release estável
-> [`v1.0.0`](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.0.0) — os quatro processos
+> Estado do código: **release estável [`v1.1.0`](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.1.0) publicada** — os quatro processos
 > selecionados estão implementados, implantados e validados no ambiente público. A base inclui PostgreSQL, Celery/Redis,
 > RPA Playwright real sobre três portais sintéticos, classificação por IA atrás de adapter, storage
 > privado e rastreabilidade ponta a ponta com eventos imutáveis e IDs correlacionados.
@@ -15,6 +14,7 @@ Portal único para quatro automações contábeis do desafio Sheep Technology. O
 | Portal HTTPS | [web-production-8f055.up.railway.app](https://web-production-8f055.up.railway.app) |
 | Repositório público | [Guilherme-Justo/SheepContabil](https://github.com/Guilherme-Justo/SheepContabil) |
 | Integração contínua | [GitHub Actions](https://github.com/Guilherme-Justo/SheepContabil/actions/workflows/ci.yml) |
+| Release estável | [SheepContabil v1.1.0](https://github.com/Guilherme-Justo/SheepContabil/releases/tag/v1.1.0) |
 
 Em 2026-08-31, o deploy automático GitHub → Railway foi recuperado e validado pelo [PR `#3`](https://github.com/Guilherme-Justo/SheepContabil/pull/3): o CI terminou verde e `web`, `worker` e `scheduler` aguardaram sua conclusão antes de publicar pela integração nativa.
 
@@ -187,12 +187,13 @@ ausência de migrations novas, sintaxe POSIX, locks Python/Node, assets e Compos
 `npm ci` reportou zero vulnerabilidades e `uv pip check` confirmou dependências compatíveis. O Docker
 Desktop local estava desligado, portanto a imagem do RC permanece como gate obrigatório do CI.
 
-Na preparação local da candidata `1.1.0`, a suíte cresceu para `320` testes: `319` passaram, os oito
+Na validação local da release `1.1.0`, a suíte cresceu para `320` testes: `319` passaram, os oito
 contratos Playwright usaram Chromium real e o único skip permaneceu reservado ao PostgreSQL do CI.
 A cobertura chegou a `86,04%`. Locks, instalações congeladas, assets, Ruff, formatação, Mypy,
 checks Django, ausência de migrations, sintaxe do worker e Compose foram aprovados; o npm auditou
-`47` pacotes sem vulnerabilidades. A migration com dados preexistentes e a imagem continuam como
-gates obrigatórios do CI do PR.
+`47` pacotes sem vulnerabilidades. Os CIs dos PRs `#52` e `#53` e da `main` aprovaram a migration
+com dados preexistentes e a imagem de produção; o autodeploy e o preflight autenticado também
+passaram antes da tag.
 
 ## Estrutura
 
@@ -233,8 +234,8 @@ tests/                       autenticação, autorização e saúde
 - [`docs/assumptions.md`](docs/assumptions.md): premissas, dúvidas e riscos.
 - [`docs/deployment.md`](docs/deployment.md): implantação e operação Railway.
 - [`docs/traceability.md`](docs/traceability.md): contrato, segurança, diagnóstico e checklist da trilha unificada.
-- [`docs/release-v1.0.0.md`](docs/release-v1.0.0.md): escopo, gates e evidências da release estável.
-- [`docs/release-v1.1.0.md`](docs/release-v1.1.0.md): delta, gates e promoção da candidata atual.
+- [`docs/release-v1.0.0.md`](docs/release-v1.0.0.md): escopo, gates e evidências da primeira release estável.
+- [`docs/release-v1.1.0.md`](docs/release-v1.1.0.md): delta, gates e evidências da release estável atual.
 - [`docs/adr/`](docs/adr/): decisões arquiteturais versionadas.
 - [`CHANGELOG.md`](CHANGELOG.md): histórico consolidado das releases.
 
