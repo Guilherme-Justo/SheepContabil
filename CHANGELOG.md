@@ -5,6 +5,14 @@ As mudanças relevantes do SheepContabil são registradas neste arquivo. O proje
 
 ## [Não publicado]
 
+Nenhuma mudança registrada.
+
+## [1.1.0] — 2026-09-11
+
+Release de prontidão demonstrativa e operação segura. Mantém os quatro processos e os contratos
+públicos da `1.0.0`, acrescentando um preparo repetível, evidências atuais e proteções contra
+alterações acidentais na massa sintética.
+
 ### Adicionado
 
 - Comando `prepare_demo`, somente leitura por padrão, para conferir o estado operacional dos
@@ -28,6 +36,14 @@ As mudanças relevantes do SheepContabil são registradas neste arquivo. O proje
   o download como anexo e a proteção contra inferência de conteúdo.
 - O preparo operacional nunca apaga execuções, eventos, comunicações, briefings ou artefatos e
   recusa estados SC-05 ativos ou divergentes.
+
+### Compatibilidade e dados
+
+- Não há migration nova, quebra intencional de URL, mudança de RBAC ou novo processo contábil.
+- Ciclos manuais do SC-04 passam a usar marcadores sintéticos próprios; o histórico existente e a
+  deduplicação deliberada dentro de cada lote permanecem preservados.
+- A nova semântica conservadora do `seed_demo` afeta apenas a manutenção da massa demonstrativa:
+  credenciais e validades já persistidas só mudam mediante opções explícitas.
 
 ## [1.0.0] — 2026-09-09
 
@@ -75,5 +91,6 @@ controle sistematizado.
 - Não há breaking change intencional nas URLs públicas ou nos contratos operacionais da versão
   `0.19.1`.
 
-[Não publicado]: https://github.com/Guilherme-Justo/SheepContabil/compare/v1.0.0...HEAD
+[Não publicado]: https://github.com/Guilherme-Justo/SheepContabil/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Guilherme-Justo/SheepContabil/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Guilherme-Justo/SheepContabil/compare/v0.19.1...v1.0.0
